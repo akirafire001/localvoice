@@ -7,11 +7,69 @@ PostgreSQL + PostGISをMVPから採用する。位置付き知識、利用者趣
 
 ### users
 - id UUID PK
+- display_name varchar(100) nullable
+- status varchar(20)（active / disabled）
+- recovery_email text nullable（任意、Googleメールとは独立）
+- recovery_email_verified_at timestamptz nullable
 - locale varchar(10)
 - notification_level varchar(20)
 - detail_mode varchar(20)
 - serendipity_level varchar(20)
 - created_at timestamptz
+
+### auth_identities
+- id UUID PK
+- user_id UUID FK
+- provider varchar(32)（MVP: google）
+- subject varchar(255)（検証済みGoogle sub）
+- created_at timestamptz
+
+Unique: `(provider, subject)`, `(user_id, provider)`。メールアドレスをGoogle識別子として使わず、メール一致で自動連携しない。
+
+### password_credentials
+- user_id UUID PK/FK
+- login_id varchar(100)
+- login_id_normalized varchar(100) UNIQUE NOT NULL
+- password_hash text NOT NULL（Argon2id、ソルトとパラメータを含む）
+- updated_at timestamptz
+
+Googleのみの利用者には行を作らない。ログインIDと表示名・復旧用メール・内部UUIDは別の値。IDの文字/長さ/正規化ルールを登録・ログイン・DBで統一する。
+
+### auth_sessions
+- id UUID PK
+- user_id UUID FK
+- access_token_hash varchar(64) UNIQUE
+- access_expires_at timestamptz
+- authenticated_via varchar(32)
+- last_reauthenticated_at timestamptz
+- expires_at timestamptz（ログインから30日の絶対期限、初期値）
+- revoked_at timestamptz nullable
+- created_at timestamptz
+
+旅行セッションとは別のログインセッション。access tokenはランダム値のSHA-256ハッシュで検索し、本人・期限・失効状態を照合する。refresh交換時は新access tokenのハッシュと期限を更新する。
+
+### auth_refresh_tokens
+- id UUID PK
+- auth_session_id UUID FK
+- token_hash varchar(64) UNIQUE NOT NULL
+- expires_at timestamptz
+- consumed_at timestamptz nullable
+- replaced_by UUID FK nullable
+- created_at timestamptz
+
+ランダムなrefresh tokenのSHA-256ハッシュのみ保存する。一回使用後も絶対期限まではハッシュを保持して再利用を検出し、再利用時は親auth_sessionsを失効する。交換はトランザクションで処理する。
+
+### auth_action_tokens
+- id UUID PK
+- user_id UUID FK
+- purpose varchar(32)（verify_email / password_reset）
+- token_hash varchar(64) UNIQUE NOT NULL
+- target_email text nullable（確認対象メール）
+- expires_at timestamptz
+- consumed_at timestamptz nullable
+- created_at timestamptz
+
+メール確認・再設定tokenは用途・user_id・対象メールに紐づけ、短期限・一回限りで検証する。メール変更依頼の再発行時は旧確認tokenを失効する。password_resetは既存password_credentialsがある場合だけ発行する。
 
 ### user_interests
 - user_id UUID FK
@@ -163,6 +221,8 @@ LIMIT 100;
 ```
 
 ## データ保持
+パスワード・Google ID token・LocalVoice tokenの平文をDB/ログに保存しない。ログインID、Google sub、内部user_idの対応を認証テーブルで管理する。認証・所有者チェックは[認証設計](authentication-design-v0.1.md)に従う。アカウント削除時は本人の認証情報・旅行・精密位置履歴を削除し、端末キャッシュへの反映とバックアップの削除方針を公開前に定義する。
+
 `context_snapshots` はプライバシー上のリスクが高いため保持期間を設定する。PoCでは分析後に位置を粗粒度化または削除できるようにする。`notification_history` はプロダクト改善に重要なので、位置生ログとは分離する。
 
 地図用の端末キャッシュにも同じ保持方針を適用する。ガイド終了後も保持期間内のセッションは地図で見返せる。PoC開始前に具体的な保存期間を設定し、端末・サーバーの期限切れ記録点を削除する。通信断中の未送信記録点も保持期限後に再送しない。

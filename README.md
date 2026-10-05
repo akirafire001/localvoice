@@ -27,6 +27,7 @@ LocalVoice は、**現在地・移動状況と事前に用意した地域の知�
 | 地理情報 | PostGIS |
 | AI | 必要箇所のみLLM |
 | 音声 | 端末TTSを基本 |
+| 認証 | Googleログイン / ID・パスワード |
 
 距離計算、速度・方向判定、候補抽出、通知間隔、重複排除、興味スコア等は通常のプログラムで処理し、人間的な判断が必要な部分にLLMを利用します。
 
@@ -49,10 +50,12 @@ LocalVoice は、**現在地・移動状況と事前に用意した地域の知�
 - [API設計 v0.1](docs/api-design-v0.1.md)
 - [Flutter画面・UX設計 v0.1](docs/flutter-ux-design-v0.1.md)
 - [地図方式の比較検討 v0.1（推奨案）](docs/map-provider-comparison-v0.1.md)
+- [認証設計 v0.1](docs/authentication-design-v0.1.md)
 
 ## MVP方針
 
 - PostgreSQL + PostGISをMVPから利用
+- GoogleログインとID・パスワードログインをMVPから用意し、個人データは本人だけが取得・変更できるようにする
 - 端末TTSを優先しTTS API原価を抑える
 - GPS生データを毎秒サーバー送信しない
 - 現在地とガイドセッション中の移動履歴を地図表示する

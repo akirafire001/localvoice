@@ -5,6 +5,47 @@ Base: `/api/v1`
 ## 共通
 JSON、UTF-8。日時はISO 8601 offset付き。IDはUUID。エラーは `{code,message,details}`。
 
+## 認証（MVP必須）
+
+認証方式はGoogleログインとLocalVoiceのID・パスワード。[認証設計](authentication-design-v0.1.md)を正本とする。IDはメールアドレスとは別のログインID。認証・復旧用の公開エンドポイント以外は `Authorization: Bearer <LocalVoice access token>` を必須とする。
+
+| Method / Path | 内容・主要入力 |
+| --- | --- |
+| POST /auth/register | ID登録: login_id, password, recovery_email（任意） |
+| POST /auth/login | IDログイン: login_id, password |
+| POST /auth/google | Google ID token検証とログイン/初回登録: id_token |
+| POST /auth/refresh | LocalVoice token更新: refresh_token |
+| POST /auth/logout | 現在のログインセッション失効（access tokenまたは対応するrefresh tokenで本人確認） |
+| POST /auth/reauthenticate | 直近の再認証を記録: passwordまたは新しいgoogle_id_token。必ず現在のuser_idに一致する方式を検証 |
+| GET /users/me | 内部ID、表示名、利用可能なログイン方法、復旧用メールの確認状態 |
+| POST /users/me/auth/google | 直近の再認証と検証済みid_tokenでGoogleを連携 |
+| DELETE /users/me/auth/google | 直近の再認証後に解除。最後のログイン手段なら拒否 |
+| PUT /users/me/auth/password | 直近の再認証後にID・パスワード追加/パスワード変更。login_id, password。既存IDの変更はMVP外 |
+| POST /users/me/recovery-email | 直近の再認証後に任意メールの確認送信: email |
+| POST /auth/email/verify | 期限付き・一回限りのtokenで復旧用メールを確認 |
+| POST /auth/password/reset-request | login_id指定。確認済み復旧用メールにのみ送信 |
+| POST /auth/password/reset | 一回限りのtoken, new_password。既存password資格情報だけを変更し、全セッションを失効 |
+| DELETE /users/me | 直近の再認証後にアカウントと本人の履歴を削除 |
+
+ログイン/Google/登録/refreshの成功応答:
+```json
+{
+ "user":{"id":"uuid","display_name":"..."},
+ "access_token":"opaque-random-token",
+ "token_type":"Bearer",
+ "expires_in":900,
+ "refresh_token":"opaque-random-refresh-token"
+}
+```
+
+access tokenは15分、refresh tokenはログインから30日の絶対期限を初期値とする。サーバーにはtokenのハッシュだけを保存する。refresh交換時は旧tokenを一回限りで消費し、再利用時はそのログインセッション全体を失効する。ログインセッションとtripセッションを区別する。
+
+Google ID tokenの署名・issuer・audience・期限を検証し、subから内部user_idを確定する。メール一致で自動統合しない。既に別user_idへ紐づくGoogleを追加する場合は409。ログイン失敗はIDの存在を明かさない共通401、レート超過は429とする。reset-requestはID/メールの存在・未確認・Googleのみの場合も同じ202で返し、送信したかを明かさない。
+
+PUT /users/me/auth/passwordの成功、パスワード再設定、アカウント削除では全ログインセッションを失効する。再ログイン後に新tokenを取得する。
+
+trip/track/context/historyだけでなく、feedback・participants・一時指示の所有者も親tripから確認する。user_idを本文で指定して他人のデータを操作することはできない。
+
 ## POST /trips
 旅行/散歩セッション開始。
 
@@ -127,9 +168,9 @@ Responseは構造化されたoverrideとUI表示用ラベルを返す。曖昧�
 
 ## セキュリティ
 - 本番はHTTPS必須
-- 認証方式はPoC段階では簡略化可能だが、公開時はアクセストークン必須
-- trip_idだけで他人の位置履歴を読めない認可を必須化
-- APIログに精密位置を無条件出力しない
+- MVPからGoogle / ID・パスワード認証、LocalVoice token検証を必須とする。PoCでも共有ユーザーや認可省略で個人データを扱わない
+- trip_id/history_idだけで他人のデータを参照・更新できないよう、全個人データAPIで認証済みuser_idと親tripの所有者を照合する
+- APIログに精密位置、パスワード、Google ID token、Authorization header、refresh/reset tokenを無条件出力しない。エラー・分析ログでも認証情報をマスクする
 
 ## 冪等性/再送
 モバイル通信断を想定し、contextの `client_event_id`（UUID）をMVPで必須にする。端末は間引いた記録点を送信前にローカル保存し、通信回復後も同じIDとobserved_atで再送する。サーバーは `(trip_session_id, client_event_id)` でcontext_snapshotsの重複を防ぎ、同一イベント再送でnotification_historyを二重生成・再通知しない。再送時はguideを返さず `guide:null`、decision.reason=`duplicate_event` とする。過去時刻の未処理点のうちガイド対象の鮮度閾値を超えた点は履歴保存のみ行い、現在のガイド選択・移動状態を巻き戻さない。鮮度閾値はPoCで調整する。同じIDで異なる内容を送った場合は競合エラーとする。セッション終了後も保持期間内の未送信点は履歴として受け付け、ガイドは生成しない。保持期限後の点は受け付けず、期限切れを返す。

@@ -31,6 +31,8 @@
 19. 事前生成した英語コンテンツ
 20. 最低限の利用ログ/コスト計測
 21. 現在地とセッション中の移動履歴の地図表示（終了後の見返しを含む）
+22. Google / ID・パスワード認証、登録・ログアウト・復旧・連携
+23. 個人データの所有者チェックとアプリ内アカウント削除
 
 ### P1: PoCで余力があれば
 - 自然言語による一時指示
@@ -62,6 +64,7 @@ Flutter App
         │ HTTPS/JSON
         ▼
 Flask API
+  ├─ Authentication/Authorization Service
   ├─ Context Service
   ├─ Candidate Service
   ├─ Ranking Service
@@ -80,7 +83,10 @@ PostgreSQL + PostGIS
 ## 4. 主要データモデル
 
 ### users
-`id, locale, notification_level, detail_mode, serendipity_level, created_at`
+`id, display_name, status, recovery_email, recovery_email_verified_at, locale, notification_level, detail_mode, serendipity_level, created_at`
+
+### 認証データ
+`auth_identities`, `password_credentials`, `auth_sessions`, `auth_refresh_tokens`, `auth_action_tokens` を利用する。GoogleのsubとLocalVoiceの正規化login_idを内部user_idへ紐づけ、パスワードはArgon2id、セッションtokenはランダム値のハッシュとして保存する。[認証設計](authentication-design-v0.1.md)・[Database設計](database-design-v0.1.md)参照。
 
 ### user_interests
 `user_id, category, explicit_score, learned_score, knowledge_score, confidence, updated_at`
@@ -200,6 +206,12 @@ MVPの自動分類は `stationary / walking / cycling / motorized / high_speed` 
 
 ## 11. Flutter画面
 
+### Login / Account（P0）
+- Googleでログイン / ID・パスワードでログイン / ID新規登録
+- 任意の復旧用メール登録・確認、パスワード再設定
+- 設定からログイン方法の連携・解除、ログアウト、アカウント削除
+- 認証切れからの復帰、アカウント切替時の位置履歴隔離
+
 ### Home
 - 「ガイドを開始」
 - 現在の旅行/散歩目的
@@ -241,6 +253,13 @@ MVPの自動分類は `stationary / walking / cycling / motorized / high_speed` 
 - 言語/居住地域/簡易趣向
 
 ## 12. API設計
+
+### Authentication / Account
+- `POST /api/v1/auth/register`, `/auth/login`, `/auth/google`
+- `POST /api/v1/auth/refresh`, `/auth/logout`, `/auth/reauthenticate`
+- `GET/DELETE /api/v1/users/me`
+- Google連携・解除、ID/パスワード追加・変更、復旧用メール確認・パスワード再設定
+- 公開する認証・復旧エンドポイント以外はLocalVoice tokenによる本人認証とデータ所有者の検証を必須にする。[API設計](api-design-v0.1.md)参照。
 
 ### Session
 - `POST /api/v1/trips` 旅行開始
@@ -339,6 +358,8 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 
 ## 20. プライバシー
 
+GoogleログインとID・パスワードログインをMVPから提供する。Google ID tokenをサーバーで検証してLocalVoiceのログインセッションを発行する。旅行セッションとは別に、ログインセッションの期限・refresh・失効を管理する。ログアウト/アカウント切替時は位置取得を停止し、キャッシュ・未送信位置をuser_idごとに隔離する。詳細は[認証設計](authentication-design-v0.1.md)。
+
 - 旅行セッション開始時のみ位置利用
 - 位置利用目的を明示
 - 生GPS履歴の保存期間を設定し、地図用の端末キャッシュとサーバー記録にも同じ保持方針を適用
@@ -368,6 +389,8 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 
 技術成功だけでなく体験を評価する。
 
+- 両認証方式と連携で同じ本人の履歴を利用でき、他人のtrip/track/feedbackへアクセスできない
+- token更新、通信断、ログアウト、アカウント切替で履歴が混ざらない
 - 8時間利用して致命的な停止がない
 - GPS/バックグラウンド制約で体験が破綻しない
 - 現在地とセッション内の移動履歴を地図で確認でき、通信断・測位欠損・再送・終了後の再表示でも誤った連続経路や重複点を描かない
@@ -380,6 +403,8 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 面白さの合格率はPoC後に数値化する。最初から恣意的な目標値を置かない。
 
 ## 23. 推奨実装順
+
+前提として、schemaに認証テーブルを含め、個人データのAPIを端末から利用する前に認証・認可を実装する。ID・パスワード登録/ログイン、Google ID token検証、token更新/失効、所有者チェックを先行する。Google OAuthクライアント設定は実装時に行う。
 
 1. PostgreSQL + PostGIS schema
 2. KnowledgeItem投入用seed/管理スクリプト
