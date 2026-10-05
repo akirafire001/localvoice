@@ -48,6 +48,7 @@ LocalVoice は、**現在地・移動状況と事前に用意した地域の知�
 - [Database設計 v0.1](docs/database-design-v0.1.md)
 - [API設計 v0.1](docs/api-design-v0.1.md)
 - [Flutter画面・UX設計 v0.1](docs/flutter-ux-design-v0.1.md)
+- [地図方式の比較検討 v0.1（推奨案）](docs/map-provider-comparison-v0.1.md)
 
 ## MVP方針
 
