@@ -30,6 +30,7 @@
 18. 情報の出典・確度表示
 19. 事前生成した英語コンテンツ
 20. 最低限の利用ログ/コスト計測
+21. 現在地とセッション中の移動履歴の地図表示（終了後の見返しを含む）
 
 ### P1: PoCで余力があれば
 - 自然言語による一時指示
@@ -93,9 +94,9 @@ PostgreSQL + PostGIS
 MVPではアカウントを持たない同行者もホスト端末内のプロフィールとして扱える。
 
 ### context_snapshots
-`id, trip_session_id, observed_at, position geography(Point,4326), accuracy_m, speed_mps, course_deg, inferred_transport_mode, confidence, context_json`
+`id, trip_session_id, client_event_id, observed_at, position geography(Point,4326), accuracy_m, speed_mps, course_deg, inferred_transport_mode, confidence, context_json`
 
-位置履歴は保持期間を設定し、不要な生ログを永久保存しない。
+位置履歴は保持期間を設定し、不要な生ログを永久保存しない。`client_event_id` は端末で採番するUUIDで、`(trip_session_id, client_event_id)` を一意にして再送時の記録点・通知の重複を防ぐ。地図用のサーバー履歴は `context_snapshots` を再利用する。
 
 ### knowledge_items
 `id, canonical_key, title, category, body_ja, short_ja, body_en, short_en, position geography(Point,4326), radius_m, interestingness, novelty, confidence_level, fact_type, valid_from, valid_until, metadata_json`
@@ -140,6 +141,7 @@ Flutterから送る例:
 ```json
 {
   "session_id": "uuid",
+  "client_event_id": "uuid",
   "observed_at": "2026-12-28T15:30:00+09:00",
   "location": {"lat": 34.0, "lon": 132.0, "accuracy_m": 12},
   "motion": {"speed_mps": 1.2, "course_deg": 240, "transport_mode": "walking", "confidence": 0.83},
@@ -220,6 +222,13 @@ MVPの自動分類は `stationary / walking / cycling / motorized / high_speed` 
 - 今日通知した内容を時系列表示
 - 再表示/再読み上げ
 
+### Map（P0）
+- ガイド中の端末の最新測位による現在地マーカー、精度円、最終更新時刻
+- セッション内の記録点を時刻順に結んだ移動履歴
+- 現在地へ戻る/移動範囲全体を表示
+- GuideとHistoryから開く。保存期間内の終了済みセッションも選択可能
+- 測位の長い欠損や異常点の前後は線を分断し、道路・線路への補正は行わない
+
 ### Preferences
 - カテゴリ趣向
 - セレンディピティ
@@ -241,6 +250,7 @@ MVPの自動分類は `stationary / walking / cycling / motorized / high_speed` 
 ### Context / Guide
 - `POST /api/v1/trips/{id}/context` ContextSnapshot送信。通知候補がなければ `guide=null`
 - `GET /api/v1/trips/{id}/history`
+- `GET /api/v1/trips/{id}/track` 地図用の時刻順位置履歴。期間指定とカーソルページングに対応
 
 ### Feedback
 - `POST /api/v1/guides/{history_id}/feedback`
@@ -317,11 +327,21 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 
 旅行開始時またはWi-Fi時に、予定地域のKnowledgeItemを端末へ先読み可能な設計にする。MVPではSQLite/FlutterローカルDB等に最近のKnowledgeItemと履歴をキャッシュ。通信断時は既存KnowledgeItemだけで簡易ガイドを継続できることを将来目標とする。
 
+### 19.1 地図用位置履歴
+- ガイド中の最新の現在地は端末の測位値を利用し、サーバーの最終記録点を現在地として扱わない。ガイド終了後は保存済み履歴を表示し、地図の閲覧だけでは新たな測位を開始しない。
+- ContextSnapshot用に間引いた記録点を、送信前に端末へ保存する。移動履歴の記録間隔とサーバー送信頻度を地図のために毎秒へ引き上げない。
+- 各点にセッションID、client_event_id、観測時刻、緯度経度、測位精度を保持する。未送信点は通信回復後に既存context APIへ再送する。
+- サーバーはcontext_snapshotsからtrack APIで履歴を返す。端末はclient_event_idでローカルの未送信点と統合し、observed_at順に描画する。
+- セッションIDと開始/終了時刻を端末に保持し、保存期間内のセッションをMapで選択できるようにする。
+- 通信回復後と終了済みセッションを開く時はtrack APIから履歴を再取得する。ページングカーソルは一覧取得用であり、遅れて届いた記録点を検出する増分同期には使わない。
+- 連続点の時刻差が5分を超える場合は線を分断する（PoC用初期値、調整可能）。異常座標や明らかな測位飛びは描画から除外し、前後の線もつながない。異常判定の精度・速度閾値は実機PoCで調整する。
+- 背景地図のライブラリ/サービスは実装時に選定し、利用条件・帰属表示・API原価・キャッシュ制約を確認する。オフライン背景地図はMVPの必須条件にしない。
+
 ## 20. プライバシー
 
 - 旅行セッション開始時のみ位置利用
 - 位置利用目的を明示
-- 生GPS履歴の保存期間を設定
+- 生GPS履歴の保存期間を設定し、地図用の端末キャッシュとサーバー記録にも同じ保持方針を適用
 - 必要がなければ精密位置履歴を削除/集約
 - 同行者プロフィールは必要最小限
 - 「過去の居住地」等は任意入力
@@ -350,6 +370,7 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 
 - 8時間利用して致命的な停止がない
 - GPS/バックグラウンド制約で体験が破綻しない
+- 現在地とセッション内の移動履歴を地図で確認でき、通信断・測位欠損・再送・終了後の再表示でも誤った連続経路や重複点を描かない
 - 通知が多すぎる/少なすぎるを調整可能
 - 誤情報を事実として断定する重大事故がない
 - 日本語/英語で意味が通る
@@ -367,12 +388,13 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 5. Flutter GPS + Guide画面
 6. Flutter→API ContextSnapshot
 7. 履歴/feedback
-8. OS TTS
-9. バックグラウンド位置
-10. topic boost/セレンディピティ
-11. 英語
-12. TripMemorySummary
-13. LLM再ランキング/表現生成
-14. P1機能
+8. 地図画面と現在地・移動履歴、ローカル記録/track API/再送・重複排除
+9. OS TTS
+10. バックグラウンド位置
+11. topic boost/セレンディピティ
+12. 英語
+13. TripMemorySummary
+14. LLM再ランキング/表現生成
+15. P1機能
 
 重要: 最初からLLMを接続しない。固定KnowledgeItem＋ルールランキングでEnd-to-Endを完成させてからAIを差し込む。これによりAIなしでも成立する部分とAIによる改善量を比較できる。

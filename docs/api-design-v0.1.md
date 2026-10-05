@@ -26,6 +26,7 @@ Response: `201 {"trip_id":"...","started_at":"..."}`
 Request:
 ```json
 {
+ "client_event_id":"9e8629bf-9a1c-4b77-8b2e-563ec9a926f8",
  "observed_at":"2026-12-28T15:30:00+09:00",
  "location":{"lat":34.0,"lon":132.0,"accuracy_m":12},
  "motion":{"speed_mps":1.2,"course_deg":240,"transport_mode":"walking","confidence":0.83},
@@ -61,6 +62,35 @@ Guide:
 
 ## GET /trips/{trip_id}/history
 今日の通知履歴。
+
+## GET /trips/{trip_id}/track
+選択したセッションの地図用移動履歴。保存期間内であれば終了済みセッションも取得可能。サーバーが受信済みのcontext_snapshotsを返し、現在地の取得は端末で行う。
+
+Query:
+- `from` / `until`: 任意の観測時刻範囲（ISO 8601 offset付き、from以上・until未満）
+- `limit`: 1〜1000、既定500
+- `cursor`: 次ページ取得用の不透明カーソル。期間条件はページ間で維持する。
+
+Response:
+```json
+{
+ "trip_id":"uuid",
+ "points":[
+   {
+     "client_event_id":"9e8629bf-9a1c-4b77-8b2e-563ec9a926f8",
+     "observed_at":"2026-12-28T15:30:00+09:00",
+     "location":{"lat":34.0,"lon":132.0,"accuracy_m":12}
+   }
+ ],
+ "next_cursor":null
+}
+```
+
+- 観測時刻と内部IDの昇順で安定したページングを行う。全ページ取得して時刻順に描画する。
+- 記録なし/保存期間後の削除済み履歴は `points:[]`。存在しないセッションと取得権限のないセッションはエラーにする。
+- ページングは一覧取得用。通信回復後は履歴を再取得し、遅れて受信された過去時刻の点を取り込む。
+- 端末はclient_event_idでローカルの未送信点と重複排除する。時刻の長い欠損や異常点は地図側で線を分断し、補正済み道路経路として扱わない。
+- trip_idだけで閲覧を許可せず、セッションの所有者を認証・認可する。
 
 ## POST /guides/{history_id}/feedback
 Request:
@@ -102,7 +132,7 @@ Responseは構造化されたoverrideとUI表示用ラベルを返す。曖昧�
 - APIログに精密位置を無条件出力しない
 
 ## 冪等性/再送
-モバイル通信断を想定し、contextにはclient event idを追加可能にする。同一イベント再送でnotification_historyを二重生成しない。
+モバイル通信断を想定し、contextの `client_event_id`（UUID）をMVPで必須にする。端末は間引いた記録点を送信前にローカル保存し、通信回復後も同じIDとobserved_atで再送する。サーバーは `(trip_session_id, client_event_id)` でcontext_snapshotsの重複を防ぎ、同一イベント再送でnotification_historyを二重生成・再通知しない。再送時はguideを返さず `guide:null`、decision.reason=`duplicate_event` とする。過去時刻の未処理点のうちガイド対象の鮮度閾値を超えた点は履歴保存のみ行い、現在のガイド選択・移動状態を巻き戻さない。鮮度閾値はPoCで調整する。同じIDで異なる内容を送った場合は競合エラーとする。セッション終了後も保持期間内の未送信点は履歴として受け付け、ガイドは生成しない。保持期限後の点は受け付けず、期限切れを返す。
 
 ## Rate control
 端末はサーバー指定 `next_check_after_sec` を尊重する。移動状態が変化した場合は早期送信可能。サーバー側にもrate limitを置く。

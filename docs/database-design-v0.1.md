@@ -44,6 +44,7 @@ PostgreSQL + PostGISをMVPから採用する。位置付き知識、利用者趣
 ### context_snapshots
 - id bigserial PK
 - trip_session_id UUID FK
+- client_event_id UUID NOT NULL（端末採番、再送でも同じ値）
 - observed_at timestamptz
 - position geography(Point,4326)
 - accuracy_m numeric
@@ -53,7 +54,11 @@ PostgreSQL + PostGISをMVPから採用する。位置付き知識、利用者趣
 - confidence numeric
 - context_json jsonb
 
-Index: `GIST(position)`, `(trip_session_id, observed_at desc)`
+Index: `GIST(position)`, `(trip_session_id, observed_at, id)`
+
+Unique: `(trip_session_id, client_event_id)`
+
+MVPの地図用移動履歴はこのテーブルを再利用する。セッションと期間を指定し、`observed_at, id` の昇順で記録点を取得する。緯度経度は `ST_Y(position::geometry)` / `ST_X(position::geometry)` として返す。端末の現在地は最新の端末測位値であり、サーバーの最終記録点とは区別する。
 
 ### knowledge_items
 - id UUID PK
@@ -159,6 +164,8 @@ LIMIT 100;
 
 ## データ保持
 `context_snapshots` はプライバシー上のリスクが高いため保持期間を設定する。PoCでは分析後に位置を粗粒度化または削除できるようにする。`notification_history` はプロダクト改善に重要なので、位置生ログとは分離する。
+
+地図用の端末キャッシュにも同じ保持方針を適用する。ガイド終了後も保持期間内のセッションは地図で見返せる。PoC開始前に具体的な保存期間を設定し、端末・サーバーの期限切れ記録点を削除する。通信断中の未送信記録点も保持期限後に再送しない。
 
 ## 将来拡張
 - knowledge_itemの面/線geometry対応
