@@ -7,19 +7,25 @@ JSON、UTF-8。日時はISO 8601 offset付き。IDはUUID。エラーは `{code,
 
 ## 認証（MVP必須）
 
-認証方式はGoogleログインとLocalVoiceのID・パスワード。[認証設計](authentication-design-v0.1.md)を正本とする。IDはメールアドレスとは別のログインID。認証・復旧用の公開エンドポイント以外は `Authorization: Bearer <LocalVoice access token>` を必須とする。
+認証方式はGoogle・Apple・LocalVoiceのID／パスワードの3方式。[認証設計](authentication-design-v0.1.md)を正本とする。IDはメールアドレスとは別のログインID。認証・復旧用の公開エンドポイントとAppleのプロトコル用コールバック以外は `Authorization: Bearer <LocalVoice access token>` を必須とする。Appleの連携・再認証フローは開始時・完了時にも現在のLocalVoice本人を確認する。
 
 | Method / Path | 内容・主要入力 |
 | --- | --- |
 | POST /auth/register | ID登録: login_id, password, recovery_email（任意） |
 | POST /auth/login | IDログイン: login_id, password |
 | POST /auth/google | Google ID token検証とログイン/初回登録: id_token |
+| POST /auth/apple/start | Apple challenge発行: platform, purpose, app_code_challenge。link/reauthenticateは本人認証必須 |
+| POST /auth/apple | iOSのApple認証結果でログイン/登録: challenge_id, id_token, authorization_code, code_verifier |
+| POST /auth/apple/callback | Android用の登録済みHTTPS戻り先。Appleのform_post（code, id_token, state等）を検証 |
+| POST /auth/apple/complete | Androidの結果引き渡し: challenge_id, handoff_code, code_verifier。link/reauthenticateは開始時と同じ本人認証必須 |
 | POST /auth/refresh | LocalVoice token更新: refresh_token |
 | POST /auth/logout | 現在のログインセッション失効（access tokenまたは対応するrefresh tokenで本人確認） |
-| POST /auth/reauthenticate | 直近の再認証を記録: passwordまたは新しいgoogle_id_token。必ず現在のuser_idに一致する方式を検証 |
+| POST /auth/reauthenticate | 直近の再認証: password / 新しいgoogle_id_token / iOSのApple認証結果（challenge_id, id_token, authorization_code, code_verifier）。Apple challengeのpurposeと本人も照合 |
 | GET /users/me | 内部ID、表示名、利用可能なログイン方法、復旧用メールの確認状態 |
 | POST /users/me/auth/google | 直近の再認証と検証済みid_tokenでGoogleを連携 |
 | DELETE /users/me/auth/google | 直近の再認証後に解除。最後のログイン手段なら拒否 |
+| POST /users/me/auth/apple | iOSのApple連携: 直近の再認証とpurpose=linkのchallenge_id, id_token, authorization_code, code_verifier |
+| DELETE /users/me/auth/apple | 直近の再認証後に解除。最後の手段なら拒否し、Apple tokenのrevokeも実行 |
 | PUT /users/me/auth/password | 直近の再認証後にID・パスワード追加/パスワード変更。login_id, password。既存IDの変更はMVP外 |
 | POST /users/me/recovery-email | 直近の再認証後に任意メールの確認送信: email |
 | POST /auth/email/verify | 期限付き・一回限りのtokenで復旧用メールを確認 |
@@ -27,7 +33,7 @@ JSON、UTF-8。日時はISO 8601 offset付き。IDはUUID。エラーは `{code,
 | POST /auth/password/reset | 一回限りのtoken, new_password。既存password資格情報だけを変更し、全セッションを失効 |
 | DELETE /users/me | 直近の再認証後にアカウントと本人の履歴を削除 |
 
-ログイン/Google/登録/refreshの成功応答:
+ログイン/Google/Apple（purpose=loginの完了）/登録/refreshの成功応答:
 ```json
 {
  "user":{"id":"uuid","display_name":"..."},
@@ -40,7 +46,15 @@ JSON、UTF-8。日時はISO 8601 offset付き。IDはUUID。エラーは `{code,
 
 access tokenは15分、refresh tokenはログインから30日の絶対期限を初期値とする。サーバーにはtokenのハッシュだけを保存する。refresh交換時は旧tokenを一回限りで消費し、再利用時はそのログインセッション全体を失効する。ログインセッションとtripセッションを区別する。
 
-Google ID tokenの署名・issuer・audience・期限を検証し、subから内部user_idを確定する。メール一致で自動統合しない。既に別user_idへ紐づくGoogleを追加する場合は409。ログイン失敗はIDの存在を明かさない共通401、レート超過は429とする。reset-requestはID/メールの存在・未確認・Googleのみの場合も同じ202で返し、送信したかを明かさない。
+Google ID tokenの署名・issuer・audience・期限を検証し、subから内部user_idを確定する。メール一致で自動統合しない。既に別user_idへ紐づくGoogle/Appleを追加する場合は409。ログイン失敗はIDの存在を明かさない共通401、レート超過は429とする。reset-requestはID/メールの存在・未確認・Google/Appleのみの場合も同じ202で返し、送信したかを明かさない。
+
+/auth/appleはpurpose=loginのchallengeのみを受け付け、/users/me/auth/appleはpurpose=link、/auth/reauthenticateのApple分岐はpurpose=reauthenticateに限定する。各完了処理でcode_verifierとnonceを照合し、challengeを原子的に一回だけ消費する。
+
+AppleではApple公開鍵による署名・issuer・設定済みaudience・期限・challengeのnonceを検証し、認可コードをApple token endpointで一度だけ交換する。Webコールバックはstateと登録済み戻り先も確認する。サーバーは処理目的・期待audience・連携/再認証対象user_idをchallengeから決め、端末の任意指定を採用しない。
+
+/auth/apple/startはchallenge_id、nonce、state（Web用）を返し、Androidにはサーバー設定から生成したauthorization_urlも返す。challengeとhandoff codeは短期限・一回限り。callbackはapplication/x-www-form-urlencodedを受け付け、最終的にアプリへ渡すのはhandoff codeだけとする。Apple/LocalVoice tokenを戻り先URLへ載せない。/completeでは開始時のapp_code_challengeとcode_verifierのSHA-256も照合する。purpose=linkなら連携結果、reauthenticateなら再認証結果を返し、loginの場合だけログインセッションを発行する。
+
+Apple解除・ユーザー削除はLocalVoice側を先に失効し、Apple revokeも呼ぶ。一時失敗時は取り消しキューへ移し、202とpending_revocation状態を返す。Apple側の取り消し確認後に完了とし、必要な暗号化tokenを削除する。
 
 PUT /users/me/auth/passwordの成功、パスワード再設定、アカウント削除では全ログインセッションを失効する。再ログイン後に新tokenを取得する。
 
@@ -168,9 +182,9 @@ Responseは構造化されたoverrideとUI表示用ラベルを返す。曖昧�
 
 ## セキュリティ
 - 本番はHTTPS必須
-- MVPからGoogle / ID・パスワード認証、LocalVoice token検証を必須とする。PoCでも共有ユーザーや認可省略で個人データを扱わない
+- MVPからGoogle / Apple / ID・パスワード認証、LocalVoice token検証を必須とする。PoCでも共有ユーザーや認可省略で個人データを扱わない
 - trip_id/history_idだけで他人のデータを参照・更新できないよう、全個人データAPIで認証済みuser_idと親tripの所有者を照合する
-- APIログに精密位置、パスワード、Google ID token、Authorization header、refresh/reset tokenを無条件出力しない。エラー・分析ログでも認証情報をマスクする
+- APIログに精密位置、パスワード、Google/Apple ID token、Apple認可コード・client_secret、Authorization header、refresh/reset/handoff tokenを無条件出力しない。エラー・分析ログでも認証情報をマスクする
 
 ## 冪等性/再送
 モバイル通信断を想定し、contextの `client_event_id`（UUID）をMVPで必須にする。端末は間引いた記録点を送信前にローカル保存し、通信回復後も同じIDとobserved_atで再送する。サーバーは `(trip_session_id, client_event_id)` でcontext_snapshotsの重複を防ぎ、同一イベント再送でnotification_historyを二重生成・再通知しない。再送時はguideを返さず `guide:null`、decision.reason=`duplicate_event` とする。過去時刻の未処理点のうちガイド対象の鮮度閾値を超えた点は履歴保存のみ行い、現在のガイド選択・移動状態を巻き戻さない。鮮度閾値はPoCで調整する。同じIDで異なる内容を送った場合は競合エラーとする。セッション終了後も保持期間内の未送信点は履歴として受け付け、ガイドは生成しない。保持期限後の点は受け付けず、期限切れを返す。

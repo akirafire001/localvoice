@@ -9,7 +9,7 @@ PostgreSQL + PostGISをMVPから採用する。位置付き知識、利用者趣
 - id UUID PK
 - display_name varchar(100) nullable
 - status varchar(20)（active / disabled）
-- recovery_email text nullable（任意、Googleメールとは独立）
+- recovery_email text nullable（任意、Google/Appleメールとは独立）
 - recovery_email_verified_at timestamptz nullable
 - locale varchar(10)
 - notification_level varchar(20)
@@ -20,11 +20,12 @@ PostgreSQL + PostGISをMVPから採用する。位置付き知識、利用者趣
 ### auth_identities
 - id UUID PK
 - user_id UUID FK
-- provider varchar(32)（MVP: google）
-- subject varchar(255)（検証済みGoogle sub）
+- provider varchar(32)（MVP: google / apple）
+- subject varchar(255)（検証済みGoogle/Apple sub）
+- status varchar(32)（active / revoked / pending_revocation）
 - created_at timestamptz
 
-Unique: `(provider, subject)`, `(user_id, provider)`。メールアドレスをGoogle識別子として使わず、メール一致で自動連携しない。
+Unique: `(provider, subject)`, `(user_id, provider)`。メールアドレスをGoogle/Apple識別子として使わず、メール一致で自動連携しない。Appleの非公開中継メールも識別子にはしない。
 
 ### password_credentials
 - user_id UUID PK/FK
@@ -33,7 +34,7 @@ Unique: `(provider, subject)`, `(user_id, provider)`。メールアドレスをG
 - password_hash text NOT NULL（Argon2id、ソルトとパラメータを含む）
 - updated_at timestamptz
 
-Googleのみの利用者には行を作らない。ログインIDと表示名・復旧用メール・内部UUIDは別の値。IDの文字/長さ/正規化ルールを登録・ログイン・DBで統一する。
+Google/Appleだけの利用者には行を作らない。ログインIDと表示名・復旧用メール・内部UUIDは別の値。IDの文字/長さ/正規化ルールを登録・ログイン・DBで統一する。
 
 ### auth_sessions
 - id UUID PK
@@ -58,6 +59,41 @@ Googleのみの利用者には行を作らない。ログインIDと表示名・
 - created_at timestamptz
 
 ランダムなrefresh tokenのSHA-256ハッシュのみ保存する。一回使用後も絶対期限まではハッシュを保持して再利用を検出し、再利用時は親auth_sessionsを失効する。交換はトランザクションで処理する。
+
+### auth_challenges（Apple認証用）
+- id UUID PK
+- purpose varchar(32)（login / link / reauthenticate）
+- user_id UUID FK nullable（連携・再認証時は必須）
+- client_kind varchar(16)（ios / android）
+- expected_audience varchar(255)
+- nonce_hash / state_hash varchar(64)
+- app_code_challenge varchar(64)（引き渡し用code_verifierのSHA-256）
+- result_ciphertext text nullable（Webコールバックの検証済み一時結果）
+- handoff_code_hash varchar(64) nullable
+- expires_at / consumed_at timestamptz
+
+短期限・一回限り。目的と認証済み本人を変更して再利用できない。nativeではnonce、Webではnonce/stateを照合し、Androidのアプリ復帰ではhandoff codeとcode_verifierも検証する。期限切れの一時結果は削除し、交換済みApple tokenが残る場合は取り消し処理へ渡す。
+
+### apple_credentials
+- auth_identity_id UUID PK/FK
+- apple_client_id varchar(255)
+- refresh_token_ciphertext text NOT NULL
+- encryption_key_id varchar(100)
+- last_verified_at timestamptz nullable
+
+Apple側の認証状態確認・revokeに利用するため、refresh tokenを暗号化保存する。暗号鍵はDB外で管理する。LocalVoiceのrefresh tokenのハッシュ保存とは区別する。
+
+### oauth_revocation_jobs
+- id UUID PK
+- provider varchar(32)（MVP: apple）
+- client_id varchar(255)
+- token_ciphertext text
+- encryption_key_id varchar(100)
+- attempts integer
+- next_attempt_at timestamptz
+- created_at timestamptz
+
+Apple解除・アカウント削除時のrevoke一時失敗の再試行用。ユーザー削除後も必要最小限の取り消し処理を続けられるよう、user_idの必須FKは持たない。Apple側の取り消しを確認したら暗号化tokenと処理行を削除する。
 
 ### auth_action_tokens
 - id UUID PK
@@ -221,7 +257,7 @@ LIMIT 100;
 ```
 
 ## データ保持
-パスワード・Google ID token・LocalVoice tokenの平文をDB/ログに保存しない。ログインID、Google sub、内部user_idの対応を認証テーブルで管理する。認証・所有者チェックは[認証設計](authentication-design-v0.1.md)に従う。アカウント削除時は本人の認証情報・旅行・精密位置履歴を削除し、端末キャッシュへの反映とバックアップの削除方針を公開前に定義する。
+パスワード・Google/Apple ID token・LocalVoice tokenの平文をDB/ログに保存しない。ログインID、Google/Apple sub、内部user_idの対応を認証テーブルで管理する。Appleの状態確認・取り消しに必要なrefresh tokenだけは暗号化して保存し、削除時の一時失敗では取り消しキューへ移して、成功後に削除する。認証・所有者チェックは[認証設計](authentication-design-v0.1.md)に従う。アカウント削除時は本人の認証情報・旅行・精密位置履歴を削除し、端末キャッシュへの反映とバックアップの削除方針を公開前に定義する。
 
 `context_snapshots` はプライバシー上のリスクが高いため保持期間を設定する。PoCでは分析後に位置を粗粒度化または削除できるようにする。`notification_history` はプロダクト改善に重要なので、位置生ログとは分離する。
 
