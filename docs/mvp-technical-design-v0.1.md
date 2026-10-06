@@ -3,7 +3,7 @@
 対象: `product-spec-v0.1.md` / `implementation-feasibility-v0.1.md`
 
 ## 1. 目的
-年末の実旅行で「位置と文脈に応じて、知らなかった面白い情報が自然に届く体験」を検証できる最小構成を定義する。全国対応や完全自動化より、宮島・広島・尾道・奈良等の実証対象地域で体験品質を確認することを優先する。
+年末の実旅行で「位置と文脈に応じて、知らなかった面白い情報が自然に届く体験」を検証できる最小構成を定義する。宮島・広島・尾道・奈良等の実証対象地域では事前に作成・レビューしたKnowledgeItemで体験品質の基準を作り、それ以外の場所では実行時にLLMで出典付きのKnowledgeItemを生成して話題を届ける。全ユーザーの全旅行先を事前に作ることはできないため、MVPの最初から実行時のLLMを組み込む。詳細は[リアルタイムLLM設計](realtime-llm-design-v0.1.md)。
 
 初期版はカメラや画像認識を使わない。話題選択の入力は位置情報・移動状況・ユーザーの興味等と事前に準備したKnowledgeItemであり、ユーザーの視界や目の前の対象物を認識することはMVPに含めない。
 
@@ -33,6 +33,9 @@
 21. 現在地とセッション中の移動履歴の地図表示（終了後の見返しを含む）
 22. Google / Apple / ID・パスワード認証、登録・ログアウト・復旧・連携
 23. 個人データの所有者チェックとアプリ内アカウント削除
+24. 実行時LLMによる候補の選択と状況に合わせた語り（黙る判断を含む）
+25. 事前KnowledgeItemのない場所での、出典付きKnowledgeItemの実行時生成（セル単位・非同期）
+26. 全通知判定の決定ログ、ガイドカードのワンタップ評価、LLM/ルール選択の切り替え
 
 ### P1: PoCで余力があれば
 - 自然言語による一時指示
@@ -48,7 +51,7 @@
 - 本格的な店舗探索/営業情報
 - map matching
 - 音声クローン/著名人音声
-- 全国自動Knowledge生成
+- 全国の事前一括Knowledge生成（MVPは実行時のセル単位生成）
 - 課金
 
 ## 3. 全体アーキテクチャ
@@ -71,8 +74,10 @@ Flask API
   ├─ Knowledge Service
   ├─ Feedback Service
   ├─ Trip Memory Service
-  ├─ LLM Adapter
-  └─ Provider Adapters
+  ├─ Guide Selector（LLM選択・語り、検証、フォールバック）
+  ├─ LLM Adapter（Claude API）
+  ├─ Knowledge Generation Worker（実行時知識生成ジョブ）
+  └─ Provider Adapters（Wikipedia / Wikidata / OSM / web検索）
         │
         ▼
 PostgreSQL + PostGIS
@@ -92,7 +97,7 @@ PostgreSQL + PostGIS
 `user_id, category, explicit_score, learned_score, knowledge_score, confidence, updated_at`
 
 ### trip_sessions
-`id, user_id, purpose, started_at, ended_at, language, manual_transport_mode, memory_summary`
+`id, user_id, purpose, started_at, ended_at, language, manual_transport_mode, selection_mode, memory_summary`
 
 ### participants
 `id, trip_session_id, display_name, locale, home_region, profile_json`
@@ -105,7 +110,17 @@ MVPではアカウントを持たない同行者もホスト端末内のプロ�
 位置履歴は保持期間を設定し、不要な生ログを永久保存しない。`client_event_id` は端末で採番するUUIDで、`(trip_session_id, client_event_id)` を一意にして再送時の記録点・通知の重複を防ぐ。地図用のサーバー履歴は `context_snapshots` を再利用する。
 
 ### knowledge_items
-`id, canonical_key, title, category, body_ja, short_ja, body_en, short_en, position geography(Point,4326), radius_m, interestingness, novelty, confidence_level, fact_type, valid_from, valid_until, metadata_json`
+`id, canonical_key, title, category, body_ja, short_ja, body_en, short_en, position geography(Point,4326), radius_m, interestingness, novelty, confidence_level, fact_type, valid_from, valid_until, origin, review_status, area_cell, generated_by, metadata_json`
+
+`origin` は `curated`（事前作成）/ `generated`（実行時生成）。
+
+### knowledge_claims
+`id, knowledge_item_id, claim_text_ja, claim_text_en, source_ids, created_at`
+
+実行時生成では主張ごとに出典を持たせ、出典のない主張は保存しない。
+
+### area_coverage / knowledge_generation_jobs
+セル（geohash）ごとの生成状況と、非同期生成ジョブのキュー。
 
 ### knowledge_sources
 `id, knowledge_item_id, url, publisher, title, retrieved_at, source_type, reliability_score, license_info`
@@ -114,7 +129,12 @@ MVPではアカウントを持たない同行者もホスト端末内のプロ�
 `from_id, to_id, relation_type, weight`
 
 ### notification_history
-`id, trip_session_id, knowledge_item_id, shown_at, channel, score, opened, spoken, feedback_type`
+`id, trip_session_id, knowledge_item_id, guide_decision_id, shown_at, channel, score, rendered_text, selection_mode, opened, spoken, feedback_type, rating`
+
+### guide_decisions
+`id, trip_session_id, context_snapshot_id, decided_at, candidates_json, rule_choice_id, llm_choice_id, final_action, reason, selection_mode, llm_model, latency_ms, estimated_cost`
+
+黙った判定も含めて記録し、旅行後の比較・リプレイに使う。
 
 ### topic_boosts
 `id, trip_session_id, topic_key, strength, created_at, expires_at, decay_rate`
@@ -171,8 +191,9 @@ Flutterから送る例:
 10. interestingness/novelty
 11. repetition penalty
 12. cooldown/通知上限判定
-13. 上位候補だけ必要に応じLLMで再ランキング/表現調整
-14. 閾値未満なら何も通知しない
+13. 閾値未満なら何も通知しない（LLMを呼ばない）
+14. 上位N件（初期値5）をLLMに渡し、話す1件を選ぶか黙るかを決め、状況に合わせた文章を作る
+15. サーバーでLLM出力を検証し、不合格・タイムアウト時はルール1位の保存済み本文へフォールバック
 
 初期スコア例:
 `score = 0.25*location + 0.20*interest + 0.15*topic + 0.15*interestingness + 0.10*timeliness + 0.10*novelty + 0.05*direction - penalties`
@@ -279,6 +300,7 @@ MVPの自動分類は `stationary / walking / cycling / motorized / high_speed` 
   - `enough_topic`
   - `like`
   - `dislike`
+  - `interesting` / `knew_it` / `not_interesting` / `wrong_info`（ワンタップ評価）
 
 ### Preferences
 - `GET/PATCH /api/v1/users/me/preferences`
@@ -290,11 +312,18 @@ MVPの自動分類は `stationary / walking / cycling / motorized / high_speed` 
 
 ## 13. LLM利用方針
 
-LLMを必須にする箇所:
-- 自然言語指示→structured intent(P1)
-- 複数候補の最終的な「今面白い」再ランキング（候補が拮抗した場合のみ）
-- 検証済み事実から状況に合った短文を作る
+MVPの最初から実行時のLLMを使う。詳細・モデル選定・フォールバックは[リアルタイムLLM設計](realtime-llm-design-v0.1.md)を正本とする。
+
+LLMを使う箇所（P0）:
+- ルールで絞った上位候補から「今話すもの」または「黙る」を選ぶ（通知可能とルールで判定された時のみ）
+- 出典付きの事実から、移動状態・方位・直前の話題・趣向に合わせた短文/読み上げ文を作る
+- 事前KnowledgeItemのない場所で、Wikipedia・Wikidata・OSM等の素材から出典付きKnowledgeItemを生成する（非同期）
 - TripMemorySummary更新
+
+LLMを使う箇所（P1）:
+- 自然言語指示→structured intent
+
+初期値: Anthropic Claude API、モデル `claude-opus-5-5`、選択・語りはeffort `low`、知識生成はeffort `medium`。LLM Adapterで差し替え可能にし、PoCで遅延・原価・品質を測って見直す。
 
 LLMを使わない箇所:
 - 距離/方向/速度
@@ -304,11 +333,11 @@ LLMを使わない箇所:
 - topic decay
 - DB検索
 
-LLMには原則として検証済みKnowledgeItemを与え、未知の事実を自由生成させない。
+LLMには出典付きの素材・KnowledgeItemだけを与え、素材にない事実を自由生成させない。出力はサーバーで検証し、失敗時はルール結果へフォールバックしてガイドを止めない。
 
 ## 14. 日本語/英語
 
-MVP対象地域の主要KnowledgeItemは事前に `ja/en` を生成・レビューしてDB保存する。実行時翻訳を標準経路にしない。動的文言だけ必要に応じ生成する。
+MVP対象地域の主要KnowledgeItemは事前に `ja/en` を生成・レビューしてDB保存する。実行時生成のKnowledgeItemは生成時に `ja/en` を同時に作る。通知文は選択・語りのLLMが利用者の言語で作る。
 
 ## 15. TTS
 
@@ -324,7 +353,10 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 
 ## 17. Knowledge作成パイプライン
 
-年末PoCでは全国自動生成を行わない。
+2系統で作る。
+
+### 17.1 事前作成（curated）
+実証対象地域で体験品質の基準を作るため、旅行前に作成・レビューする。
 
 1. 実証旅行ルート/地域を指定
 2. 情報候補を収集
@@ -336,6 +368,16 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 8. 英語版生成
 9. 人または別モデルでレビュー
 10. DB投入
+
+### 17.2 実行時生成（generated）
+事前作成のない場所では、現在地と進行方向の先のセルについて非同期ジョブで生成する。全国を事前に一括生成はしない。
+
+1. セルのカバレッジを確認し、未生成ならジョブを積む
+2. Wikipedia（ja/en）・Wikidata・OSMから素材を取得（不足時のみweb検索）
+3. LLMで構造化し、主張ごとに出典IDを付与（出典のない主張は破棄）
+4. confidence/fact_typeをルールで付与
+5. `origin=generated, review_status=unreviewed` で保存し、全ユーザーで共有
+6. `wrong_info` 報告で配信停止・レビュー待ちにする
 
 ## 18. バックグラウンド動作
 
@@ -382,6 +424,9 @@ Google・Apple・ID／パスワードの3方式をMVPから提供する。Google
 - more_related率
 - enough_topic率
 - 明示like/dislike
+- ワンタップ評価（interesting / knew_it / not_interesting / wrong_info）の率。curated/generated別、llm/rule別
+- LLMが黙ることを選んだ件数、検証失敗・タイムアウトによるフォールバック件数
+- `/context` 応答時間（p50/p95）と知識生成ジョブの所要時間
 - LLM呼出回数/トークン/原価
 - 外部API原価
 - バッテリー開始/終了値（利用者申告または取得可能範囲）
@@ -400,7 +445,10 @@ Google・Apple・ID／パスワードの3方式をMVPから提供する。Google
 - 誤情報を事実として断定する重大事故がない
 - 日本語/英語で意味が通る
 - 「知らなかった。面白い」と感じる通知が一定割合ある
-- API原価を測定できる
+- 事前作成のない場所でも出典付きのガイドが届き、curated/generated別に評価を比較できる
+- LLMの選択とルール1位の選択を、同じ旅行の決定ログで比較・リプレイできる
+- LLMの障害・遅延時もルール結果へフォールバックしてガイドが止まらない
+- API原価（特に1人8時間あたりのLLM原価）を測定できる
 
 面白さの合格率はPoC後に数値化する。最初から恣意的な目標値を置かない。
 
@@ -408,20 +456,22 @@ Google・Apple・ID／パスワードの3方式をMVPから提供する。Google
 
 前提として、schemaに認証テーブルを含め、個人データのAPIを端末から利用する前に認証・認可を実装する。ID・パスワード登録/ログイン、Google/Apple ID token検証、token更新/失効、所有者チェックを先行する。Google OAuthクライアント、Apple App ID/Services ID・キー・戻り先の設定は実装時に行う。
 
-1. PostgreSQL + PostGIS schema
-2. KnowledgeItem投入用seed/管理スクリプト
+1. PostgreSQL + PostGIS schema（guide_decisions・area_coverage・生成ジョブを含む）
+2. KnowledgeItem投入用seed/管理スクリプト（少数の実証地域分）
 3. Flask `/context` APIとPostGIS周辺検索
 4. ranking/cooldown/重複排除
-5. Flutter GPS + Guide画面
-6. Flutter→API ContextSnapshot
-7. 履歴/feedback
-8. 地図画面と現在地・移動履歴、ローカル記録/track API/再送・重複排除
-9. OS TTS
-10. バックグラウンド位置
-11. topic boost/セレンディピティ
-12. 英語
-13. TripMemorySummary
-14. LLM再ランキング/表現生成
-15. P1機能
+5. LLM Adapterと選択・語り（検証・タイムアウト・フォールバック、決定ログ）
+6. Flutter GPS + Guide画面（ワンタップ評価を含む）
+7. Flutter→API ContextSnapshot
+8. 実行時知識生成ジョブ（Wikipedia/Wikidata/OSM素材→LLM構造化）
+9. 履歴/feedback
+10. 地図画面と現在地・移動履歴、ローカル記録/track API/再送・重複排除
+11. OS TTS
+12. バックグラウンド位置
+13. topic boost/セレンディピティ
+14. 英語
+15. TripMemorySummary
+16. LLM/ルール選択の切り替えと決定ログのリプレイ
+17. P1機能
 
-重要: 最初からLLMを接続しない。固定KnowledgeItem＋ルールランキングでEnd-to-Endを完成させてからAIを差し込む。これによりAIなしでも成立する部分とAIによる改善量を比較できる。
+重要: LLMはMVPの最初から接続する。ただしルール側（候補抽出・cooldown・重複排除・フォールバック）を先に用意し、LLMはその上に載せる。全通知判定でルール1位とLLMの選択を両方記録するため、ルールのみの場合との差を同じ旅行のデータで比較できる。

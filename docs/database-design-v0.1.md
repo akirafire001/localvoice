@@ -124,6 +124,7 @@ Apple解除・アカウント削除時のrevoke一時失敗の再試行用。ユ
 - language varchar(10)
 - started_at/ended_at timestamptz
 - manual_transport_mode varchar(32) nullable
+- selection_mode varchar(8) default 'llm'
 - memory_summary text
 - settings_json jsonb
 
@@ -168,10 +169,42 @@ MVPの地図用移動履歴はこのテーブルを再利用する。セッシ�
 - confidence_level varchar(16)
 - fact_type varchar(32)
 - valid_from/valid_until timestamptz nullable
+- origin varchar(16): `curated`（事前作成）/ `generated`（実行時生成）
+- review_status varchar(16): `reviewed` / `unreviewed` / `suspended`（`wrong_info` 報告で配信停止）
+- area_cell varchar(12) nullable: 生成元のgeohashセル
+- generated_by jsonb nullable: 生成に使ったモデル・プロンプト版・生成日時
 - metadata_json jsonb
 - created_at/updated_at timestamptz
 
-Index: `GIST(position)`, `(category)`, `(valid_until)`
+Index: `GIST(position)`, `(category)`, `(valid_until)`, `(area_cell)`
+
+候補検索では `review_status <> 'suspended'` を条件に加える。
+
+### knowledge_claims
+- id UUID PK
+- knowledge_item_id UUID FK
+- claim_text_ja text / claim_text_en text
+- source_ids UUID[]（knowledge_sources.id。空は不可）
+- created_at timestamptz
+
+実行時生成のKnowledgeItemは主張単位で出典を持つ。LLMの選択・語りは `used_claim_ids` でここを参照し、サーバーが出典のない事実の混入を検証する。
+
+### area_coverage
+- area_cell varchar(12) PK
+- status varchar(16): `none` / `queued` / `generating` / `done` / `failed`
+- item_count integer
+- generated_at / expires_at timestamptz nullable
+
+### knowledge_generation_jobs
+- id UUID PK
+- area_cell varchar(12)
+- priority integer（現在地 > 進行方向の先）
+- status varchar(16)
+- attempts integer
+- error text nullable
+- created_at / started_at / finished_at timestamptz
+
+MVPのジョブキューはこのテーブルとワーカープロセスで実装する（`FOR UPDATE SKIP LOCKED` で取得）。
 
 ### knowledge_sources
 - id UUID PK
@@ -199,9 +232,32 @@ Index: `GIST(position)`, `(category)`, `(valid_until)`
 - channel varchar(16)
 - score numeric
 - score_components jsonb
+- guide_decision_id UUID FK
+- rendered_text text（LLMが作った、または保存済みの実際の通知文）
+- selection_mode varchar(8): `llm` / `rule`
 - opened boolean
 - spoken boolean
 - feedback_type varchar(32) nullable
+- rating varchar(16) nullable: `interesting` / `knew_it` / `not_interesting` / `wrong_info`
+
+### guide_decisions
+- id UUID PK
+- trip_session_id UUID FK
+- context_snapshot_id UUID FK
+- decided_at timestamptz
+- candidates_json jsonb（候補ID・ルールスコア内訳）
+- rule_choice_id UUID nullable（ルール1位）
+- llm_choice_id UUID nullable
+- final_action varchar(16): `speak` / `silent`
+- reason varchar(32)
+- selection_mode varchar(8)
+- fallback boolean
+- llm_model varchar(64) nullable
+- prompt_version varchar(32) nullable
+- latency_ms integer nullable
+- estimated_cost numeric(12,6) nullable
+
+黙った判定も含め、通知判定をしたすべての時点を記録する。旅行後のLLM/ルール比較とリプレイに使う。精密位置は `context_snapshots` 側にあり、保持期間の削除方針に従う。
 
 ### topic_boosts
 - id UUID PK
@@ -268,4 +324,4 @@ LIMIT 100;
 - pgvectorによる意味検索
 - route/map matching
 - multilingualテーブルへの正規化
-- knowledge versioning / review workflow
+- knowledge versioning / review workflow（MVPは `review_status` のみ）
