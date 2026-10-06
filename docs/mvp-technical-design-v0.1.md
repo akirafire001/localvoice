@@ -17,7 +17,7 @@
 5. 手動移動モード上書き
 6. PostGISによる周辺KnowledgeItem検索
 7. 日本語/英語の表示
-8. 端末TTSによる読み上げ
+8. 品質確認済み音声の再生、VoiceProvider、事前生成/キャッシュ、端末TTSへの代替
 9. アプリ内カード表示
 10. OSローカル通知
 11. 通知頻度制御とcooldown
@@ -33,6 +33,8 @@
 21. 現在地とセッション中の移動履歴の地図表示（終了後の見返しを含む）
 22. Google / Apple / ID・パスワード認証、登録・ログアウト・復旧・連携
 23. 個人データの所有者チェックとアプリ内アカウント削除
+
+P0のコンテンツは名所の説明に限定せず、土地の小話を十分に用意する。学校沿革・過去ニュース・施設概要だけの項目を自動案内の主力にしない。詳細は[コンテンツ品質方針](content-quality-policy-v0.1.md)。音声の比較試聴と声・話速選択はP0に含めるが、複数の商用TTSをすべて本番接続することは要求しない。
 
 ### P1: PoCで余力があれば
 - 自然言語による一時指示
@@ -59,7 +61,7 @@ Flutter App
   ├─ Motion Estimator
   ├─ Session State
   ├─ Local Cache
-  ├─ Notification/TTS
+  ├─ Notification / Audio Player / Device TTS Fallback
   └─ API Client
         │ HTTPS/JSON
         ▼
@@ -72,7 +74,8 @@ Flask API
   ├─ Feedback Service
   ├─ Trip Memory Service
   ├─ LLM Adapter
-  └─ Provider Adapters
+  ├─ Voice Service / Audio Cache
+  └─ Provider Adapters（選定したTTSを含む）
         │
         ▼
 PostgreSQL + PostGIS
@@ -83,7 +86,7 @@ PostgreSQL + PostGIS
 ## 4. 主要データモデル
 
 ### users
-`id, display_name, status, recovery_email, recovery_email_verified_at, locale, notification_level, detail_mode, serendipity_level, created_at`
+`id, display_name, status, recovery_email, recovery_email_verified_at, locale, notification_level, detail_mode, serendipity_level, voice_settings_json, created_at`
 
 ### 認証データ
 `auth_identities`, `password_credentials`, `auth_sessions`, `auth_refresh_tokens`, `auth_action_tokens`, `auth_challenges`, `apple_credentials`, `oauth_revocation_jobs` を利用する。Google/Appleの検証済みsubとLocalVoiceの正規化login_idを内部user_idへ紐づけ、パスワードはArgon2id、LocalVoiceのセッションtokenはランダム値のハッシュとして保存する。Appleの状態確認・取り消し用refresh tokenはサーバーで暗号化保存し、秘密鍵・暗号鍵はDB/アプリ/Gitと分離する。[認証設計](authentication-design-v0.1.md)・[Database設計](database-design-v0.1.md)参照。
@@ -106,6 +109,8 @@ MVPではアカウントを持たない同行者もホスト端末内のプロ�
 
 ### knowledge_items
 `id, canonical_key, title, category, body_ja, short_ja, body_en, short_en, position geography(Point,4326), radius_m, interestingness, novelty, confidence_level, fact_type, valid_from, valid_until, metadata_json`
+
+`metadata_json`に小話の分類、土地との関係、面白さの理由、現在とのつながり、音声用原稿・版を保持する。詳細は[コンテンツ品質方針](content-quality-policy-v0.1.md)。音声資産は`audio_assets`で本文・読み・声・モデル・利用範囲の版と対応づける。[音声設計](voice-design-v0.1.md)参照。
 
 ### knowledge_sources
 `id, knowledge_item_id, url, publisher, title, retrieved_at, source_type, reliability_score, license_info`
@@ -140,6 +145,8 @@ MVPではアカウントを持たない同行者もホスト端末内のプロ�
 
 値は固定仕様ではなくPoC調整値とする。候補取得後に距離、進行方向、趣向、重複等で再スコアリングする。
 
+地域の小話は`position + radius_m`で適用範囲を定義する。近隣POI検索に加え、利用者がその適用範囲内にいる地域項目も取得して統合・重複排除する。探索半径の外に代表座標があっても適用範囲内なら候補になり、範囲外の一般的な話を量のために混ぜない。[DB設計](database-design-v0.1.md)参照。
+
 ## 6. ContextSnapshot
 
 Flutterから送る例:
@@ -159,7 +166,7 @@ Flutterから送る例:
 
 ## 7. 候補選択パイプライン
 
-1. PostGISで空間候補を取得
+1. PostGISで空間候補を取得。近くの施設だけでなく適用範囲内の地域の小話も含める
 2. valid_from/valid_untilで期限切れ除外
 3. 今日既に出した項目/類似項目を除外または減点
 4. 距離スコア
@@ -178,6 +185,8 @@ Flutterから送る例:
 `score = 0.25*location + 0.20*interest + 0.15*topic + 0.15*interestingness + 0.10*timeliness + 0.10*novelty + 0.05*direction - penalties`
 
 係数はPoC計測用の初期値であり仕様確定値ではない。
+
+通常の自動案内はコンテンツのレビュー結果`auto_eligible=true`を必要とする。沿革だけ・関連の薄い過去ニュース・汎用的な施設概要は、距離が近くてもこの条件を満たさない。明示質問・実用情報は別経路で扱う。趣向外の候補も品質条件を満たすものから選ぶ。候補不足を記録し、地域の小話へ探索を広げても不足する場合は通知しない。詳細は[コンテンツ品質方針](content-quality-policy-v0.1.md)。
 
 ## 8. 「黙る」ロジック
 
@@ -221,14 +230,18 @@ MVPの自動分類は `stationary / walking / cycling / motorized / high_speed` 
 
 ### Guide
 - 最新ガイドカード
+- 上部約3分の1のミニ地図（現在地・移動履歴・今の話の地点/地域）。タップでMapを全画面表示
 - タイトル/本文/画像(任意)
 - 確度
 - 出典
 - もっと詳しく
 - 関連情報を増やす
 - この話はもういい
+- 次の話（現在の案内のスキップ。topic boost終了とは分ける）
 - 音声再生/停止
 - 現在有効なtopic/temporary stateチップ
+
+詳細文を展開すると地図を細いプレビューへ縮める。Guide/詳細/Mapの切替は同じ音声再生状態を利用し、画面遷移だけで再生を停止・重複開始しない。新しい案内へスキップした時は現在の再生要求と遅着音声を無効化する。地図の適用範囲はKnowledgeItemの確認済みposition/radius_mを利用し、将来の面geometry未実装時に精密な地域境界として見せない。[Flutter UX](flutter-ux-design-v0.1.md)参照。
 
 ### History
 - 今日通知した内容を時系列表示
@@ -236,6 +249,7 @@ MVPの自動分類は `stationary / walking / cycling / motorized / high_speed` 
 
 ### Map（P0）
 - ガイド中の端末の最新測位による現在地マーカー、精度円、最終更新時刻
+- 今の話の地点/地域とコンパクトな音声プレイヤー（案内中のみ）
 - セッション内の記録点を時刻順に結んだ移動履歴
 - 現在地へ戻る/移動範囲全体を表示
 - GuideとHistoryから開く。保存期間内の終了済みセッションも選択可能
@@ -279,6 +293,7 @@ MVPの自動分類は `stationary / walking / cycling / motorized / high_speed` 
   - `enough_topic`
   - `like`
   - `dislike`
+  - `skip_story`（現在の案内を止め、最新contextから別の適格な小話を要求。topic/長期趣向の変更とは分ける）
 
 ### Preferences
 - `GET/PATCH /api/v1/users/me/preferences`
@@ -312,7 +327,11 @@ MVP対象地域の主要KnowledgeItemは事前に `ja/en` を生成・レビュ�
 
 ## 15. TTS
 
-MVPはFlutterからOS標準TTSを利用する。クラウドTTSは使わず、音声品質が体験上不足する場合にのみ比較検証する。これにより通知ごとのTTS API原価をほぼゼロにできる。
+MVPから高品質音声の比較試聴を行い、通常の案内には選定した音声を使う。Google Gemini-TTS/Chirp 3 HD、CoeFont、VOICEVOX、Kokoroを比較対象とする。端末TTSは比較基準と通信断・障害時等の代替であり、初期の品質を端末標準だけで決めない。
+
+静的な日英小話は原稿と読みをレビューして事前生成する。Flutterは音声ファイルを再生し、Flask側のVoiceProviderが生成・キャッシュ・配信を管理する。個人化した原稿だけ必要時に生成し、個人用音声を共有キャッシュへ混ぜない。キーは本文版・音声用原稿hash・読み辞書版・言語・モデル/声・スタイル/速度・利用範囲を含む。期限切れ本文の音声を再生しない。
+
+生成待ちには期限を設け、キャッシュ→利用者が許可した端末TTS→文字表示の順で劣化動作を選ぶ。停止/スキップ/終了後に遅着した音声を勝手に再生しない。API契約、商用配信・保存条件、事前生成、費用、試聴項目の正本は[音声設計](voice-design-v0.1.md)。
 
 ## 16. 情報信頼性
 
@@ -337,6 +356,8 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 9. 人または別モデルでレビュー
 10. DB投入
 
+レビューで「土地との関係・面白さの理由・具体性・話題の種類」を確認し、自動案内への採用可否と保留理由を保存する。根拠と面白さを別に評価する。採用した日英原稿は読みを確認し、選定音声で事前生成・試聴する。
+
 ## 18. バックグラウンド動作
 
 最もリスクが高い部分の一つ。MVPでは「旅行中にガイドモードを明示開始した時だけ」位置追跡を行う。常時追跡はしない。
@@ -345,7 +366,7 @@ Highの目安は公的/一次資料を含む複数根拠、Mediumは独立した
 
 ## 19. キャッシュ/オフライン
 
-旅行開始時またはWi-Fi時に、予定地域のKnowledgeItemを端末へ先読み可能な設計にする。MVPではSQLite/FlutterローカルDB等に最近のKnowledgeItemと履歴をキャッシュ。通信断時は既存KnowledgeItemだけで簡易ガイドを継続できることを将来目標とする。
+旅行開始時またはWi-Fi時に、予定地域のKnowledgeItemと利用条件の確認済み音声を端末へ先読み可能な設計にする。MVPではSQLite/FlutterローカルDB等に最近のKnowledgeItem・履歴と音声ファイルをキャッシュする。MVPで通信断時の保存済み音声再生を検証する。通信断時に新しい地域へ移動しても継続する全面的なオフラインガイドは将来目標とする。
 
 ### 19.1 地図用位置履歴
 - ガイド中の最新の現在地は端末の測位値を利用し、サーバーの最終記録点を現在地として扱わない。ガイド終了後は保存済み履歴を表示し、地図の閲覧だけでは新たな測位を開始しない。
@@ -384,6 +405,8 @@ Google・Apple・ID／パスワードの3方式をMVPから提供する。Google
 - 明示like/dislike
 - LLM呼出回数/トークン/原価
 - 外部API原価
+- 自動案内の保留理由、名所以外の小話数、話題の種類、場所による候補不足
+- 声・モデル別の聞き心地/誤読/声への停止反応、生成待ち時間、キャッシュ率、音声秒数と生成原価
 - バッテリー開始/終了値（利用者申告または取得可能範囲）
 
 ## 22. 年末PoCの成功条件
@@ -400,6 +423,8 @@ Google・Apple・ID／パスワードの3方式をMVPから提供する。Google
 - 誤情報を事実として断定する重大事故がない
 - 日本語/英語で意味が通る
 - 「知らなかった。面白い」と感じる通知が一定割合ある
+- よく話す設定で土地の小話が豊富に届き、沿革・過去ニュースの羅列や類似話題で埋まらない
+- 日英の声・地名の読み・長時間の聞き心地を比較評価し、採用音声と不採用理由を記録できる
 - API原価を測定できる
 
 面白さの合格率はPoC後に数値化する。最初から恣意的な目標値を置かない。
@@ -416,7 +441,7 @@ Google・Apple・ID／パスワードの3方式をMVPから提供する。Google
 6. Flutter→API ContextSnapshot
 7. 履歴/feedback
 8. 地図画面と現在地・移動履歴、ローカル記録/track API/再送・重複排除
-9. OS TTS
+9. 高品質音声の比較試聴、選定VoiceProvider/音声再生/キャッシュ/端末TTS代替
 10. バックグラウンド位置
 11. topic boost/セレンディピティ
 12. 英語
