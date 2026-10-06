@@ -15,6 +15,7 @@ PostgreSQL + PostGISをMVPから採用する。位置付き知識、利用者趣
 - notification_level varchar(20)
 - detail_mode varchar(20)
 - serendipity_level varchar(20)
+- voice_settings_json jsonb（言語別voice_profile_id、再生速度、端末TTS代替の許可）
 - created_at timestamptz
 
 ### auth_identities
@@ -206,6 +207,28 @@ Index: `GIST(position)`, `(category)`, `(valid_until)`, `(area_cell)`
 
 MVPのジョブキューはこのテーブルとワーカープロセスで実装する（`FOR UPDATE SKIP LOCKED` で取得）。
 
+`metadata_json.story_quality`に`content_kind, why_here, interest_hook, present_connection, auto_eligible, hold_reason, reviewed_at, reviewer, review_version`を保持する。本文/言語ごとの音声用原稿と読み辞書の版も保持する。通常の自動案内では採用レビュー済みの`auto_eligible=true`だけを使う。[コンテンツ品質方針](content-quality-policy-v0.1.md)参照。
+
+### audio_assets
+- id UUID PK
+- knowledge_item_id UUID FK nullable
+- owner_user_id UUID FK nullable（個人用では必須）
+- trip_session_id UUID FK nullable（個人用音声の利用範囲）
+- scope varchar(16)（shared / private）
+- cache_key varchar(64) UNIQUE（原稿/読み/声/モデル/形式/利用範囲を含むhash）
+- content_version text / speech_text_hash varchar(64) / pronunciation_version text
+- language varchar(10)
+- provider / model / model_version / voice_profile_id / voice_version text
+- synthesis_settings_json jsonb（スタイル・合成時の速度等）
+- status varchar(16)（pending / ready / failed / invalidated）
+- storage_key text nullable（永続の公開URLではない）
+- audio_format varchar(32) / duration_ms integer nullable
+- attribution_json jsonb / terms_version text（選定声の確認済み条件）
+- valid_until timestamptz nullable / retention_until timestamptz nullable
+- created_at/updated_at timestamptz
+
+共有は個人情報を含まない静的原稿だけに限定する。privateはowner_user_id必須でuser/trip範囲をcache_keyに含め、所有者を照合して配信する。共有の事前生成費用はapi_usage_logsのtrip_session_id=nullで記録し、利用者ごとの生成費と区別する。Provider内のジョブ・再試行は冪等な同一資産の処理として扱う。
+
 ### knowledge_sources
 - id UUID PK
 - knowledge_item_id UUID FK
@@ -239,6 +262,10 @@ MVPのジョブキューはこのテーブルとワーカープロセスで実�
 - spoken boolean
 - feedback_type varchar(32) nullable
 - rating varchar(16) nullable: `interesting` / `knew_it` / `not_interesting` / `wrong_info`
+- speech_snapshot_json jsonb nullable（案内の確定音声原稿・本文版・言語）
+- audio_asset_id UUID FK nullable
+
+案内ごとの確定原稿を音声生成に使い、クライアントから任意の読み上げ本文は受け取らない。音声資産が期限切れ/訂正で無効化された場合は、履歴の旧音声をそのまま再生しない。[音声設計](voice-design-v0.1.md)参照。
 
 ### guide_decisions
 - id UUID PK
@@ -312,12 +339,16 @@ ORDER BY distance_m
 LIMIT 100;
 ```
 
+上記は近隣の点候補の基本例。地域の小話は別に`ST_DWithin(position, current_position, radius_m)`で適用範囲内の項目を取得し、近隣候補と統合・重複排除する。地域の代表座標が近隣探索半径の外にあるだけで、利用者を含む地域知識を落とさない。MVPは事前登録した地域項目に限定し、可変半径検索の性能は実装時に確認する。
+
 ## データ保持
 パスワード・Google/Apple ID token・LocalVoice tokenの平文をDB/ログに保存しない。ログインID、Google/Apple sub、内部user_idの対応を認証テーブルで管理する。Appleの状態確認・取り消しに必要なrefresh tokenだけは暗号化して保存し、削除時の一時失敗では取り消しキューへ移して、成功後に削除する。認証・所有者チェックは[認証設計](authentication-design-v0.1.md)に従う。アカウント削除時は本人の認証情報・旅行・精密位置履歴を削除し、端末キャッシュへの反映とバックアップの削除方針を公開前に定義する。
 
 `context_snapshots` はプライバシー上のリスクが高いため保持期間を設定する。PoCでは分析後に位置を粗粒度化または削除できるようにする。`notification_history` はプロダクト改善に重要なので、位置生ログとは分離する。
 
 地図用の端末キャッシュにも同じ保持方針を適用する。ガイド終了後も保持期間内のセッションは地図で見返せる。PoC開始前に具体的な保存期間を設定し、端末・サーバーの期限切れ記録点を削除する。通信断中の未送信記録点も保持期限後に再送しない。
+
+個人用音声のDB行・保存ファイル・端末キャッシュをuser/trip単位で期限管理する。DB行を削除する前に保存ファイルのstorage_keyを削除キューへ移し、ファイルも除去する。アカウント切替で別ユーザーへ配信/表示しない。本文の訂正・有効期限・削除を音声資産にも反映し、sharedの音声に個人のプロフィール・会話を混ぜない。
 
 ## 将来拡張
 - knowledge_itemの面/線geometry対応

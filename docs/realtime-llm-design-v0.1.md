@@ -64,6 +64,16 @@ Flutter ──ContextSnapshot──▶ Flask /context
 - 実行時生成の伝承・俗説は `fact_type=tradition/legend` とし、事実として扱わない。
 - 誤り報告（後述の `wrong_info`）を受けたKnowledgeItemは即座に配信停止し、レビュー待ちにする。
 
+### 3.5 コンテンツ品質方針との関係
+[コンテンツ品質方針](content-quality-policy-v0.1.md)の採用条件（土地との関係・面白さの理由・具体性・根拠）は実行時生成にも適用する。ただし実行時に人のレビューは挟めないため、次のように扱う。
+
+- 生成時にLLMへ `metadata_json.story_quality`（`content_kind, why_here, interest_hook, present_connection`）も出力させる。
+- 採用条件の機械判定（出典の対応、沿革・過去ニュース・基本情報だけの候補の除外、汎用説明の除外）を通ったものだけ `auto_eligible=true` とし、`reviewer=auto`、`review_status=unreviewed` で記録する。人の採用レビューを済ませた事前作成分（curated）とは区別して集計する。
+- 旅行後に実行時生成分を抜き取りでレビューし、機械判定の基準を見直す。
+
+### 3.6 音声との関係
+LLMが案内ごとに作る文章は事前生成の音声キャッシュに載らない。[音声設計](voice-design-v0.1.md)の「必要時の生成」で個人用（private）の音声資産として生成し、確定原稿は `notification_history.speech_snapshot_json` に保存する。音声生成の待ち時間が長い場合は端末TTSで代替する。LLMの応答時間と音声生成の待ち時間を合わせて計測する。
+
 ## 4. B. 選択と語り
 
 ### 4.1 LLMを呼ぶ条件

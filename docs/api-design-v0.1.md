@@ -113,7 +113,7 @@ Guide:
    "confidence":{"level":"high","fact_type":"verified_fact"},
    "sources":[{"title":"...","publisher":"...","url":"..."}],
    "image":null,
-   "speech":{"enabled":true,"text":"..."},
+   "speech":{"enabled":true,"text":"...","content_version":"v1","voice_profile_id":"ja-default","audio":null},
    "origin":"generated",
    "selection_mode":"llm"
  },
@@ -122,6 +122,28 @@ Guide:
 ```
 
 サーバーは毎回guideを返す義務を持たない。`guide:null` が正常系。
+
+`speech.enabled`はこの案内が音声対応であることを示す。自動再生は端末の音声ON/OFFと再生要求に従う。`speech.text`は意味を保ってレビューした音声用原稿。サーバーに確定原稿を保存し、音声OFFの端末は個別生成を要求しない。
+
+## GET /voices
+
+言語を指定し、品質/利用条件確認済みのvoice_profile_id、表示名、対応言語、試聴資産、必要なクレジットを返す。Provider/model/声/スタイルの対応はサーバーの許可リストで管理する。試聴資産も確認済みの原稿・音声に限定する。
+
+## POST /guides/{history_id}/speech
+
+認証済み本人の親tripへの所有者チェック後、指定案内の確定原稿とvoice_profile_idから音声を取得・必要時生成する。Request: `{"voice_profile_id":"ja-default"}`。本文、任意のモデル、外部URLをクライアントから受け取らない。許可された言語/声の組み合わせだけを使う。
+
+- ready: `200 {"status":"ready","asset_id":"uuid","audio_path":"/api/v1/speech-assets/uuid","audio_format":"audio/mpeg","valid_until":null,"attribution":[]}`。
+- pending: `202 {"status":"pending","asset_id":"uuid","retry_after_sec":2}`。再度同じPOSTで状態を取得できる。同じキーの同時/再送要求は一つのジョブへ集約する。
+- 期限切れ/削除/訂正済み原稿は410。未知の声/言語の不一致は400。原価/頻度上限は429。生成の一時失敗は503とし、再試行待ちを返す。
+
+本文版・原稿hash・読み辞書版・Provider/model/声/設定/形式・shared/private範囲を含むキーで生成する。個人化原稿はprivateにし、user/tripをキーに含める。共有静的音声でも本文の有効性と案内のアクセス権を確認する。再生速度の端末設定変更だけで再合成しない。
+
+## GET /speech-assets/{asset_id}
+
+認証・所有者/案内利用権・本文の有効性・保持期限を検証して音声bytesを返す。privateはowner_user_idと照合する。クライアントがまだ案内として受け取っていない個人音声や、他人の音声へアクセスできない。試聴用のshared音声は/voicesの許可リストへ掲載された資産に限定し、認証済み利用者が取得できる。ready以外の資産は音声として返さない。
+
+端末は停止/スキップ/次案内/終了時に再生要求を失効し、遅着した音声は自動再生しない。待ち上限時は設定済みの代替読み上げか文字表示へ移る。pending取得を高速ポーリングしない。voice設定、キャッシュと再生の正本は[音声設計](voice-design-v0.1.md)。
 
 ## GET /trips/{trip_id}/history
 今日の通知履歴。
@@ -166,6 +188,7 @@ Action:
 - `enough_topic`
 - `like`
 - `dislike`
+- `skip_story`
 - `interesting`（知らなかった・面白い）
 - `knew_it`（知っていた）
 - `not_interesting`（興味なし）
@@ -173,8 +196,10 @@ Action:
 
 `more_detail` は詳細文を返してよい。`more_related` はtopic boostを生成。`enough_topic` は当該topic boostを終了するが長期趣向を下げない。
 
+`skip_story`は「次の話」。現在の案内の音声を停止し、最新の有効なcontextから別の適格候補を要求する。現在の項目をセッション内で既出として扱うが、その話題全体や長期趣向を下げない。明示操作なので通常の自動通知cooldownとは分ける一方、品質・鮮度・重複・API/原価上限は維持する。次候補がなければ`guide:null`と理由を返し、話を捏造しない。端末は現在の音声要求を失効してから新しい案内を再生する。
+
 ## GET/PATCH /users/me/preferences
-通知頻度、情報量、セレンディピティ、言語等。
+通知頻度、情報量、セレンディピティ、言語、言語別voice_profile_id、再生速度、端末TTS代替の許可等。voiceはサーバーの許可リストから選ぶ。再生速度は端末の対応範囲に制限する。
 
 ## GET/PATCH /users/me/interests
 カテゴリ別の明示趣向。
