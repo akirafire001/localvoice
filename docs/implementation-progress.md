@@ -10,16 +10,21 @@
 | M0 | 進捗ファイル・リポジトリ構成・開発環境 | 完了 |
 | M1 | サーバー基盤（Flask app factory、DBモデル、エラー形式）と認証（ID/パスワード、token更新・失効、再認証、me、削除、Google、Apple、復旧メール・再設定） | 完了 |
 | M2 | trip・context（PostGIS候補・ランキング・cooldown・黙る判定・決定ログ）・history・track・feedback・preferences/interests | 完了 |
-| M3 | LLM Adapter（Claude）による選択・語り＋検証・フォールバック、実行時知識生成ワーカー（Wikipedia/Wikidata/OSM）、curated seed、TripMemorySummary | 未着手 |
+| M3 | LLM Adapter（Claude）による選択・語り＋検証・フォールバック、実行時知識生成ワーカー（Wikipedia/Wikidata/OSM）、curated seed、TripMemorySummary | 完了 |
 | M4 | 音声（VoiceProvider、/voices、/guides/{id}/speech、/speech-assets、キャッシュ） | 未着手 |
 | M5 | Flutterアプリ（認証・Home・Guide・Map・History・Preferences・Account、GPS・移動推定・ローカル記録/再送、通知、音声） | 未着手 |
 | M6 | P1（一時指示commands、temporary state、participants） | 未着手 |
 
 ## 次にやること
 
-- M3 を開始する: `server/localvoice/services/llm.py`（現在はスタブで常にNone→ルールへフォールバック）にClaude Adapterを実装し、`knowledge_gen.py`（enqueue_for_position と生成ワーカー）と curated seed を作る。
+- M4 を開始する: `server/localvoice/services/voice.py`（現在は声の許可リストのみ）に VoiceProvider（silent/Google TTS）、AudioAsset のキャッシュキー・生成キュー、`GET /voices`、`POST /guides/{id}/speech`、`GET /speech-assets/{id}`、`worker.process_pending_audio`/`cleanup_expired_audio` を実装する。
 
 ## 判断した内容
+
+- LLMは `services/llm.py` の ClaudeLLM（`claude-opus-5-5`、構造化出力、選択はeffort low・4秒、生成はmedium、`fallbacks: "default"`、systemにcache_control）。キー未設定時は無効でルールにフォールバック。
+- LLM出力の検証: 候補内のID、候補のclaim ID、視界表現の禁止、方位不確かな時の左右禁止、素材にない数字の禁止。失敗理由は guide_decisions.fallback_reason。
+- 実行時生成の確度はルールで medium/low のみ（highは自動付与しない）。沿革・実用のみ・関係の薄い過去ニュースは auto_eligible=false。
+- 実証地域の curated seed（宮島・広島・尾道・奈良 18話）は**下書き**。旅行前に人が出典と読みを確認し、review_status を reviewed にする必要がある。
 
 - 通知頻度は quiet/normal/talkative/chatty（cooldown 900/360/180/90秒、1時間上限 3/6/12/20）。値は `services/prefs.py`。
 - 「この話はもういい」(enough_topic) は当該カテゴリのboostを終了し、2時間の負のboostを入れる（長期趣向は変えない）。

@@ -34,6 +34,20 @@ def create_app(config=None):
         create_schema(app)
         print("schema created")
 
+    @app.cli.command("seed")
+    def seed_cmd():
+        """Load the draft curated stories for the PoC regions."""
+        from .db import session_scope
+        from .seed import curated
+
+        with session_scope(app) as db:
+            c, u = curated.load(db)
+        print(f"curated stories: {c} created, {u} updated")
+
+    from .worker import register as register_worker
+
+    register_worker(app)
+
     @app.cli.command("drop-db")
     def drop_db_cmd():
         drop_schema(app)

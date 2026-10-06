@@ -82,8 +82,8 @@ class Config:
         self.LLM_GENERATE_TIMEOUT_SEC = _float("LLM_GENERATE_TIMEOUT_SEC", 120.0)
         self.LLM_SESSION_COST_LIMIT_USD = _float("LLM_SESSION_COST_LIMIT_USD", 5.0)
         # USD per million tokens (input, output); update when the model changes
-        self.LLM_PRICE_INPUT_PER_MTOK = _float("LLM_PRICE_INPUT_PER_MTOK", 5.0)
-        self.LLM_PRICE_OUTPUT_PER_MTOK = _float("LLM_PRICE_OUTPUT_PER_MTOK", 25.0)
+        self.LLM_PRICE_INPUT_PER_MTOK = _float("LLM_PRICE_INPUT_PER_MTOK", 4.0)
+        self.LLM_PRICE_OUTPUT_PER_MTOK = _float("LLM_PRICE_OUTPUT_PER_MTOK", 20.0)
 
         # Runtime knowledge generation
         self.KNOWLEDGE_GENERATION_ENABLED = _bool("KNOWLEDGE_GENERATION_ENABLED", True)
