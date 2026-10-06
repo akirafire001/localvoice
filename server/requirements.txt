@@ -1,0 +1,10 @@
+Flask>=3.1
+SQLAlchemy>=2.0
+GeoAlchemy2>=0.15
+psycopg[binary]>=3.2
+argon2-cffi>=23.1
+google-auth>=2.30
+PyJWT[crypto]>=2.8
+requests>=2.32
+anthropic>=0.40
+pytest>=8
