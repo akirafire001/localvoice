@@ -62,6 +62,8 @@ class GuideSession extends ChangeNotifier {
   LocalStore? store;
   Map<String, dynamic>? trip;
   final List<Map<String, dynamic>> guides = [];
+  List<Map<String, dynamic>> overrides = [];
+  List<Map<String, dynamic>> participants = [];
   Map<String, dynamic>? current;
   Position? lastPosition;
   Motion? lastMotion;
@@ -90,6 +92,7 @@ class GuideSession extends ChangeNotifier {
             ..clear()
             ..addAll(await store!.guides(saved));
           current = guides.isEmpty ? null : guides.last;
+          unawaited(refreshExtras());
         } else {
           await store!.set('active_trip_id', null);
         }
@@ -106,6 +109,8 @@ class GuideSession extends ChangeNotifier {
     _retry?.cancel();
     trip = null;
     guides.clear();
+    overrides = [];
+    participants = [];
     current = null;
     lastPosition = null;
     motion.clear();
@@ -118,6 +123,8 @@ class GuideSession extends ChangeNotifier {
   Future<void> startTrip(Map<String, dynamic> body) async {
     trip = (await api.post('/api/v1/trips', body)).json;
     guides.clear();
+    overrides = [];
+    participants = [];
     current = null;
     throttle.reset();
     motion.clear();
@@ -297,6 +304,55 @@ class GuideSession extends ChangeNotifier {
     if (g is Map) await _onGuide(g.cast<String, dynamic>());
     notifyListeners();
     return r;
+  }
+
+  // ------------------------------------------------------------ P1: instructions, states, companions
+
+  Future<void> refreshExtras() async {
+    if (tripId == null) return;
+    try {
+      overrides = ((await api.get('/api/v1/trips/$tripId/overrides')).json['active'] as List)
+          .cast<Map<String, dynamic>>();
+      participants = ((await api.get('/api/v1/trips/$tripId/participants')).json['participants'] as List)
+          .cast<Map<String, dynamic>>();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Natural-language instruction. Returns the server response (created, needs_confirmation, ...).
+  Future<Map<String, dynamic>> sendCommand(String text) async {
+    final r = (await api.post('/api/v1/trips/$tripId/commands', {'text': text})).json;
+    overrides = (r['active'] as List).cast<Map<String, dynamic>>();
+    throttle.reset(); // re-evaluate soon with the new instruction
+    if (overrides.any((o) => o['type'] == 'quiet')) await audio.stop();
+    notifyListeners();
+    return r;
+  }
+
+  Future<void> removeOverride(String id) async {
+    overrides = ((await api.delete('/api/v1/trips/$tripId/overrides/$id')).json['active'] as List)
+        .cast<Map<String, dynamic>>();
+    throttle.reset();
+    notifyListeners();
+  }
+
+  bool get isQuiet => overrides.any((o) => o['type'] == 'quiet');
+
+  Future<void> setQuiet(int minutes) async {
+    final r = (await api.post('/api/v1/trips/$tripId/states', {'type': 'quiet', 'minutes': minutes})).json;
+    overrides = (r['active'] as List).cast<Map<String, dynamic>>();
+    await audio.stop();
+    notifyListeners();
+  }
+
+  Future<void> addParticipant(String name, List<String> interests) async {
+    await api.post('/api/v1/trips/$tripId/participants', {'display_name': name, 'interests': interests});
+    await refreshExtras();
+  }
+
+  Future<void> removeParticipant(String id) async {
+    await api.delete('/api/v1/trips/$tripId/participants/$id');
+    await refreshExtras();
   }
 
   void playCurrent() {

@@ -13,14 +13,18 @@
 | M3 | LLM Adapter（Claude）による選択・語り＋検証・フォールバック、実行時知識生成ワーカー（Wikipedia/Wikidata/OSM）、curated seed、TripMemorySummary | 完了 |
 | M4 | 音声（VoiceProvider、/voices、/guides/{id}/speech、/speech-assets、キャッシュ） | 完了 |
 | M5 | Flutterアプリ（認証・Home・Guide・Map・History・Preferences・Account、GPS・移動推定・ローカル記録/再送、通知、音声） | 未着手 |
-| M6 | P1（一時指示commands、temporary state、participants） | 未着手 |
+| M6 | P1（一時指示commands、temporary state、participants） | 完了 |
 
 ## 次にやること
 
-- M6 を開始する: サーバーに `POST /trips/{id}/commands`（自然言語→intent_overrides、LLMなしはルール解釈）、`DELETE /trips/{id}/overrides/{id}`、temporary state（静かに等）、`POST /trips/{id}/participants` を追加し、Guide画面にコマンド入力と参加者UIを付ける。
-- その後: PR説明の更新、Ready for review。
+- MVPの対象機能は実装済み。残りは人の作業: curated seed の出典・読みの確認（review_status を reviewed へ）、APIキー・Google/Apple・TTS の設定、実機（Android/iOS）での動作確認。
+- 実機確認で見つかった不具合の修正、PoC後に Alembic 移行の導入。
 
 ## 判断した内容
+
+- 一時指示（P1）: `POST /trips/{id}/commands` は Claude（構造化出力、検証あり）で解釈し、使えない時はキーワード解釈。分からない指示は 422 で保存しない。曖昧（確信度<0.6）は15分だけ反映し `needs_confirmation`。同じカテゴリ・状態の新しい指示は古いものを置き換える。「降りるまで」等の測れない終了条件は文字で保持するだけで、自動終了はしない（チップの×で解除）。
+- 一時状態: quiet 30分（自動案内停止）、hungry 60分（食を優先）、toilet 20分（実用を優先）、tired（間隔2倍）、bored（間隔半分）、no_time（短い文）。UIの「30分静かに」は `POST /trips/{id}/states`。
+- 同行者（participants）はホストのtrip内だけのプロフィールで、興味カテゴリを話題選びに加える。最大8人。
 
 - Flutter: 状態管理は provider。ローカルDBはユーザーごとに別ファイル（`lv_<user_id>.db`）、ログアウト/切替時は GPS・音声・通知を止めてから閉じる。
 - 位置送信は 30m移動 / 60秒 / 移動区分の変化で間引き、サーバーの `next_check_after_sec` 中は大きく動いた時だけ送る。オフライン中は端末に保存し、回復後に再送（サーバー側は履歴保存のみ）。

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../api/api_client.dart';
 import '../audio/audio_controller.dart';
 import '../guide/guide_session.dart';
 import '../location/track.dart';
@@ -81,6 +82,13 @@ class _GuideScreenState extends State<GuideScreen> {
           PopupMenuButton<String>(
             onSelected: (v) async {
               if (v == 'transport') await _pickTransport(s);
+              if (v == 'people' && context.mounted) {
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => const _Companions(),
+                );
+              }
               if (v == 'map' && context.mounted) {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => MapScreen(initialTripId: s.tripId)));
               }
@@ -88,6 +96,7 @@ class _GuideScreenState extends State<GuideScreen> {
             itemBuilder: (_) => [
               PopupMenuItem(value: 'transport', child: Text(tr('移動手段を変更', 'Change transport'))),
               PopupMenuItem(value: 'map', child: Text(tr('地図を開く', 'Open map'))),
+              PopupMenuItem(value: 'people', child: Text(tr('同行者', 'Companions'))),
             ],
           ),
           TextButton(onPressed: () => _finish(s), child: Text(tr('終了', 'Finish'))),
@@ -364,6 +373,165 @@ class _Sources extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Free-text temporary instruction (flutter-ux §7) plus a one-tap quiet button.
+class _CommandBar extends StatefulWidget {
+  const _CommandBar({required this.session});
+  final GuideSession session;
+  @override
+  State<_CommandBar> createState() => _CommandBarState();
+}
+
+class _CommandBarState extends State<_CommandBar> {
+  final _c = TextEditingController();
+  bool _busy = false;
+
+  Future<void> _send() async {
+    final text = _c.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      final r = await widget.session.sendCommand(text);
+      _c.clear();
+      if (!mounted) return;
+      final labels = (r['created'] as List).map((e) => e['label']).join('、');
+      showInfo(
+        context,
+        r['needs_confirmation'] == true
+            ? tr('「$labels」として短時間だけ反映しました。違う場合は×で解除してください。', 'Applied "$labels" briefly. Tap × if that is wrong.')
+            : r['resumed'] == true && labels.isEmpty
+            ? tr('ガイドを再開します', 'Guiding resumed')
+            : tr('「$labels」にしました', 'Set: $labels'),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'command_not_understood') {
+        showInfo(
+          context,
+          tr(
+            'うまく理解できませんでした。例:「しばらく建築を多めに」「30分静かに」',
+            'Not understood. Try "more architecture for a while" or "quiet for 30 min".',
+          ),
+        );
+      } else {
+        showError(context, e);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.session;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 8, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _c,
+                enabled: !_busy,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: tr('例: しばらく建築を多めに', 'e.g. more architecture for a while'),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+            IconButton(icon: const Icon(Icons.send), tooltip: tr('送信', 'Send'), onPressed: _busy ? null : _send),
+            IconButton(
+              icon: Icon(s.isQuiet ? Icons.notifications_off : Icons.notifications_paused_outlined),
+              tooltip: tr('30分静かに', 'Quiet for 30 min'),
+              onPressed: s.isQuiet ? null : () => guarded(context, () => s.setQuiet(30)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Companions extends StatefulWidget {
+  const _Companions();
+  @override
+  State<_Companions> createState() => _CompanionsState();
+}
+
+class _CompanionsState extends State<_Companions> {
+  final _name = TextEditingController();
+  final Set<String> _interests = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.watch<GuideSession>();
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(tr('同行者', 'Companions'), style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            tr('同行者の興味も話題選びに反映します。この旅行の中だけで使います。', 'Their interests are used for this trip only.'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          for (final p in s.participants)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(p['display_name'] as String),
+              subtitle: Text(((p['interests'] as List?) ?? []).map((c) => categoryLabel(c as String)).join('・')),
+              trailing: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => guarded(context, () => s.removeParticipant(p['participant_id'] as String)),
+              ),
+            ),
+          const Divider(),
+          TextField(
+            controller: _name,
+            decoration: InputDecoration(labelText: tr('名前', 'Name')),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            children: [
+              for (final c in categoryLabels.keys)
+                FilterChip(
+                  label: Text(categoryLabel(c)),
+                  selected: _interests.contains(c),
+                  onSelected: (v) => setState(() => v ? _interests.add(c) : _interests.remove(c)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: () async {
+                if (_name.text.trim().isEmpty) return;
+                final ok = await guarded(context, () async {
+                  await s.addParticipant(_name.text.trim(), _interests.toList());
+                  return true;
+                });
+                if (ok == true && mounted) {
+                  setState(() {
+                    _name.clear();
+                    _interests.clear();
+                  });
+                }
+              },
+              child: Text(tr('追加', 'Add')),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

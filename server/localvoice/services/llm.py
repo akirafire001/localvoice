@@ -122,6 +122,33 @@ GENERATE_SCHEMA = {
 
 SUMMARY_SYSTEM = """Summarize what a LocalVoice audio guide has told a traveller so far today, so the next stories can build on it. 2-4 sentences in the requested language: main themes, places, and threads that could be continued. Use only the given stories."""
 
+COMMAND_SYSTEM = """You turn a traveller's spoken or typed instruction to the LocalVoice audio guide into structured, temporary settings. Return JSON only, following the schema.
+- intents: change how often a topic category comes up. type focus_category (more of it) or suppress_category (less of it). target must be one of: history, architecture, nature, food, culture, everyday_life, industry, seasonal, practical.
+- states: the traveller's current situation. quiet (stop talking), hungry, toilet, tired, bored, no_time (keep it short).
+- resume: true when they ask the guide to start talking again.
+- ttl_min: how long it should last in minutes (5-240). Use the stated duration when given; otherwise a sensible default (quiet 30, toilet 20, others 60).
+- end_condition: copy any end condition you cannot measure (e.g. "until I get off this train") as short text, else null. Do not guess when it ends.
+- confidence: 0-1, how sure you are of the interpretation. Use below 0.6 when the request is vague or could mean several things.
+Never invent categories or states outside these lists. If nothing applies, return empty lists and confidence 0."""
+
+COMMAND_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "intents": {"type": "array", "items": {"type": "object", "properties": {
+            "type": {"type": "string", "enum": ["focus_category", "suppress_category"]},
+            "target": {"type": "string"},
+            "ttl_min": {"type": "integer"}}, "required": ["type", "target", "ttl_min"], "additionalProperties": False}},
+        "states": {"type": "array", "items": {"type": "object", "properties": {
+            "type": {"type": "string", "enum": ["quiet", "hungry", "toilet", "tired", "bored", "no_time"]},
+            "ttl_min": {"type": "integer"}}, "required": ["type", "ttl_min"], "additionalProperties": False}},
+        "resume": {"type": "boolean"},
+        "end_condition": {"type": ["string", "null"]},
+        "confidence": {"type": "number"},
+    },
+    "required": ["intents", "states", "resume", "end_condition", "confidence"],
+    "additionalProperties": False,
+}
+
 
 class LLMError(Exception):
     pass
@@ -294,6 +321,13 @@ class ClaudeLLM:
         except (LLMError, _MetaError):
             return None
         return data.get("summary")
+
+    def parse_command(self, text, language):
+        """Returns (data, meta) or raises LLMError/_MetaError."""
+        return self._json_call(
+            COMMAND_SYSTEM, json.dumps({"language": language, "instruction": text}, ensure_ascii=False),
+            COMMAND_SCHEMA, "low", self.cfg.LLM_TIMEOUT_SEC, max_tokens=1000,
+        )
 
 
 class _MetaError(Exception):

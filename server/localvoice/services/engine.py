@@ -15,10 +15,11 @@ from ..models import (
     IntentOverride,
     KnowledgeItem,
     NotificationHistory,
+    Participant,
     TemporaryState,
 )
 from ..util import now, parse_datetime, parse_uuid
-from . import geo
+from . import commands, geo
 from .prefs import CATEGORIES, NOTIFICATION_LEVELS, trip_settings
 from .ranking import active_boosts, fetch_candidates, load_interests, score_candidates, seed_for, todays_history
 from .rendering import item_speech_text, item_texts, location_payload, guide_payload
@@ -198,8 +199,14 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     t = now()
     settings = trip_settings(trip, user)
     mode = trip.selection_mode
-    level = NOTIFICATION_LEVELS.get(settings["notification_level"], NOTIFICATION_LEVELS["normal"])
+    level = dict(NOTIFICATION_LEVELS.get(settings["notification_level"], NOTIFICATION_LEVELS["normal"]))
     manual = trigger != "context"
+    state_topics, cooldown_factor, detail_override = commands.state_effects(commands.active_states(db, trip.id, t))
+    if cooldown_factor != 1.0:
+        level["cooldown_sec"] = int(level["cooldown_sec"] * cooldown_factor)
+        level["hourly_limit"] = max(1, round(level["hourly_limit"] / cooldown_factor))
+    if detail_override:
+        settings["detail_mode"] = detail_override
 
     if snap.accuracy_m is not None and float(snap.accuracy_m) > cfg.MAX_ACCURACY_M:
         return _silent(db, trip, snap, "low_accuracy", mode, 30, trigger=trigger)
@@ -234,6 +241,9 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     intents = active_intents(db, trip.id, t)
     session_topics = set((snap.context_json or {}).get("active_topics") or [])
     session_topics |= set((trip.settings_json or {}).get("focus_categories") or [])
+    session_topics |= state_topics
+    for (prof,) in db.execute(select(Participant.profile_json).where(Participant.trip_session_id == trip.id)):
+        session_topics |= set((prof or {}).get("interests") or [])  # companions' interests (P1)
     for it in intents:
         if it.type == "focus_category" and it.target:
             session_topics.add(it.target)

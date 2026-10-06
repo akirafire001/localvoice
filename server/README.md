@@ -43,10 +43,11 @@ Tests use a real PostGIS database and fake Google/Apple/LLM/TTS providers; no ex
 ## Layout
 
 - `localvoice/auth/` — ID/password, Google, Apple, LocalVoice sessions
-- `localvoice/api/` — trips/context/history/track, feedback, preferences, voices
+- `localvoice/api/` — trips/context/history/track, feedback, preferences, voices, commands/overrides/states/participants (P1)
 - `localvoice/services/engine.py` — `/context` pipeline (rules → LLM → validation → decision log)
 - `localvoice/services/ranking.py` — PostGIS candidates and scoring
 - `localvoice/services/llm.py` — Claude adapter and output validation
 - `localvoice/services/knowledge_gen.py`, `sources.py` — runtime knowledge generation
 - `localvoice/services/voice.py` — VoiceProvider and audio cache
+- `localvoice/services/commands.py` — natural-language temporary instructions and temporary states
 - `localvoice/worker.py` — background loop
