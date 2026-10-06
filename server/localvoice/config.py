@@ -48,7 +48,8 @@ class Config:
         self.APPLE_SERVICES_ID = os.environ.get("APPLE_SERVICES_ID", "")  # Android/Web audience
         self.APPLE_REDIRECT_URI = os.environ.get("APPLE_REDIRECT_URI", "")
         self.APPLE_ANDROID_APP_RETURN_URI = os.environ.get(
-            "APPLE_ANDROID_APP_RETURN_URI", "localvoice://auth/apple"
+            "APPLE_ANDROID_APP_RETURN_URI",
+            "intent://callback#Intent;package=com.localvoice.localvoice;scheme=signinwithapple;end"
         )
         self.APPLE_CHALLENGE_TTL_SEC = _int("APPLE_CHALLENGE_TTL_SEC", 600)
         # Fernet-compatible key material for encrypting Apple refresh tokens (kept outside the DB)

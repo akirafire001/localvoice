@@ -17,9 +17,16 @@
 
 ## 次にやること
 
-- M5 を開始する: `app/` に Flutter プロジェクトを作る（認証・Home・Guide・Map・History・Preferences・Account、GPS・移動推定・ローカル記録/再送、通知、音声）。サーバーAPIは `server/README.md` と各 `api/*.py` を参照。
+- M6 を開始する: サーバーに `POST /trips/{id}/commands`（自然言語→intent_overrides、LLMなしはルール解釈）、`DELETE /trips/{id}/overrides/{id}`、temporary state（静かに等）、`POST /trips/{id}/participants` を追加し、Guide画面にコマンド入力と参加者UIを付ける。
+- その後: PR説明の更新、Ready for review。
 
 ## 判断した内容
+
+- Flutter: 状態管理は provider。ローカルDBはユーザーごとに別ファイル（`lv_<user_id>.db`）、ログアウト/切替時は GPS・音声・通知を止めてから閉じる。
+- 位置送信は 30m移動 / 60秒 / 移動区分の変化で間引き、サーバーの `next_check_after_sec` 中は大きく動いた時だけ送る。オフライン中は端末に保存し、回復後に再送（サーバー側は履歴保存のみ）。
+- Androidは位置のフォアグラウンドサービス（常時位置権限は求めない）、iOSは `location`/`audio` バックグラウンドモード。
+- 音声は世代番号で管理し、古い・停止後・ログアウト後の音声は自動再生しない。サーバー音声を最大5秒待ち、端末TTSは利用者が許可した時だけ。
+- Android の Apple ログインは sign_in_with_apple のWebフロー。サーバー `apple/start` が client_id と redirect_uri を返し、コールバックは `intent://callback?...;scheme=signinwithapple` でアプリへ戻す（handoff code を `apple/complete` へ）。
 
 - 音声: `TTS_PROVIDER=none` が既定（端末TTSへ代替）。`google`（Chirp 3 HD）と開発用 `silent` を実装。声は `services/voice.py` の許可リスト。採用声は試聴後に差し替える。個人化（LLMが書いた）原稿は private、保存済み原稿は shared。
 

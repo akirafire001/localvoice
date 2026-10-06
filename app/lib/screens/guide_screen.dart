@@ -1,0 +1,369 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../audio/audio_controller.dart';
+import '../guide/guide_session.dart';
+import '../location/track.dart';
+import '../util/i18n.dart';
+import '../widgets/common.dart';
+import '../widgets/track_map.dart';
+import 'history_screen.dart';
+import 'home_screen.dart';
+import 'map_screen.dart';
+
+/// Main screen while guiding (flutter-ux §3): mini map on top third, current story card,
+/// one-tap ratings and commands.
+class GuideScreen extends StatefulWidget {
+  const GuideScreen({super.key});
+  @override
+  State<GuideScreen> createState() => _GuideScreenState();
+}
+
+class _GuideScreenState extends State<GuideScreen> {
+  List<TrackPoint> _track = [];
+  int _trackLoadedFor = -1;
+
+  Future<void> _loadTrack(GuideSession s) async {
+    if (s.store == null || s.tripId == null) return;
+    final rows = await s.store!.points(s.tripId!);
+    if (!mounted) return;
+    setState(() {
+      _track = [
+        for (final r in rows)
+          TrackPoint(
+            DateTime.parse(r['observed_at'] as String),
+            r['lat'] as double,
+            r['lon'] as double,
+            r['accuracy_m'] as double?,
+          ),
+      ];
+    });
+  }
+
+  Future<void> _finish(GuideSession s) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('ガイドを終了しますか？', 'Finish the guide?')),
+        content: Text(tr('位置情報の取得と音声を止めます。', 'Location tracking and audio will stop.')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('続ける', 'Continue'))),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('終了', 'Finish'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final tripId = s.tripId;
+    final summary = await guarded(context, s.finishTrip);
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TripDetailScreen(tripId: tripId!, summary: summary),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.watch<GuideSession>();
+    final audio = context.watch<AudioController>();
+    if (s.guides.length + (s.lastPosition == null ? 0 : 1) != _trackLoadedFor) {
+      _trackLoadedFor = s.guides.length + (s.lastPosition == null ? 0 : 1);
+      _loadTrack(s);
+    }
+    final pos = s.lastPosition;
+    final g = s.current;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(tr('ガイド中', 'Guiding')),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (v) async {
+              if (v == 'transport') await _pickTransport(s);
+              if (v == 'map' && context.mounted) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => MapScreen(initialTripId: s.tripId)));
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'transport', child: Text(tr('移動手段を変更', 'Change transport'))),
+              PopupMenuItem(value: 'map', child: Text(tr('地図を開く', 'Open map'))),
+            ],
+          ),
+          TextButton(onPressed: () => _finish(s), child: Text(tr('終了', 'Finish'))),
+        ],
+      ),
+      body: Column(
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height / 3,
+            child: TrackMap(
+              compact: true,
+              points: _track,
+              current: pos == null ? null : TrackPoint(pos.timestamp, pos.latitude, pos.longitude, pos.accuracy),
+              currentAccuracyM: pos?.accuracy,
+              guides: [
+                for (final x in s.guides)
+                  if (x['location']?['lat'] != null)
+                    GuideMarker(
+                      (x['location']['lat'] as num).toDouble(),
+                      (x['location']['lon'] as num).toDouble(),
+                      x['title'] as String,
+                    ),
+              ],
+            ),
+          ),
+          _StatusBar(session: s),
+          Expanded(
+            child: g == null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        tr(
+                          '近くに話題があればお知らせします。画面を閉じてもガイドは続きます。',
+                          'We will tell you when there is a story nearby. Guiding continues with the screen off.',
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+                : _GuideCard(guide: g, session: s, audio: audio),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickTransport(GuideSession s) async {
+    final cur = s.trip?['manual_transport_mode'] as String? ?? 'auto';
+    final v = await showModalBottomSheet<String>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final k in transportLabels.keys)
+              ListTile(
+                title: Text(labelOf(transportLabels, k)),
+                trailing: k == cur ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.pop(c, k),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (v != null && v != cur && mounted) await guarded(context, () => s.updateTrip({'manual_transport_mode': v}));
+  }
+}
+
+class _StatusBar extends StatelessWidget {
+  const _StatusBar({required this.session});
+  final GuideSession session;
+  @override
+  Widget build(BuildContext context) {
+    final s = session;
+    String text;
+    IconData icon;
+    switch (s.gps) {
+      case GpsState.denied:
+        text = tr('位置情報が許可されていません。設定で許可してください。', 'Location permission is off. Allow it in Settings.');
+        icon = Icons.location_disabled;
+      case GpsState.serviceOff:
+        text = tr('端末の位置情報がオフです。', 'Device location is turned off.');
+        icon = Icons.location_off;
+      case GpsState.off:
+      case GpsState.starting:
+        text = tr('位置情報を待っています…', 'Waiting for location…');
+        icon = Icons.location_searching;
+      case GpsState.on:
+        final acc = s.lastPosition?.accuracy;
+        text = acc == null
+            ? tr('位置情報を待っています…', 'Waiting for location…')
+            : acc > 100
+            ? tr('位置の精度が低いため、案内を控えています（±${acc.round()}m）', 'Low accuracy (±${acc.round()} m); holding guides')
+            : '${_modeLabel(s.lastMotion?.mode)} · ±${acc.round()}m';
+        icon = Icons.gps_fixed;
+    }
+    if (s.offline) {
+      text = tr('オフライン：位置は端末に保存し、通信回復後に送ります', 'Offline: points are saved and sent later');
+      icon = Icons.cloud_off;
+    }
+    return Container(
+      width: double.infinity,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 16),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
+        ],
+      ),
+    );
+  }
+
+  static String _modeLabel(String? m) => switch (m) {
+    'stationary' => tr('停止中', 'Stopped'),
+    'walking' => tr('徒歩', 'Walking'),
+    'cycling' => tr('自転車程度', 'Cycling speed'),
+    'motorized' => tr('車・電車', 'Car / train'),
+    'high_speed' => tr('高速移動', 'High speed'),
+    _ => tr('移動を判定中', 'Detecting movement'),
+  };
+}
+
+class _GuideCard extends StatelessWidget {
+  const _GuideCard({required this.guide, required this.session, required this.audio});
+  final Map<String, dynamic> guide;
+  final GuideSession session;
+  final AudioController audio;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = guide;
+    final theme = Theme.of(context);
+    final rating = g['rating'] as String?;
+    final playingThis = audio.currentHistoryId == g['history_id'] && audio.state != SpeechState.idle;
+    final loc = g['location'] as Map?;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Row(
+          children: [
+            Chip(label: Text(categoryLabel(g['category'] as String?)), visualDensity: VisualDensity.compact),
+            const SizedBox(width: 8),
+            if (g['origin'] == 'generated') const GeneratedBadge(),
+            const Spacer(),
+            if (loc?['relative_direction'] != null)
+              Text(_dir(loc!['relative_direction'] as String), style: theme.textTheme.bodySmall),
+          ],
+        ),
+        Text(g['title'] as String? ?? '', style: theme.textTheme.titleLarge),
+        const SizedBox(height: 8),
+        Text(g['text'] as String? ?? '', style: theme.textTheme.bodyLarge),
+        if (g['detail_text'] != null && g['_showDetail'] == true) ...[
+          const SizedBox(height: 8),
+          Text(g['detail_text'] as String, style: theme.textTheme.bodyMedium),
+        ],
+        const SizedBox(height: 8),
+        _Sources(guide: g),
+        if (audio.state == SpeechState.textOnly && audio.currentHistoryId == g['history_id'])
+          Text(
+            tr('音声を用意できなかったため、文字で表示しています。', 'Audio is unavailable; showing text.'),
+            style: theme.textTheme.bodySmall,
+          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            IconButton.filledTonal(
+              icon: Icon(playingThis ? Icons.stop : Icons.volume_up),
+              tooltip: playingThis ? tr('停止', 'Stop') : tr('読み上げ', 'Play'),
+              onPressed: () => playingThis ? audio.stop() : session.playCurrent(),
+            ),
+            if (audio.state == SpeechState.preparing && audio.currentHistoryId == g['history_id'])
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            const Spacer(),
+            TextButton(
+              onPressed: () async {
+                await guarded(context, () => session.feedback(g, 'more_detail'));
+                g['_showDetail'] = true;
+              },
+              child: Text(tr('詳しく', 'More')),
+            ),
+            TextButton(
+              onPressed: () => guarded(context, () => session.feedback(g, 'skip_story')),
+              child: Text(tr('次の話', 'Next')),
+            ),
+          ],
+        ),
+        Wrap(
+          spacing: 8,
+          children: [
+            ActionChip(
+              label: Text(tr('関連する話を', 'More like this')),
+              onPressed: () => _act(context, 'more_related', tr('関連する話を増やします', 'More related stories')),
+            ),
+            ActionChip(
+              label: Text(tr('この話題はもう十分', 'Enough of this topic')),
+              onPressed: () => _act(context, 'enough_topic', tr('しばらくこの話題を控えます', 'This topic will pause for a while')),
+            ),
+          ],
+        ),
+        const Divider(height: 24),
+        Text(tr('この話はどうでしたか？', 'How was this story?'), style: theme.textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final r in const [
+              ['interesting', '面白い', 'Interesting'],
+              ['knew_it', '知ってた', 'Knew it'],
+              ['not_interesting', '興味なし', 'Not for me'],
+              ['wrong_info', '情報が違う', 'Wrong info'],
+            ])
+              ChoiceChip(
+                label: Text(tr(r[1], r[2])),
+                selected: rating == r[0],
+                onSelected: (_) => _act(
+                  context,
+                  r[0],
+                  r[0] == 'wrong_info' ? tr('報告しました。確認まで表示を止めます。', 'Reported; hidden until reviewed.') : null,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _act(BuildContext context, String action, String? done) async {
+    final r = await guarded(context, () => session.feedback(guide, action));
+    if (r != null && done != null && context.mounted) showInfo(context, done);
+  }
+
+  static String _dir(String d) => switch (d) {
+    'ahead' => tr('前方', 'ahead'),
+    'left' => tr('左手', 'on the left'),
+    'right' => tr('右手', 'on the right'),
+    'behind' => tr('後方', 'behind'),
+    'here' => tr('この辺り', 'around here'),
+    _ => '',
+  };
+}
+
+class _Sources extends StatelessWidget {
+  const _Sources({required this.guide});
+  final Map<String, dynamic> guide;
+  @override
+  Widget build(BuildContext context) {
+    final src = (guide['sources'] as List?) ?? const [];
+    final conf = guide['confidence'] as Map?;
+    if (src.isEmpty && conf == null) return const SizedBox.shrink();
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      title: Text(tr('出典・信頼度', 'Sources & confidence'), style: Theme.of(context).textTheme.bodySmall),
+      children: [
+        if (conf != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${tr('信頼度', 'Confidence')}: ${conf['level']} · ${conf['fact_type'] ?? ''}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        for (final s in src)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '• ${s['title'] ?? s['url'] ?? ''}${s['license'] != null ? ' (${s['license']})' : ''}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+      ],
+    );
+  }
+}

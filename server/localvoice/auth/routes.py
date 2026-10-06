@@ -321,6 +321,8 @@ def apple_start():
     resp = {"challenge_id": str(ch.id), "nonce": nonce, "expires_at": ch.expires_at.isoformat()}
     if state:
         resp["state"] = state
+        resp["client_id"] = audience
+        resp["redirect_uri"] = _cfg().APPLE_REDIRECT_URI
         resp["authorization_url"] = APPLE_AUTHORIZE_URL + "?" + urlencode(
             {
                 "client_id": audience,
