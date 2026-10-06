@@ -95,7 +95,7 @@ class Config:
         )
 
         # Voice (voice-design §6-7)
-        self.TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "silent")  # silent | google
+        self.TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "none")  # none | silent (dev) | google
         self.GOOGLE_TTS_API_KEY = os.environ.get("GOOGLE_TTS_API_KEY", "")
         self.AUDIO_STORE_DIR = os.environ.get("AUDIO_STORE_DIR", "audio_store")
         self.PRIVATE_AUDIO_RETENTION_DAYS = _int("PRIVATE_AUDIO_RETENTION_DAYS", 7)

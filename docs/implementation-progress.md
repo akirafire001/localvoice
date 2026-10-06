@@ -11,15 +11,17 @@
 | M1 | サーバー基盤（Flask app factory、DBモデル、エラー形式）と認証（ID/パスワード、token更新・失効、再認証、me、削除、Google、Apple、復旧メール・再設定） | 完了 |
 | M2 | trip・context（PostGIS候補・ランキング・cooldown・黙る判定・決定ログ）・history・track・feedback・preferences/interests | 完了 |
 | M3 | LLM Adapter（Claude）による選択・語り＋検証・フォールバック、実行時知識生成ワーカー（Wikipedia/Wikidata/OSM）、curated seed、TripMemorySummary | 完了 |
-| M4 | 音声（VoiceProvider、/voices、/guides/{id}/speech、/speech-assets、キャッシュ） | 未着手 |
+| M4 | 音声（VoiceProvider、/voices、/guides/{id}/speech、/speech-assets、キャッシュ） | 完了 |
 | M5 | Flutterアプリ（認証・Home・Guide・Map・History・Preferences・Account、GPS・移動推定・ローカル記録/再送、通知、音声） | 未着手 |
 | M6 | P1（一時指示commands、temporary state、participants） | 未着手 |
 
 ## 次にやること
 
-- M4 を開始する: `server/localvoice/services/voice.py`（現在は声の許可リストのみ）に VoiceProvider（silent/Google TTS）、AudioAsset のキャッシュキー・生成キュー、`GET /voices`、`POST /guides/{id}/speech`、`GET /speech-assets/{id}`、`worker.process_pending_audio`/`cleanup_expired_audio` を実装する。
+- M5 を開始する: `app/` に Flutter プロジェクトを作る（認証・Home・Guide・Map・History・Preferences・Account、GPS・移動推定・ローカル記録/再送、通知、音声）。サーバーAPIは `server/README.md` と各 `api/*.py` を参照。
 
 ## 判断した内容
+
+- 音声: `TTS_PROVIDER=none` が既定（端末TTSへ代替）。`google`（Chirp 3 HD）と開発用 `silent` を実装。声は `services/voice.py` の許可リスト。採用声は試聴後に差し替える。個人化（LLMが書いた）原稿は private、保存済み原稿は shared。
 
 - LLMは `services/llm.py` の ClaudeLLM（`claude-opus-5-5`、構造化出力、選択はeffort low・4秒、生成はmedium、`fallbacks: "default"`、systemにcache_control）。キー未設定時は無効でルールにフォールバック。
 - LLM出力の検証: 候補内のID、候補のclaim ID、視界表現の禁止、方位不確かな時の左右禁止、素材にない数字の禁止。失敗理由は guide_decisions.fallback_reason。
