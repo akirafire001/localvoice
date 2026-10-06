@@ -67,6 +67,8 @@ Request:
 ```json
 {"purpose":"travel","language":"ja","settings":{"notification_level":"normal","detail_mode":"auto","serendipity":"normal"}}
 ```
+`settings.selection_mode` は `llm`（既定）/ `rule`。PoCで同じ旅行の中で切り替えて比較するために使う。
+
 Response: `201 {"trip_id":"...","started_at":"..."}`
 
 ## PATCH /trips/{trip_id}
@@ -77,6 +79,8 @@ Response: `201 {"trip_id":"...","started_at":"..."}`
 
 ## POST /trips/{trip_id}/context
 中心API。位置/移動/状態を送信し、通知すべき場合だけguideを返す。
+
+処理順: ルール判定（cooldown・上限・GPS精度・候補の閾値）→ 通知可能な時だけLLMで選択・語り → サーバーで出力検証 → 失敗時はルール1位の保存済み本文へフォールバック。LLMの呼び出しには短いタイムアウト（初期値4秒）を置く。あわせて、現在地と進行方向の先で知識が足りないセルの実行時生成ジョブを非同期に積む（応答は待たない）。詳細は[リアルタイムLLM設計](realtime-llm-design-v0.1.md)。
 
 Request:
 ```json
@@ -94,6 +98,8 @@ No notification:
 {"guide":null,"decision":{"reason":"cooldown","next_check_after_sec":60}}
 ```
 
+`decision.reason` は `cooldown` / `hourly_limit` / `low_accuracy` / `below_threshold` / `llm_silent`（LLMが黙ることを選んだ）/ `duplicate_event` 等。
+
 Guide:
 ```json
 {
@@ -107,9 +113,11 @@ Guide:
    "confidence":{"level":"high","fact_type":"verified_fact"},
    "sources":[{"title":"...","publisher":"...","url":"..."}],
    "image":null,
-   "speech":{"enabled":true,"text":"...","content_version":"v1","voice_profile_id":"ja-default","audio":null}
+   "speech":{"enabled":true,"text":"...","content_version":"v1","voice_profile_id":"ja-default","audio":null},
+   "origin":"generated",
+   "selection_mode":"llm"
  },
- "decision":{"score":0.81,"reason":"selected"}
+ "decision":{"score":0.81,"reason":"selected","decision_id":"uuid","fallback":false}
 }
 ```
 
@@ -181,6 +189,10 @@ Action:
 - `like`
 - `dislike`
 - `skip_story`
+- `interesting`（知らなかった・面白い）
+- `knew_it`（知っていた）
+- `not_interesting`（興味なし）
+- `wrong_info`（間違っていそう。該当KnowledgeItemを配信停止しレビュー待ちにする）
 
 `more_detail` は詳細文を返してよい。`more_related` はtopic boostを生成。`enough_topic` は当該topic boostを終了するが長期趣向を下げない。
 
