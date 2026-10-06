@@ -17,7 +17,12 @@ def create_app(config=None):
 
     from .auth.routes import bp as auth_bp
 
-    app.register_blueprint(auth_bp, url_prefix="/api/v1")
+    from .api.guides import bp as guides_bp
+    from .api.preferences import bp as prefs_bp
+    from .api.trips import bp as trips_bp
+
+    for bp in (auth_bp, trips_bp, guides_bp, prefs_bp):
+        app.register_blueprint(bp, url_prefix="/api/v1")
 
     @app.get("/healthz")
     def healthz():

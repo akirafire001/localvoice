@@ -1,6 +1,6 @@
 Flask>=3.1
 SQLAlchemy>=2.0
-GeoAlchemy2>=0.15
+GeoAlchemy2[shapely]>=0.15
 psycopg[binary]>=3.2
 argon2-cffi>=23.1
 google-auth>=2.30
