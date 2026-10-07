@@ -10,7 +10,7 @@ from ..errors import ApiError, bad_request, not_found
 from ..models import ApiUsageLog, IntentOverride, Participant, TemporaryState
 from ..services import commands
 from ..services.engine import llm_cost_so_far
-from ..services.llm import LLMError, _MetaError, get_llm
+from ..services.llm import LLMError, _MetaError, get_llm, llm_provider
 from ..services.prefs import LANGUAGES
 from ..util import json_body, now, parse_uuid, require_str
 from .trips import get_owned_trip
@@ -47,7 +47,7 @@ def _parse(db, trip, text):
             log.info("command parse fell back: %s", e)
         finally:
             if meta.get("model"):
-                db.add(ApiUsageLog(trip_session_id=trip.id, provider="anthropic", operation="parse_command",
+                db.add(ApiUsageLog(trip_session_id=trip.id, provider=llm_provider(llm), operation="parse_command",
                                    request_units=1, estimated_cost=meta.get("cost_usd") or 0,
                                    details_json={"model": meta.get("model"), "latency_ms": meta.get("latency_ms")}))
     return commands.rule_parse(text), {}

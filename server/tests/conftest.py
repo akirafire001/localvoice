@@ -6,6 +6,10 @@ from cryptography.fernet import Fernet
 from sqlalchemy import text
 
 os.environ.setdefault("TESTING", "1")
+# Real keys on a developer machine must not change provider defaults (model, prices) in tests.
+for _key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LLM_PROVIDER", "LLM_MODEL",
+             "LLM_PRICE_INPUT_PER_MTOK", "LLM_PRICE_OUTPUT_PER_MTOK"):
+    os.environ.pop(_key, None)
 
 from localvoice import create_app  # noqa: E402
 from localvoice.auth.providers import ProviderTokenInvalid  # noqa: E402

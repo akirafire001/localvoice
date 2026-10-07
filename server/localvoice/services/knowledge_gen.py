@@ -20,7 +20,7 @@ from ..models import (
 )
 from ..util import now
 from . import geo
-from .llm import VISUAL_PATTERNS, LLMError, get_llm
+from .llm import VISUAL_PATTERNS, LLMError, get_llm, llm_provider
 from .sources import collect_materials
 
 log = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ def generate_cell(db, cell):
         names = [m["title"] for m in materials if m.get("title")]
         try:
             extra, meta = llm.research_with_web_search(cell, center, names)
-            _usage(db, "web_research", meta)
+            _usage(db, "web_research", meta, llm)
             base = len(materials)
             for i, m in enumerate(extra, 1):
                 m["id"] = f"m{base + i}"
@@ -147,13 +147,13 @@ def generate_cell(db, cell):
     if not materials:
         return 0
     items, meta = llm.generate_items(cell, center, materials)
-    _usage(db, "generate_knowledge", meta)
+    _usage(db, "generate_knowledge", meta, llm)
     return store_generated(db, cell, center, materials, items, meta)
 
 
-def _usage(db, operation, meta):
+def _usage(db, operation, meta, llm):
     db.add(ApiUsageLog(
-        trip_session_id=None, provider="anthropic", operation=operation, request_units=1,
+        trip_session_id=None, provider=llm_provider(llm), operation=operation, request_units=1,
         estimated_cost=meta.get("cost_usd") or 0, details_json={k: v for k, v in meta.items() if k != "cost_usd"},
     ))
 

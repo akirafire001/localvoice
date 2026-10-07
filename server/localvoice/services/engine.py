@@ -162,10 +162,12 @@ def _silent(db, trip, snap, reason, mode, next_after=60, candidates=None, rule_c
 
 
 def llm_cost_so_far(db, trip_id):
+    from .llm import LLM_PROVIDERS  # local import to avoid cycles
+
     return float(
         db.execute(
             select(func.coalesce(func.sum(ApiUsageLog.estimated_cost), 0)).where(
-                ApiUsageLog.trip_session_id == trip_id, ApiUsageLog.provider == "anthropic"
+                ApiUsageLog.trip_session_id == trip_id, ApiUsageLog.provider.in_(LLM_PROVIDERS)
             )
         ).scalar_one()
     )
@@ -304,7 +306,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     chosen, selection, fallback, fallback_reason = rule_choice, None, False, None
     llm_meta = {}
     if mode == "llm":
-        from .llm import get_llm  # local import to avoid cycles
+        from .llm import get_llm, llm_provider  # local import to avoid cycles
 
         llm = get_llm()
         if llm is None:
@@ -313,7 +315,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
             fallback, fallback_reason = True, "cost_limit"
         else:
             result = llm.select(sel_input)
-            _log_llm_usage(db, trip.id, result)
+            _log_llm_usage(db, trip.id, result, llm_provider(llm))
             llm_meta = {
                 "llm_model": result.model,
                 "prompt_version": result.prompt_version,
@@ -398,13 +400,13 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     }
 
 
-def _log_llm_usage(db, trip_id, sel):
+def _log_llm_usage(db, trip_id, sel, provider):
     if sel.model is None:
         return
     db.add(
         ApiUsageLog(
             trip_session_id=trip_id,
-            provider="anthropic",
+            provider=provider,
             operation="select_narrate",
             request_units=1,
             estimated_cost=sel.cost_usd or 0,

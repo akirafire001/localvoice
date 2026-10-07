@@ -35,6 +35,7 @@
 - 音声: `TTS_PROVIDER=none` が既定（端末TTSへ代替）。`google`（Chirp 3 HD）と開発用 `silent` を実装。声は `services/voice.py` の許可リスト。採用声は試聴後に差し替える。個人化（LLMが書いた）原稿は private、保存済み原稿は shared。
 
 - LLMは `services/llm.py` の ClaudeLLM（`claude-opus-5-5`、構造化出力、選択はeffort low・4秒、生成はmedium、`fallbacks: "default"`、systemにcache_control）。キー未設定時は無効でルールにフォールバック。
+- OpenAIも選べる（`LLM_PROVIDER=openai` または `OPENAI_API_KEY` のみ設定）。`OpenAILLM` が Responses API の構造化出力（strict json_schema）と web_search で同じプロンプト・スキーマ・検証を使う。既定モデルは `gpt-6-luna`（選択の4秒タイムアウトに収まる。`gpt-6.1-sol` は実測約8秒でルールにフォールバックする）。api_usage_logs の provider は `openai`。
 - LLM出力の検証: 候補内のID、候補のclaim ID、視界表現の禁止、方位不確かな時の左右禁止、素材にない数字の禁止。失敗理由は guide_decisions.fallback_reason。
 - 実行時生成の確度はルールで medium/low のみ（highは自動付与しない）。沿革・実用のみ・関係の薄い過去ニュースは auto_eligible=false。
 - 実証地域の curated seed（宮島・広島・尾道・奈良 18話）は**下書き**。旅行前に人が出典と読みを確認し、review_status を reviewed にする必要がある。

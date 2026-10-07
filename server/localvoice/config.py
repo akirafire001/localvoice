@@ -78,18 +78,21 @@ class Config:
 
         # LLM (realtime-llm-design §5)
         self.ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+        self.OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
         self.LLM_PROVIDER = os.environ.get(
-            "LLM_PROVIDER", "anthropic" if self.ANTHROPIC_API_KEY else "disabled"
+            "LLM_PROVIDER",
+            "anthropic" if self.ANTHROPIC_API_KEY else "openai" if self.OPENAI_API_KEY else "disabled",
         )
-        self.LLM_MODEL = os.environ.get("LLM_MODEL", "claude-opus-5-5")
+        openai = self.LLM_PROVIDER == "openai"
+        self.LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-6-luna" if openai else "claude-opus-5-5")
         self.LLM_SELECT_EFFORT = os.environ.get("LLM_SELECT_EFFORT", "low")
         self.LLM_GENERATE_EFFORT = os.environ.get("LLM_GENERATE_EFFORT", "medium")
         self.LLM_TIMEOUT_SEC = _float("LLM_TIMEOUT_SEC", 4.0)
         self.LLM_GENERATE_TIMEOUT_SEC = _float("LLM_GENERATE_TIMEOUT_SEC", 120.0)
         self.LLM_SESSION_COST_LIMIT_USD = _float("LLM_SESSION_COST_LIMIT_USD", 5.0)
         # USD per million tokens (input, output); update when the model changes
-        self.LLM_PRICE_INPUT_PER_MTOK = _float("LLM_PRICE_INPUT_PER_MTOK", 4.0)
-        self.LLM_PRICE_OUTPUT_PER_MTOK = _float("LLM_PRICE_OUTPUT_PER_MTOK", 20.0)
+        self.LLM_PRICE_INPUT_PER_MTOK = _float("LLM_PRICE_INPUT_PER_MTOK", 0.1 if openai else 4.0)
+        self.LLM_PRICE_OUTPUT_PER_MTOK = _float("LLM_PRICE_OUTPUT_PER_MTOK", 0.5 if openai else 20.0)
 
         # Runtime knowledge generation
         self.KNOWLEDGE_GENERATION_ENABLED = _bool("KNOWLEDGE_GENERATION_ENABLED", True)
