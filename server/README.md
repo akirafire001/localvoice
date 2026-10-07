@@ -23,8 +23,11 @@ flask --app localvoice worker      # separate process: knowledge generation, aud
 | `ANTHROPIC_API_KEY` | Enables Claude for selection/narration and runtime knowledge generation. Without an LLM key the rule result is used. |
 | `OPENAI_API_KEY` | Enables OpenAI (Responses API) instead, with the same prompts, schemas and validation |
 | `LLM_PROVIDER` | `anthropic` / `openai` / `disabled`. Default: whichever key is set (Anthropic first) |
-| `LLM_MODEL` | Default `claude-opus-5-5` (Anthropic) / `gpt-6-luna` (OpenAI; fits the 4s selection timeout — `gpt-6.1-sol` took ~8s) |
-| `LLM_PRICE_INPUT_PER_MTOK`, `LLM_PRICE_OUTPUT_PER_MTOK` | USD per 1M tokens for the cost cap. Defaults match the default model (4/20 Claude, 0.1/0.5 Luna); set them when changing `LLM_MODEL` |
+| `LLM_REALTIME_MODEL` | Selection/narration and natural-language commands; must answer within `LLM_TIMEOUT_SEC`. Default `gpt-6-luna` (OpenAI, ~2s) / `claude-opus-5-5` |
+| `LLM_BACKGROUND_MODEL` | Knowledge generation, web research and trip summaries in the worker. Default `gpt-6.1-sol` (OpenAI) / `claude-opus-5-5` |
+| `LLM_MODEL` | Sets both of the above when they are not set individually |
+| `LLM_PRICES` | Extra or overriding prices, `model=in/out,...` (USD per 1M tokens). Built-in: `claude-opus-5-5`, `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6-luna` (`config.MODEL_PRICES`) |
+| `LLM_PRICE_INPUT_PER_MTOK`, `LLM_PRICE_OUTPUT_PER_MTOK` | Price for models not in the table (default 4/20) |
 | `LLM_TIMEOUT_SEC` | Selection timeout (default 4s) before falling back to rules |
 | `LLM_SESSION_COST_LIMIT_USD` | Per-trip LLM cost cap (default 5) |
 | `GOOGLE_CLIENT_IDS` | Comma-separated Google OAuth client IDs accepted as ID-token audience |

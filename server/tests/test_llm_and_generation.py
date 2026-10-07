@@ -263,10 +263,10 @@ def test_claude_adapter_request_shape_and_cost(app):
 
     llm = ClaudeLLM.__new__(ClaudeLLM)
     llm.cfg = app.config["LV"]
-    llm.model = "claude-opus-5-5"
     llm.client = SimpleNamespace(beta=SimpleNamespace(messages=FakeMessages()))
-    data, meta = llm._json_call("sys", "user", SELECT_SCHEMA, "low", 4.0)
+    data, meta = llm._json_call("sys", "user", SELECT_SCHEMA, "low", 4.0, model="claude-opus-5-5")
     assert data == {"action": "stay_silent"}
+    assert captured["model"] == "claude-opus-5-5"
     assert captured["output_config"]["effort"] == "low"
     assert captured["output_config"]["format"]["type"] == "json_schema"
     assert captured["fallbacks"] == "default" and captured["timeout"] == 4.0
@@ -281,7 +281,6 @@ def _openai_llm(app, responses):
 
     llm = OpenAILLM.__new__(OpenAILLM)
     llm.cfg = app.config["LV"]
-    llm.model = "gpt-6.1-sol"
     llm.client = SimpleNamespace(responses=responses)
     return llm
 
@@ -306,14 +305,14 @@ def test_openai_adapter_request_shape_and_cost(app):
 
     llm = _openai_llm(app, FakeResponses())
     assert llm.provider == "openai"
-    data, meta = llm._json_call("sys", "user", SELECT_SCHEMA, "low", 4.0)
+    data, meta = llm._json_call("sys", "user", SELECT_SCHEMA, "low", 4.0, model="gpt-6.1-sol")
     assert data == {"action": "stay_silent"}
+    assert captured["model"] == "gpt-6.1-sol"
     assert captured["instructions"] == "sys" and captured["input"] == "user"
     assert captured["reasoning"] == {"effort": "low"} and captured["timeout"] == 4.0
     fmt = captured["text"]["format"]
     assert fmt["type"] == "json_schema" and fmt["strict"] is True and fmt["schema"] is SELECT_SCHEMA
-    cfg = app.config["LV"]
-    expected = (1000 * cfg.LLM_PRICE_INPUT_PER_MTOK + 200 * cfg.LLM_PRICE_OUTPUT_PER_MTOK) / 1_000_000
+    expected = (1000 * 2 + 200 * 10) / 1_000_000  # gpt-6.1-sol list price
     assert abs(meta["cost_usd"] - expected) < 1e-9
 
 
@@ -352,7 +351,7 @@ def test_openai_adapter_truncated_output_and_web_citations(app):
 
     llm = _openai_llm(app, FakeResponses())
     with pytest.raises(_MetaError) as e:
-        llm._json_call("sys", "user", SELECT_SCHEMA, "low", 4.0)
+        llm._json_call("sys", "user", SELECT_SCHEMA, "low", 4.0, model="gpt-6-luna")
     assert e.value.code == "max_tokens"
     materials, _meta = llm.research_with_web_search("xn76", (34.3, 132.3), ["宮島"])
     assert materials == [
@@ -361,3 +360,42 @@ def test_openai_adapter_truncated_output_and_web_citations(app):
         {"kind": "web", "title": "https://example.org/name", "url": "https://example.org/name",
          "text": "Name: The name means shrine island."},
     ]
+
+
+def test_models_per_task(app, monkeypatch):
+    from types import SimpleNamespace
+
+    from localvoice.config import Config
+    from localvoice.services.llm import OpenAILLM
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    cfg = Config()
+    assert (cfg.LLM_PROVIDER, cfg.LLM_REALTIME_MODEL, cfg.LLM_BACKGROUND_MODEL) == ("openai", "gpt-6-luna", "gpt-6.1-sol")
+    monkeypatch.setenv("LLM_MODEL", "gpt-6-astra")
+    monkeypatch.setenv("LLM_REALTIME_MODEL", "gpt-6-luna")
+    monkeypatch.setenv("LLM_PRICES", "gpt-6-astra=8/40")
+    cfg = Config()
+    assert (cfg.LLM_REALTIME_MODEL, cfg.LLM_BACKGROUND_MODEL) == ("gpt-6-luna", "gpt-6-astra")
+    assert cfg.llm_price("gpt-6-astra") == (8.0, 40.0) and cfg.llm_price("unknown") == (4.0, 20.0)
+
+    calls = []
+
+    class FakeResponses:
+        def create(self, **kw):
+            calls.append(kw["model"])
+            return SimpleNamespace(
+                status="completed", model=kw["model"], usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+                output=[SimpleNamespace(type="message", content=[SimpleNamespace(
+                    type="output_text", annotations=[],
+                    text='{"intents": [], "states": [], "resume": false, "end_condition": null, '
+                         '"confidence": 0, "summary": "s", "items": []}')])],
+            )
+
+    llm = OpenAILLM.__new__(OpenAILLM)
+    llm.cfg = cfg
+    llm.client = SimpleNamespace(responses=FakeResponses())
+    llm.parse_command("静かにして", "ja")
+    llm.generate_items("xn76", (34.3, 132.3), [])
+    llm.summarize(SimpleNamespace(language="ja", memory_summary=None), [])
+    llm.research_with_web_search("xn76", (34.3, 132.3), [])
+    assert calls == ["gpt-6-luna", "gpt-6-astra", "gpt-6-astra", "gpt-6-astra"]

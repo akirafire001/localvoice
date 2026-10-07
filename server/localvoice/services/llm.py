@@ -161,26 +161,31 @@ class ClaudeLLM:
         import anthropic
 
         self.cfg = cfg
-        self.model = cfg.LLM_MODEL
         self.client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY, max_retries=0)
+
+    # Selection and commands must answer within LLM_TIMEOUT_SEC; generation, research and summaries run
+    # in the worker and can use a slower, stronger model.
+    @property
+    def realtime_model(self):
+        return self.cfg.LLM_REALTIME_MODEL
+
+    @property
+    def background_model(self):
+        return self.cfg.LLM_BACKGROUND_MODEL
 
     # ------------------------------------------------------------ core call
 
-    def _cost(self, usage):
-        cfg = self.cfg
+    def _cost(self, usage, model):
+        price_in, price_out = self.cfg.llm_price(model)
         inp = (usage.input_tokens or 0) + (getattr(usage, "cache_creation_input_tokens", 0) or 0) * 1.25
         cached = getattr(usage, "cache_read_input_tokens", 0) or 0
-        return (
-            inp * cfg.LLM_PRICE_INPUT_PER_MTOK
-            + cached * cfg.LLM_PRICE_INPUT_PER_MTOK * 0.05
-            + (usage.output_tokens or 0) * cfg.LLM_PRICE_OUTPUT_PER_MTOK
-        ) / 1_000_000
+        return (inp * price_in + cached * price_in * 0.05 + (usage.output_tokens or 0) * price_out) / 1_000_000
 
-    def _json_call(self, system, user_content, schema, effort, timeout, max_tokens=4000, tools=None):
+    def _json_call(self, system, user_content, schema, effort, timeout, max_tokens=4000, tools=None, *, model):
         import anthropic
 
         kwargs = dict(
-            model=self.model,
+            model=model,
             max_tokens=max_tokens,
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_content}],
@@ -203,7 +208,7 @@ class ClaudeLLM:
         except anthropic.APIConnectionError:
             raise LLMError("connection_error")
         latency = int((time.monotonic() - t0) * 1000)
-        cost = self._cost(resp.usage)
+        cost = self._cost(resp.usage, model)
         meta = {"latency_ms": latency, "cost_usd": cost, "model": resp.model,
                 "input_tokens": resp.usage.input_tokens, "output_tokens": resp.usage.output_tokens}
         if resp.stop_reason == "refusal":
@@ -226,7 +231,7 @@ class ClaudeLLM:
         try:
             data, meta = self._json_call(
                 SELECT_SYSTEM, json.dumps(payload, ensure_ascii=False), SELECT_SCHEMA,
-                self.cfg.LLM_SELECT_EFFORT, self.cfg.LLM_TIMEOUT_SEC, max_tokens=4000,
+                self.cfg.LLM_SELECT_EFFORT, self.cfg.LLM_TIMEOUT_SEC, max_tokens=4000, model=self.realtime_model,
             )
         except _MetaError as e:
             return Selection(action="speak", error=e.code, model=e.meta.get("model"),
@@ -260,7 +265,7 @@ class ClaudeLLM:
         try:
             data, meta = self._json_call(
                 GENERATE_SYSTEM, user, GENERATE_SCHEMA, self.cfg.LLM_GENERATE_EFFORT,
-                self.cfg.LLM_GENERATE_TIMEOUT_SEC, max_tokens=16000,
+                self.cfg.LLM_GENERATE_TIMEOUT_SEC, max_tokens=16000, model=self.background_model,
             )
         except _MetaError as e:
             raise LLMError(e.code)
@@ -280,7 +285,7 @@ class ClaudeLLM:
         t0 = time.monotonic()
         try:
             resp = self.client.messages.create(
-                model=self.model,
+                model=self.background_model,
                 max_tokens=8000,
                 messages=[{"role": "user", "content": prompt}],
                 tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 3}],
@@ -303,8 +308,8 @@ class ClaudeLLM:
                     "url": url,
                     "text": (getattr(c, "cited_text", "") or "")[:1500],
                 })
-        meta = {"latency_ms": int((time.monotonic() - t0) * 1000), "cost_usd": self._cost(resp.usage),
-                "model": resp.model}
+        meta = {"latency_ms": int((time.monotonic() - t0) * 1000),
+                "cost_usd": self._cost(resp.usage, self.background_model), "model": resp.model}
         return materials, meta
 
     # ------------------------------------------------------------ summary
@@ -318,7 +323,7 @@ class ClaudeLLM:
                 SUMMARY_SYSTEM,
                 json.dumps({"language": trip.language, "previous_summary": trip.memory_summary, "stories": stories},
                            ensure_ascii=False),
-                schema, "low", 20.0, max_tokens=2000,
+                schema, "low", 20.0, max_tokens=2000, model=self.background_model,
             )
         except (LLMError, _MetaError):
             return None
@@ -328,7 +333,7 @@ class ClaudeLLM:
         """Returns (data, meta) or raises LLMError/_MetaError."""
         return self._json_call(
             COMMAND_SYSTEM, json.dumps({"language": language, "instruction": text}, ensure_ascii=False),
-            COMMAND_SCHEMA, "low", self.cfg.LLM_TIMEOUT_SEC, max_tokens=1000,
+            COMMAND_SCHEMA, "low", self.cfg.LLM_TIMEOUT_SEC, max_tokens=1000, model=self.realtime_model,
         )
 
 
@@ -341,17 +346,16 @@ class OpenAILLM(ClaudeLLM):
         import openai
 
         self.cfg = cfg
-        self.model = cfg.LLM_MODEL
         self.client = openai.OpenAI(api_key=cfg.OPENAI_API_KEY, max_retries=0)
 
-    def _cost(self, usage):
-        cfg = self.cfg
+    def _cost(self, usage, model):
+        price_in, price_out = self.cfg.llm_price(model)
         details = getattr(usage, "input_tokens_details", None)
         cached = (getattr(details, "cached_tokens", 0) or 0) if details else 0
         return (
-            ((usage.input_tokens or 0) - cached) * cfg.LLM_PRICE_INPUT_PER_MTOK
-            + cached * cfg.LLM_PRICE_INPUT_PER_MTOK * 0.1
-            + (usage.output_tokens or 0) * cfg.LLM_PRICE_OUTPUT_PER_MTOK
+            ((usage.input_tokens or 0) - cached) * price_in
+            + cached * price_in * 0.1
+            + (usage.output_tokens or 0) * price_out
         ) / 1_000_000
 
     def _create(self, **kwargs):
@@ -368,9 +372,9 @@ class OpenAILLM(ClaudeLLM):
         except openai.APIConnectionError:
             raise LLMError("connection_error")
 
-    def _json_call(self, system, user_content, schema, effort, timeout, max_tokens=4000, tools=None):
+    def _json_call(self, system, user_content, schema, effort, timeout, max_tokens=4000, tools=None, *, model):
         kwargs = dict(
-            model=self.model,
+            model=model,
             instructions=system,
             input=user_content,
             max_output_tokens=max_tokens,
@@ -384,7 +388,7 @@ class OpenAILLM(ClaudeLLM):
         t0 = time.monotonic()
         resp = self._create(**kwargs)
         latency = int((time.monotonic() - t0) * 1000)
-        meta = {"latency_ms": latency, "cost_usd": self._cost(resp.usage), "model": resp.model,
+        meta = {"latency_ms": latency, "cost_usd": self._cost(resp.usage, model), "model": resp.model,
                 "input_tokens": resp.usage.input_tokens, "output_tokens": resp.usage.output_tokens}
         parts = [c for o in resp.output if o.type == "message" for c in o.content]
         if any(c.type == "refusal" for c in parts):
@@ -412,7 +416,7 @@ class OpenAILLM(ClaudeLLM):
         t0 = time.monotonic()
         try:
             resp = self._create(
-                model=self.model,
+                model=self.background_model,
                 input=prompt,
                 max_output_tokens=8000,
                 tools=[{"type": "web_search"}],
@@ -448,8 +452,8 @@ class OpenAILLM(ClaudeLLM):
                         "url": re.sub(r"[?&]utm_source=openai$", "", url),
                         "text": fact[:1500],
                     })
-        meta = {"latency_ms": int((time.monotonic() - t0) * 1000), "cost_usd": self._cost(resp.usage),
-                "model": resp.model}
+        meta = {"latency_ms": int((time.monotonic() - t0) * 1000),
+                "cost_usd": self._cost(resp.usage, self.background_model), "model": resp.model}
         return materials, meta
 
 
