@@ -1,0 +1,37 @@
+# Python (server/)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets and local settings — keep keys (Apple private key, API keys) out of Git
+.env
+.env.*
+!.env.example
+*.p8
+*.pem
+instance/
+
+# Runtime data
+audio_store/
+*.log
+*.sqlite3
+
+# Flutter (app/) — app/.gitignore has the rest
+app/build/
+app/.dart_tool/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
