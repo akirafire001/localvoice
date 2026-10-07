@@ -272,3 +272,92 @@ def test_claude_adapter_request_shape_and_cost(app):
     assert captured["fallbacks"] == "default" and captured["timeout"] == 4.0
     assert captured["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert abs(meta["cost_usd"] - (1000 * 4 + 200 * 20) / 1_000_000) < 1e-9
+
+
+def _openai_llm(app, responses):
+    from types import SimpleNamespace
+
+    from localvoice.services.llm import OpenAILLM
+
+    llm = OpenAILLM.__new__(OpenAILLM)
+    llm.cfg = app.config["LV"]
+    llm.model = "gpt-6.1-sol"
+    llm.client = SimpleNamespace(responses=responses)
+    return llm
+
+
+def test_openai_adapter_request_shape_and_cost(app):
+    from types import SimpleNamespace
+
+    from localvoice.services.llm import SELECT_SCHEMA
+
+    captured = {}
+
+    class FakeResponses:
+        def create(self, **kw):
+            captured.update(kw)
+            return SimpleNamespace(
+                status="completed", incomplete_details=None, model="gpt-6.1-sol",
+                usage=SimpleNamespace(input_tokens=1000, output_tokens=200,
+                                      input_tokens_details=SimpleNamespace(cached_tokens=0)),
+                output=[SimpleNamespace(type="reasoning"), SimpleNamespace(type="message", content=[
+                    SimpleNamespace(type="output_text", text='{"action": "stay_silent"}', annotations=[])])],
+            )
+
+    llm = _openai_llm(app, FakeResponses())
+    assert llm.provider == "openai"
+    data, meta = llm._json_call("sys", "user", SELECT_SCHEMA, "low", 4.0)
+    assert data == {"action": "stay_silent"}
+    assert captured["instructions"] == "sys" and captured["input"] == "user"
+    assert captured["reasoning"] == {"effort": "low"} and captured["timeout"] == 4.0
+    fmt = captured["text"]["format"]
+    assert fmt["type"] == "json_schema" and fmt["strict"] is True and fmt["schema"] is SELECT_SCHEMA
+    cfg = app.config["LV"]
+    expected = (1000 * cfg.LLM_PRICE_INPUT_PER_MTOK + 200 * cfg.LLM_PRICE_OUTPUT_PER_MTOK) / 1_000_000
+    assert abs(meta["cost_usd"] - expected) < 1e-9
+
+
+def test_openai_adapter_truncated_output_and_web_citations(app):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from localvoice.services.llm import SELECT_SCHEMA, _MetaError
+
+    usage = SimpleNamespace(input_tokens=10, output_tokens=10, input_tokens_details=None)
+    cite1 = " ([example.org](https://example.org/oysters?utm_source=openai))"
+    cite2 = " ([example.org](https://example.org/name))"
+    text = ("1. **Oysters:** Oysters are farmed here. A festival is held in February." + cite1
+            + "\n\n2. **Name:** The name means shrine island." + cite2)
+    i1, i2 = text.index(cite1), text.index(cite2)
+    responses = [
+        SimpleNamespace(status="incomplete", incomplete_details=SimpleNamespace(reason="max_output_tokens"),
+                        model="gpt-6.1-sol", usage=usage,
+                        output=[SimpleNamespace(type="message", content=[
+                            SimpleNamespace(type="output_text", text='{"act', annotations=[])])]),
+        SimpleNamespace(status="completed", model="gpt-6.1-sol", usage=usage, output=[
+            SimpleNamespace(type="web_search_call"),
+            SimpleNamespace(type="message", content=[SimpleNamespace(type="output_text", text=text, annotations=[
+                SimpleNamespace(type="url_citation", url="https://example.org/oysters?utm_source=openai",
+                                title="Oysters", start_index=i1, end_index=i1 + len(cite1)),
+                SimpleNamespace(type="url_citation", url="https://example.org/name", title=None,
+                                start_index=i2, end_index=i2 + len(cite2)),
+            ])]),
+        ]),
+    ]
+
+    class FakeResponses:
+        def create(self, **kw):
+            return responses.pop(0)
+
+    llm = _openai_llm(app, FakeResponses())
+    with pytest.raises(_MetaError) as e:
+        llm._json_call("sys", "user", SELECT_SCHEMA, "low", 4.0)
+    assert e.value.code == "max_tokens"
+    materials, _meta = llm.research_with_web_search("xn76", (34.3, 132.3), ["宮島"])
+    assert materials == [
+        {"kind": "web", "title": "Oysters", "url": "https://example.org/oysters",
+         "text": "Oysters: Oysters are farmed here. A festival is held in February."},
+        {"kind": "web", "title": "https://example.org/name", "url": "https://example.org/name",
+         "text": "Name: The name means shrine island."},
+    ]
