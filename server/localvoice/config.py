@@ -16,6 +16,25 @@ def _float(name, default):
     return float(os.environ.get(name, default))
 
 
+def _prices(spec):
+    """Parse "model=in/out,model2=in/out" into {model: (in, out)}."""
+    out = {}
+    for part in filter(None, (p.strip() for p in spec.split(","))):
+        model, _, price = part.partition("=")
+        inp, _, outp = price.partition("/")
+        out[model.strip()] = (float(inp), float(outp))
+    return out
+
+
+# USD per million tokens (input, output), as published by the providers (checked 2026-10-07)
+MODEL_PRICES = {
+    "claude-opus-5-5": (4.0, 20.0),
+    "gpt-6-astra": (10.0, 50.0),
+    "gpt-6.1-sol": (2.0, 10.0),
+    "gpt-6-luna": (0.1, 0.5),
+}
+
+
 class Config:
     """Runtime settings. Every value can be overridden by an environment variable of the same name."""
 
@@ -77,22 +96,33 @@ class Config:
         self.TRACK_RETENTION_DAYS = _int("TRACK_RETENTION_DAYS", 90)
 
         # LLM (realtime-llm-design §5)
-        self.ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-        self.OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+        # LOCALVOICE_* names win so a developer's general-purpose keys are not used by accident.
+        self.ANTHROPIC_API_KEY = os.environ.get("LOCALVOICE_ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
+        self.OPENAI_API_KEY = os.environ.get("LOCALVOICE_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
         self.LLM_PROVIDER = os.environ.get(
             "LLM_PROVIDER",
             "anthropic" if self.ANTHROPIC_API_KEY else "openai" if self.OPENAI_API_KEY else "disabled",
         )
         openai = self.LLM_PROVIDER == "openai"
-        self.LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-6-luna" if openai else "claude-opus-5-5")
+        # LLM_MODEL sets both; the realtime model must answer within LLM_TIMEOUT_SEC
+        # (selection, commands), the background model does knowledge generation, web research and summaries.
+        self.LLM_MODEL = os.environ.get("LLM_MODEL", "")
+        self.LLM_REALTIME_MODEL = os.environ.get(
+            "LLM_REALTIME_MODEL", self.LLM_MODEL or ("gpt-6-luna" if openai else "claude-opus-5-5")
+        )
+        self.LLM_BACKGROUND_MODEL = os.environ.get(
+            "LLM_BACKGROUND_MODEL", self.LLM_MODEL or ("gpt-6.1-sol" if openai else "claude-opus-5-5")
+        )
         self.LLM_SELECT_EFFORT = os.environ.get("LLM_SELECT_EFFORT", "low")
         self.LLM_GENERATE_EFFORT = os.environ.get("LLM_GENERATE_EFFORT", "medium")
         self.LLM_TIMEOUT_SEC = _float("LLM_TIMEOUT_SEC", 4.0)
         self.LLM_GENERATE_TIMEOUT_SEC = _float("LLM_GENERATE_TIMEOUT_SEC", 120.0)
         self.LLM_SESSION_COST_LIMIT_USD = _float("LLM_SESSION_COST_LIMIT_USD", 5.0)
-        # USD per million tokens (input, output); update when the model changes
-        self.LLM_PRICE_INPUT_PER_MTOK = _float("LLM_PRICE_INPUT_PER_MTOK", 0.1 if openai else 4.0)
-        self.LLM_PRICE_OUTPUT_PER_MTOK = _float("LLM_PRICE_OUTPUT_PER_MTOK", 0.5 if openai else 20.0)
+        # USD per million tokens (input, output). LLM_PRICES="model=in/out,..." adds or overrides models;
+        # LLM_PRICE_*_PER_MTOK is used for models not in the table.
+        self.LLM_PRICES = {**MODEL_PRICES, **_prices(os.environ.get("LLM_PRICES", ""))}
+        self.LLM_PRICE_INPUT_PER_MTOK = _float("LLM_PRICE_INPUT_PER_MTOK", 4.0)
+        self.LLM_PRICE_OUTPUT_PER_MTOK = _float("LLM_PRICE_OUTPUT_PER_MTOK", 20.0)
 
         # Runtime knowledge generation
         self.KNOWLEDGE_GENERATION_ENABLED = _bool("KNOWLEDGE_GENERATION_ENABLED", True)
@@ -112,3 +142,7 @@ class Config:
 
         for k, v in overrides.items():
             setattr(self, k, v)
+
+    def llm_price(self, model):
+        """(input, output) USD per million tokens for a model."""
+        return self.LLM_PRICES.get(model, (self.LLM_PRICE_INPUT_PER_MTOK, self.LLM_PRICE_OUTPUT_PER_MTOK))

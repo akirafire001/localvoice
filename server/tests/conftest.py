@@ -7,8 +7,9 @@ from sqlalchemy import text
 
 os.environ.setdefault("TESTING", "1")
 # Real keys on a developer machine must not change provider defaults (model, prices) in tests.
-for _key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LLM_PROVIDER", "LLM_MODEL",
-             "LLM_PRICE_INPUT_PER_MTOK", "LLM_PRICE_OUTPUT_PER_MTOK"):
+for _key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LOCALVOICE_ANTHROPIC_API_KEY", "LOCALVOICE_OPENAI_API_KEY",
+             "LLM_PROVIDER", "LLM_MODEL", "LLM_REALTIME_MODEL",
+             "LLM_BACKGROUND_MODEL", "LLM_PRICES", "LLM_PRICE_INPUT_PER_MTOK", "LLM_PRICE_OUTPUT_PER_MTOK"):
     os.environ.pop(_key, None)
 
 from localvoice import create_app  # noqa: E402
