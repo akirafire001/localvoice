@@ -4,7 +4,12 @@ class AppConfig {
   static const apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:8000');
 
   /// Google OAuth "web/server" client ID whose audience the server accepts.
-  static const googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+  /// Web OAuth client of Google Cloud project localvoice-510815 (public value, not a secret).
+  /// The Android client (380406027309-n90gqbindbkpbfmf81esmdrbm276gkr5.apps.googleusercontent.com) is matched by package name + SHA-1 and needs no code.
+  static const googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+    defaultValue: '380406027309-epmgbpd9gk6h1d1vk6j3c7b6d5l0gdlv.apps.googleusercontent.com',
+  );
 
   /// OpenFreeMap style (map-provider-comparison: MapLibre + OpenFreeMap recommended)
   static const mapStyleUrl = String.fromEnvironment(
