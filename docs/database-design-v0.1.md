@@ -229,6 +229,8 @@ MVPのジョブキューはこのテーブルとワーカープロセスで実�
 
 共有は個人情報を含まない静的原稿だけに限定する。privateはowner_user_id必須でuser/trip範囲をcache_keyに含め、所有者を照合して配信する。共有の事前生成費用はapi_usage_logsのtrip_session_id=nullで記録し、利用者ごとの生成費と区別する。Provider内のジョブ・再試行は冪等な同一資産の処理として扱う。
 
+MVPではGoogle Chirp 3 HDの音声資産を保存し、`provider=google_cloud_tts`、`model=chirp3_hd`、`audio_format=audio/mpeg`を使用する。`synthesis_settings_json`に実際のGoogle `voice.name`、`language_code`、接続先、合成設定を記録し、`voice_profile_id`はアプリ内の許可済み音声IDとする。Providerが固定モデル版を公開しない場合は`model_version=provider-managed`と記録し、固定版での再生成を保証した扱いにしない。`voice_version`は内部の音声設定版として管理し、読み・声・設定変更や品質確認を伴う再生成では別資産にする。生成時の文字数と原価はapi_usage_logsへ記録する。[音声設計](voice-design-v0.1.md)参照。
+
 ### knowledge_sources
 - id UUID PK
 - knowledge_item_id UUID FK

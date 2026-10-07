@@ -17,7 +17,7 @@
 5. 手動移動モード上書き
 6. PostGISによる周辺KnowledgeItem検索
 7. 日本語/英語の表示
-8. 品質確認済み音声の再生、VoiceProvider、事前生成/キャッシュ、端末TTSへの代替
+8. 品質確認済みChirp 3 HD音声の再生、VoiceProvider、事前生成/キャッシュ、端末TTSへの代替
 9. アプリ内カード表示
 10. OSローカル通知
 11. 通知頻度制御とcooldown
@@ -37,7 +37,7 @@
 25. 事前KnowledgeItemのない場所での、出典付きKnowledgeItemの実行時生成（セル単位・非同期）
 26. 全通知判定の決定ログ、ガイドカードのワンタップ評価、LLM/ルール選択の切り替え
 
-P0のコンテンツは名所の説明に限定せず、土地の小話を十分に用意する。学校沿革・過去ニュース・施設概要だけの項目を自動案内の主力にしない。詳細は[コンテンツ品質方針](content-quality-policy-v0.1.md)。音声の比較試聴と声・話速選択はP0に含めるが、複数の商用TTSをすべて本番接続することは要求しない。
+P0のコンテンツは名所の説明に限定せず、土地の小話を十分に用意する。学校沿革・過去ニュース・施設概要だけの項目を自動案内の主力にしない。詳細は[コンテンツ品質方針](content-quality-policy-v0.1.md)。Chirp 3 HD内の比較試聴と声・話速選択はP0に含める。MVPの通常TTS接続はChirp 3 HDに限定する。
 
 ### P1: PoCで余力があれば
 - 自然言語による一時指示
@@ -80,7 +80,7 @@ Flask API
   ├─ LLM Adapter（Claude API）
   ├─ Knowledge Generation Worker（実行時知識生成ジョブ）
   ├─ Voice Service / Audio Cache
-  └─ Provider Adapters（Wikipedia / Wikidata / OSM / web検索 / 選定したTTS）
+  └─ Provider Adapters（Wikipedia / Wikidata / OSM / web検索 / Google Cloud TTS・Chirp 3 HD）
         │
         ▼
 PostgreSQL + PostGIS
@@ -356,7 +356,9 @@ MVP対象地域の主要KnowledgeItemは事前に `ja/en` を生成・レビュ�
 
 ## 15. TTS
 
-MVPから高品質音声の比較試聴を行い、通常の案内には選定した音声を使う。Google Gemini-TTS/Chirp 3 HD、CoeFont、VOICEVOX、Kokoroを比較対象とする。端末TTSは比較基準と通信断・障害時等の代替であり、初期の品質を端末標準だけで決めない。
+MVPのTTSはGoogle Cloud Text-to-SpeechのChirp 3 HDを採用する（2026-10-06決定）。日本語・英語の具体的な声は同サービス内の試聴で選び、運営の許可リストとして管理する。他サービスは比較メモに将来候補として残す。端末TTSは比較基準と通信断・障害時等の代替とする。
+
+FlaskのVoiceProviderはGoogle公式Pythonクライアントの`synthesize_speech`でテキストからMP3を生成し、完成したファイルを保存・配信する。MVPではストリーミング合成を必須にしない。接続先は`global`を初期値とし、地域変更は利用可否・条件・待ち時間を確認して設定で切り替える。Google Cloud認証はサーバー側のApplication Default Credentials（実行環境のサービスアカウント等）を使い、認証情報をFlutterへ渡さない。
 
 静的な日英小話は原稿と読みをレビューして事前生成する。Flutterは音声ファイルを再生し、Flask側のVoiceProviderが生成・キャッシュ・配信を管理する。個人化した原稿だけ必要時に生成し、個人用音声を共有キャッシュへ混ぜない。キーは本文版・音声用原稿hash・読み辞書版・言語・モデル/声・スタイル/速度・利用範囲を含む。期限切れ本文の音声を再生しない。
 
@@ -492,7 +494,7 @@ Google・Apple・ID／パスワードの3方式をMVPから提供する。Google
 8. 実行時知識生成ジョブ（Wikipedia/Wikidata/OSM素材→LLM構造化）
 9. 履歴/feedback
 10. 地図画面と現在地・移動履歴、ローカル記録/track API/再送・重複排除
-11. 高品質音声の比較試聴、選定VoiceProvider/音声再生/キャッシュ/端末TTS代替
+11. Chirp 3 HD内の声の比較試聴、Google Cloud VoiceProvider/音声再生/キャッシュ/端末TTS代替
 12. バックグラウンド位置
 13. topic boost/セレンディピティ
 14. 英語

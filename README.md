@@ -28,7 +28,7 @@ LocalVoice は、**現在地・移動状況と事前に用意した地域の知�
 | Database | PostgreSQL |
 | 地理情報 | PostGIS |
 | AI | Claude API（実行時の選択・語り、未準備地域の知識生成） |
-| 音声 | 高品質TTSを比較試聴して選定。事前生成・音声キャッシュ＋必要時の生成、端末TTSは代替手段 |
+| 音声 | Google Cloud Text-to-SpeechのChirp 3 HDをMVPで採用。事前生成・音声キャッシュ＋必要時の生成、端末TTSは代替手段 |
 | 認証 | Googleログイン / Appleログイン / ID・パスワード |
 
 距離計算、速度・方向判定、候補抽出、通知間隔、重複排除、興味スコア等は通常のプログラムで処理し、「今どれを話すか、黙るか」と状況に合わせた語り、事前準備のない場所の知識生成にLLMを利用します。
@@ -56,6 +56,8 @@ LocalVoice は、**現在地・移動状況と事前に用意した地域の知�
 - [リアルタイムLLM設計 v0.1](docs/realtime-llm-design-v0.1.md)
 - [土地の小話・コンテンツ品質方針 v0.1](docs/content-quality-policy-v0.1.md)
 - [音声品質・TTS比較と設計 v0.1](docs/voice-design-v0.1.md)
+- [TTSサービス料金比較・有料ユーザーの音声選択案 v0.1](docs/tts-service-comparison-v0.1.md)
+- [100万文字の音声生成量・原価試算 v0.1](docs/tts-volume-estimate-v0.1.md)
 
 ### Screen Concepts
 - [全16画面の画像・更新内容](docs/ui/README.md)
@@ -64,13 +66,12 @@ LocalVoice は、**現在地・移動状況と事前に用意した地域の知�
 ガイド画面は上部に地図、下に小話・音声操作・選択式コマンドを配置。詳細表示では地図を縮め、全画面地図でも音声操作を継続するデザイン案です。
 
 <img src="docs/ui/06-guide.png" alt="地図付きの音声ガイド画面" width="260"> <img src="docs/ui/08-map.png" alt="音声操作付きの全画面地図" width="260">
-- [TTSサービス料金比較・有料ユーザーの音声選択案 v0.1](docs/tts-service-comparison-v0.1.md)
 
 ## MVP方針
 
 - PostgreSQL + PostGISをMVPから利用
 - Google・Apple・ID／パスワードの3方式をMVPから用意し、個人データは本人だけが取得・変更できるようにする
-- 高品質音声の比較試聴をMVPに含め、静的原稿の事前生成・キャッシュで原価と待ち時間を抑える
+- Chirp 3 HD内で日英の声を試聴・選定し、静的原稿の事前生成・キャッシュで原価と待ち時間を抑える
 - GPS生データを毎秒サーバー送信しない
 - 現在地とガイドセッション中の移動履歴を地図表示する
 - 実行時のLLM（候補の選択・語り、未準備地域の知識生成）を最初から組み込む
