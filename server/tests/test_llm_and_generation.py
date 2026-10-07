@@ -399,3 +399,14 @@ def test_models_per_task(app, monkeypatch):
     llm.summarize(SimpleNamespace(language="ja", memory_summary=None), [])
     llm.research_with_web_search("xn76", (34.3, 132.3), [])
     assert calls == ["gpt-6-luna", "gpt-6-astra", "gpt-6-astra", "gpt-6-astra"]
+
+
+def test_localvoice_key_names_take_precedence(monkeypatch):
+    from localvoice.config import Config
+
+    monkeypatch.setenv("OPENAI_API_KEY", "general")
+    assert Config().OPENAI_API_KEY == "general"
+    monkeypatch.setenv("LOCALVOICE_OPENAI_API_KEY", "app")
+    monkeypatch.setenv("LOCALVOICE_ANTHROPIC_API_KEY", "app-claude")
+    cfg = Config()
+    assert (cfg.OPENAI_API_KEY, cfg.ANTHROPIC_API_KEY) == ("app", "app-claude")

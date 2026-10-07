@@ -96,8 +96,9 @@ class Config:
         self.TRACK_RETENTION_DAYS = _int("TRACK_RETENTION_DAYS", 90)
 
         # LLM (realtime-llm-design §5)
-        self.ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-        self.OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+        # LOCALVOICE_* names win so a developer's general-purpose keys are not used by accident.
+        self.ANTHROPIC_API_KEY = os.environ.get("LOCALVOICE_ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
+        self.OPENAI_API_KEY = os.environ.get("LOCALVOICE_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
         self.LLM_PROVIDER = os.environ.get(
             "LLM_PROVIDER",
             "anthropic" if self.ANTHROPIC_API_KEY else "openai" if self.OPENAI_API_KEY else "disabled",

@@ -20,8 +20,8 @@ flask --app localvoice worker      # separate process: knowledge generation, aud
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL URL (`postgresql+psycopg://…`) |
-| `ANTHROPIC_API_KEY` | Enables Claude for selection/narration and runtime knowledge generation. Without an LLM key the rule result is used. |
-| `OPENAI_API_KEY` | Enables OpenAI (Responses API) instead, with the same prompts, schemas and validation |
+| `ANTHROPIC_API_KEY` (or `LOCALVOICE_ANTHROPIC_API_KEY`) | Enables Claude for selection/narration and runtime knowledge generation. Without an LLM key the rule result is used. |
+| `OPENAI_API_KEY` (or `LOCALVOICE_OPENAI_API_KEY`) | Enables OpenAI (Responses API) instead, with the same prompts, schemas and validation. The `LOCALVOICE_` names take precedence, so a key for this app does not clash with general-purpose keys on the same machine |
 | `LLM_PROVIDER` | `anthropic` / `openai` / `disabled`. Default: whichever key is set (Anthropic first) |
 | `LLM_REALTIME_MODEL` | Selection/narration and natural-language commands; must answer within `LLM_TIMEOUT_SEC`. Default `gpt-6-luna` (OpenAI, ~2s) / `claude-opus-5-5` |
 | `LLM_BACKGROUND_MODEL` | Knowledge generation, web research and trip summaries in the worker. Default `gpt-6.1-sol` (OpenAI) / `claude-opus-5-5` |
