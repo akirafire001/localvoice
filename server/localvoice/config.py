@@ -36,9 +36,14 @@ class Config:
         self.ACTION_TOKEN_TTL_SEC = _int("ACTION_TOKEN_TTL_SEC", 3600)
         self.APP_PUBLIC_URL = os.environ.get("APP_PUBLIC_URL", "https://localvoice.example")
 
-        # Google sign-in: comma separated OAuth client IDs accepted as audience
+        # Google sign-in: comma separated OAuth client IDs accepted as audience.
+        # Defaults are the LocalVoice project's public client IDs (web/server and iOS); not secrets.
         self.GOOGLE_CLIENT_IDS = [
-            x for x in os.environ.get("GOOGLE_CLIENT_IDS", "").split(",") if x
+            x for x in os.environ.get(
+                "GOOGLE_CLIENT_IDS",
+                "380406027309-epmgbpd9gk6h1d1vk6j3c7b6d5l0gdlv.apps.googleusercontent.com,"
+                "380406027309-ibs30tj1jkoleq1p87s5bv078sa5p5u5.apps.googleusercontent.com",
+            ).split(",") if x
         ]
         # Sign in with Apple
         self.APPLE_TEAM_ID = os.environ.get("APPLE_TEAM_ID", "")

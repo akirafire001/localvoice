@@ -12,3 +12,5 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# Shared development signing key (not a release key; its SHA-1 is registered in Google Cloud)
+!app/dev.keystore

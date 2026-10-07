@@ -13,10 +13,13 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000 \
 | dart-define | Default | Purpose |
 |---|---|---|
 | `API_BASE_URL` | `http://10.0.2.2:8000` | Server URL (Android emulator → host). Release builds need HTTPS; cleartext is allowed only in the debug manifest. |
-| `GOOGLE_SERVER_CLIENT_ID` | empty | Google OAuth client ID put into the ID token audience (must be in the server's `GOOGLE_CLIENT_IDS`) |
+| `GOOGLE_SERVER_CLIENT_ID` | project web client ID | Google OAuth client ID put into the ID token audience (must be in the server's `GOOGLE_CLIENT_IDS`) |
 | `MAP_STYLE_URL` | OpenFreeMap liberty | MapLibre style |
 
-External setup still needed per platform: Google Sign-In (Android SHA-1 / iOS URL scheme and `GIDClientID`), Sign in with Apple capability (iOS) and a Services ID + return URL (Android, see server `APPLE_*`).
+Android builds are signed with the shared development key `android/app/dev.keystore` (password `android`), so every machine has the same certificate:
+SHA-1 `49:F2:85:40:66:8F:2D:3C:F3:04:1C:9E:33:18:4D:32:A4:C0:72:52`. Register this SHA-1 for the Android OAuth client. Use a real upload key (and register its SHA-1 too) before publishing to Google Play.
+
+Google Sign-In is configured for Google Cloud project `localvoice-510815` (web, Android and iOS clients; iOS `GIDClientID` and URL scheme are in `ios/Runner/Info.plist`). Only accounts listed as test users on the OAuth consent screen can sign in until the app is published. External setup still needed: Sign in with Apple capability (iOS) and a Services ID + return URL (Android, see server `APPLE_*`).
 
 ## Structure
 

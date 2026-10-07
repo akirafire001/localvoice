@@ -29,10 +29,20 @@ android {
         versionName = flutter.versionName
     }
 
+    // Shared development key so every machine builds with the same SHA-1, which is
+    // registered for the Android OAuth client in Google Cloud. Not for store releases.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("dev.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // TODO: use a real upload key before publishing; register its SHA-1 in Google Cloud too.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

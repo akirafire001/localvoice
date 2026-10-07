@@ -2,6 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>GIDClientID</key>
+	<string>380406027309-ibs30tj1jkoleq1p87s5bv078sa5p5u5.apps.googleusercontent.com</string>
+	<key>GIDServerClientID</key>
+	<string>380406027309-epmgbpd9gk6h1d1vk6j3c7b6d5l0gdlv.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.380406027309-ibs30tj1jkoleq1p87s5bv078sa5p5u5</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ガイド中だけ、近くの話題を選ぶために現在地を使います。</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
