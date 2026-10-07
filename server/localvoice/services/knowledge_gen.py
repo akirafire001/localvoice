@@ -21,7 +21,7 @@ from ..models import (
 from ..util import now
 from . import geo
 from .llm import VISUAL_PATTERNS, LLMError, get_llm, llm_provider
-from .sources import collect_materials
+from .sources import collect_materials, town_materials
 
 log = logging.getLogger(__name__)
 
@@ -133,22 +133,52 @@ def generate_cell(db, cell):
     center = geo.geohash_center(cell)
     s, w, n, e = geo.geohash_bbox(cell)
     materials = collect_materials(center[0], center[1], (s, w, n, e))
+    if _cfg().LOCAL_HISTORY_RESEARCH_ENABLED:
+        towns = town_materials(center[0], center[1], (s, w, n, e))
+        materials += towns
+        new = _unresearched_towns(db, towns)
+        if new and hasattr(llm, "research_local_history"):
+            try:
+                extra, meta = llm.research_local_history(cell, center, new)
+                _usage(db, "local_history_research", {**meta, "towns": [_town_key(t) for t in new]}, llm)
+                materials += extra
+            except LLMError as err:
+                log.warning("local history research failed for %s: %s", cell, err)
     if len([m for m in materials if m["kind"] != "osm"]) < 2 and hasattr(llm, "research_with_web_search"):
         names = [m["title"] for m in materials if m.get("title")]
         try:
             extra, meta = llm.research_with_web_search(cell, center, names)
             _usage(db, "web_research", meta, llm)
-            base = len(materials)
-            for i, m in enumerate(extra, 1):
-                m["id"] = f"m{base + i}"
             materials += extra
         except LLMError as err:
             log.warning("web research failed for %s: %s", cell, err)
     if not materials:
         return 0
+    for i, m in enumerate(materials, 1):
+        m["id"] = f"m{i}"
     items, meta = llm.generate_items(cell, center, materials)
     _usage(db, "generate_knowledge", meta, llm)
     return store_generated(db, cell, center, materials, items, meta)
+
+
+def _town_key(t):
+    return f"{t['municipality']}{t['town']}"
+
+
+def _unresearched_towns(db, towns):
+    """Towns not researched within COVERAGE_TTL_DAYS. A town often spans several cells; its stories are
+    area-wide, so one search per town avoids paying for (and storing) the same story in every cell."""
+    if not towns:
+        return []
+    since = now() - timedelta(days=_cfg().COVERAGE_TTL_DAYS)
+    done = set()
+    for (names,) in db.execute(
+        select(ApiUsageLog.details_json["towns"]).where(
+            ApiUsageLog.operation == "local_history_research", ApiUsageLog.created_at >= since
+        )
+    ):
+        done.update(names or [])
+    return [t for t in towns if _town_key(t) not in done]
 
 
 def _usage(db, operation, meta, llm):

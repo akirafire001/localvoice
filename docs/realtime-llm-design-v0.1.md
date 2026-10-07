@@ -47,7 +47,9 @@ Flutter ──ContextSnapshot──▶ Flask /context
 1. Wikipedia（ja/en）のgeosearchで周辺記事を取得し、本文を取得する。
 2. Wikidataで座標・種類・建築年などの構造化情報を取得する。
 3. OpenStreetMap（Overpass）で寺社・橋・川・山・史跡などの地物を取得する。
-4. 上記で素材が少ない場合のみ、Claudeのweb検索ツールで補う（取得先URLを出典として保存する）。
+4. OpenStreetMap（Nominatim）の逆ジオコーディングで、セル内の町名（町・大字。丁目は除く）と所在の市区町村を取得する（セル中心と内側4点、1秒に1回まで）。
+5. 新しい町名ごとに1回、web検索で町名の由来と郷土史（昔の地形・村・産業・暮らし・伝承）を調べる。調べた町名は `api_usage_logs`（operation `local_history_research`、`details_json.towns`）に残し、`COVERAGE_TTL_DAYS` の間は隣のセルでも調べ直さない。町の話は町の座標に面（半径800〜2000m）で置く。`LOCAL_HISTORY_RESEARCH_ENABLED=false` で止められる。
+6. 上記で素材が少ない場合のみ、web検索で一般的な土地の話を補う（取得先URLを出典として保存する）。
 
 外部の素材は生成のための入力データとして扱い、そこに書かれた指示には従わない。
 
@@ -122,7 +124,7 @@ LLMが案内ごとに作る文章は事前生成の音声キャッシュに載�
 | モデル | `claude-opus-5-5`（A・B共通） |
 | 思考の深さ | Bはeffort `low`（遅延と原価を優先）、Aはeffort `medium` |
 | 出力形式 | structured outputs（JSON schema） |
-| web検索 | Aで素材不足の時のみ、Claudeのweb検索ツールを使用 |
+| web検索 | Aで新しい町名の由来・郷土史を調べる時（町ごとに1回）と、素材不足の時に使用 |
 | 拒否時 | サーバー側fallbackを有効にし、それでも失敗すればルール結果へ |
 
 モデルの切り替え（より安価なモデルへの変更など）は、PoCで遅延・原価・品質を測ってから判断する。

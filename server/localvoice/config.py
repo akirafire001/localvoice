@@ -132,6 +132,10 @@ class Config:
         self.HTTP_USER_AGENT = os.environ.get(
             "HTTP_USER_AGENT", "LocalVoice/0.1 (https://github.com/akirafire001/localvoice)"
         )
+        # Town names (町名) of a cell come from Nominatim reverse geocoding; each town gets one web search
+        # for its name origin and local history per COVERAGE_TTL_DAYS (realtime-llm-design §3.2)
+        self.NOMINATIM_URL = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org")
+        self.LOCAL_HISTORY_RESEARCH_ENABLED = _bool("LOCAL_HISTORY_RESEARCH_ENABLED", True)
 
         # Voice (voice-design §6-7)
         self.TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "none")  # none | silent (dev) | google
