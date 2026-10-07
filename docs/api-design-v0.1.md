@@ -129,9 +129,13 @@ Guide:
 
 言語を指定し、品質/利用条件確認済みのvoice_profile_id、表示名、対応言語、試聴資産、必要なクレジットを返す。Provider/model/声/スタイルの対応はサーバーの許可リストで管理する。試聴資産も確認済みの原稿・音声に限定する。
 
+MVPの許可リストはChirp 3 HDの日英音声に限定する。`voice_profile_id`をGoogleの`voice.name`・`language_code`・内部設定版へサーバー側で対応付け、Providerをクライアントに選ばせない。`ja-default`等のアプリ内IDは試聴後に決めた具体的な声へ対応付ける。将来の有料限定音声は契約状態で絞り込み・取得権限を確認する設計とし、課金機能の導入自体は別途決定する。
+
 ## POST /guides/{history_id}/speech
 
 認証済み本人の親tripへの所有者チェック後、指定案内の確定原稿とvoice_profile_idから音声を取得・必要時生成する。Request: `{"voice_profile_id":"ja-default"}`。本文、任意のモデル、外部URLをクライアントから受け取らない。許可された言語/声の組み合わせだけを使う。
+
+キャッシュ未命中時はサーバーからChirp 3 HDへ通常のテキスト合成を要求し、MP3の保存を完了してからreadyへ進める。Google Cloudの認証・合成パラメータはサーバー内部に限定する。同じ原稿を未選択の全声で生成せず、利用者が選んだ1声だけを取得・必要時生成する。
 
 - ready: `200 {"status":"ready","asset_id":"uuid","audio_path":"/api/v1/speech-assets/uuid","audio_format":"audio/mpeg","valid_until":null,"attribution":[]}`。
 - pending: `202 {"status":"pending","asset_id":"uuid","retry_after_sec":2}`。再度同じPOSTで状態を取得できる。同じキーの同時/再送要求は一つのジョブへ集約する。
