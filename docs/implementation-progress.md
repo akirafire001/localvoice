@@ -22,6 +22,8 @@
 
 ## 判断した内容
 
+- LLMはClaudeとOpenAIを切り替え可能（`LLM_PROVIDER`、キーがある方を自動選択）。プロンプト・JSONスキーマ・検証は共通で、OpenAIはResponses API（strict JSON schema、`store=false`、Web検索はurl_citationを素材化）。OpenAI利用時は料金単価 `LLM_PRICE_*` をそのモデルの値に設定する。
+
 - 一時指示（P1）: `POST /trips/{id}/commands` は Claude（構造化出力、検証あり）で解釈し、使えない時はキーワード解釈。分からない指示は 422 で保存しない。曖昧（確信度<0.6）は15分だけ反映し `needs_confirmation`。同じカテゴリ・状態の新しい指示は古いものを置き換える。「降りるまで」等の測れない終了条件は文字で保持するだけで、自動終了はしない（チップの×で解除）。
 - 一時状態: quiet 30分（自動案内停止）、hungry 60分（食を優先）、toilet 20分（実用を優先）、tired（間隔2倍）、bored（間隔半分）、no_time（短い文）。UIの「30分静かに」は `POST /trips/{id}/states`。
 - 同行者（participants）はホストのtrip内だけのプロフィールで、興味カテゴリを話題選びに加える。最大8人。

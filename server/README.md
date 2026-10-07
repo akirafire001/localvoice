@@ -20,8 +20,12 @@ flask --app localvoice worker      # separate process: knowledge generation, aud
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL URL (`postgresql+psycopg://…`) |
-| `ANTHROPIC_API_KEY` | Enables Claude for selection/narration and runtime knowledge generation. Without it the rule result is used. |
-| `LLM_MODEL` | Default `claude-opus-5-5` |
+| `LLM_PROVIDER` | `anthropic`, `openai` or `disabled`. Default: whichever API key is set (rules only when none) |
+| `ANTHROPIC_API_KEY` | Enables Claude for selection/narration, runtime knowledge generation and commands |
+| `OPENAI_API_KEY` | Enables OpenAI for the same features (Responses API, strict JSON schema, web search) |
+| `LLM_MODEL` | Default `claude-opus-5-5` (anthropic) / `gpt-5.5` (openai) |
+| `LLM_PRICE_INPUT_PER_MTOK`, `LLM_PRICE_OUTPUT_PER_MTOK` | USD per million tokens for cost logging and the per-trip cap. Defaults are Claude's; set them to the OpenAI model's prices when using OpenAI |
+| `LLM_REASONING` | OpenAI only: send reasoning effort (default on; turn off for non-reasoning models) |
 | `LLM_TIMEOUT_SEC` | Selection timeout (default 4s) before falling back to rules |
 | `LLM_SESSION_COST_LIMIT_USD` | Per-trip LLM cost cap (default 5) |
 | `GOOGLE_CLIENT_IDS` | Comma-separated Google OAuth client IDs accepted as ID-token audience |

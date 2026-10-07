@@ -1,4 +1,7 @@
-"""LLM Adapter (realtime-llm-design §4-6). Claude is called only from the server.
+"""LLM Adapter (realtime-llm-design §4-6). The LLM is called only from the server.
+
+Providers: Claude (LLM_PROVIDER=anthropic) and OpenAI (LLM_PROVIDER=openai). Both use the same
+prompts, JSON schemas and validation; only the API call differs.
 
 get_llm() returns None when the LLM is disabled; callers then use the rule result.
 Tests install a fake with app.extensions["lv_llm"].
@@ -426,13 +429,117 @@ def _is_distance_number(n, distance_m):
     return abs(v - distance_m) <= max(60, distance_m * 0.25) or abs(v - distance_m / 1000) <= 1
 
 
+class OpenAILLM(ClaudeLLM):
+    """Same behaviour as ClaudeLLM through the OpenAI Responses API with strict JSON schema output."""
+
+    provider = "openai"
+
+    def __init__(self, cfg):
+        import openai
+
+        self.cfg = cfg
+        self.model = cfg.LLM_MODEL
+        self.client = openai.OpenAI(api_key=cfg.OPENAI_API_KEY, max_retries=0)
+
+    def _cost(self, usage):
+        cfg = self.cfg
+        inp = usage.input_tokens or 0
+        details = getattr(usage, "input_tokens_details", None)
+        cached = (getattr(details, "cached_tokens", 0) or 0) if details else 0
+        return (
+            (inp - cached) * cfg.LLM_PRICE_INPUT_PER_MTOK
+            + cached * cfg.LLM_PRICE_INPUT_PER_MTOK * cfg.LLM_CACHED_INPUT_RATIO
+            + (usage.output_tokens or 0) * cfg.LLM_PRICE_OUTPUT_PER_MTOK
+        ) / 1_000_000
+
+    def _create(self, **kwargs):
+        import openai
+
+        t0 = time.monotonic()
+        try:
+            resp = self.client.responses.create(model=self.model, store=False, **kwargs)
+        except openai.APITimeoutError:
+            raise LLMError("timeout")
+        except openai.RateLimitError:
+            raise LLMError("rate_limited")
+        except openai.APIStatusError as e:
+            raise LLMError(f"api_error_{e.status_code}")
+        except openai.APIConnectionError:
+            raise LLMError("connection_error")
+        usage = resp.usage
+        meta = {"latency_ms": int((time.monotonic() - t0) * 1000),
+                "cost_usd": self._cost(usage) if usage else 0.0, "model": resp.model,
+                "input_tokens": usage.input_tokens if usage else None,
+                "output_tokens": usage.output_tokens if usage else None}
+        return resp, meta
+
+    def _reasoning(self, effort):
+        return {"reasoning": {"effort": effort}} if self.cfg.LLM_REASONING else {}
+
+    def _json_call(self, system, user_content, schema, effort, timeout, max_tokens=4000, tools=None):
+        resp, meta = self._create(
+            instructions=system,
+            input=user_content,
+            text={"format": {"type": "json_schema", "name": "localvoice_output", "schema": schema, "strict": True}},
+            max_output_tokens=max_tokens,
+            timeout=timeout,
+            **self._reasoning(effort),
+        )
+        for out in resp.output or []:
+            if out.type == "message" and any(c.type == "refusal" for c in out.content):
+                raise _MetaError("refusal", meta)
+        if resp.status == "incomplete":
+            reason = getattr(resp.incomplete_details, "reason", None)
+            raise _MetaError("max_tokens" if reason == "max_output_tokens" else f"incomplete_{reason}", meta)
+        try:
+            data = json.loads(resp.output_text) if resp.output_text else None
+        except ValueError:
+            data = None
+        if data is None:
+            raise _MetaError("invalid_json", meta)
+        return data, meta
+
+    def research_with_web_search(self, cell, center, place_names):
+        prompt = (
+            "Find a few specific, interesting local facts (food, place-name origins, terrain, industry, customs, "
+            f"legends) about the area around lat {center[0]:.4f}, lon {center[1]:.4f}"
+            + (f" (nearby: {', '.join(place_names[:8])})" if place_names else "")
+            + ". Report each fact in one or two sentences with its source."
+        )
+        resp, meta = self._create(
+            input=prompt, tools=[{"type": "web_search"}], max_tool_calls=3, max_output_tokens=8000,
+            timeout=self.cfg.LLM_GENERATE_TIMEOUT_SEC, **self._reasoning("low"),
+        )
+        materials = []
+        for out in resp.output or []:
+            if out.type != "message":
+                continue
+            for c in out.content:
+                if c.type != "output_text":
+                    continue
+                for a in c.annotations or []:
+                    if a.type != "url_citation" or not a.url:
+                        continue
+                    materials.append({
+                        "kind": "web",
+                        "title": a.title or a.url,
+                        "url": a.url,
+                        "text": (c.text[a.start_index:a.end_index] or c.text)[:1500],
+                    })
+        return materials, meta
+
+
+PROVIDERS = {"anthropic": ("ANTHROPIC_API_KEY", ClaudeLLM), "openai": ("OPENAI_API_KEY", OpenAILLM)}
+
+
 def get_llm():
     ext = current_app.extensions
     if "lv_llm" in ext:
         return ext["lv_llm"]
     cfg = current_app.config["LV"]
-    if cfg.LLM_PROVIDER != "anthropic" or not cfg.ANTHROPIC_API_KEY:
+    entry = PROVIDERS.get(cfg.LLM_PROVIDER)
+    if entry is None or not getattr(cfg, entry[0]):
         return None
     if "lv_llm_client" not in ext:
-        ext["lv_llm_client"] = ClaudeLLM(cfg)
+        ext["lv_llm_client"] = entry[1](cfg)
     return ext["lv_llm_client"]

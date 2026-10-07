@@ -78,10 +78,17 @@ class Config:
 
         # LLM (realtime-llm-design §5)
         self.ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-        self.LLM_PROVIDER = os.environ.get(
-            "LLM_PROVIDER", "anthropic" if self.ANTHROPIC_API_KEY else "disabled"
+        self.OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+        default_provider = (
+            "anthropic" if self.ANTHROPIC_API_KEY else "openai" if self.OPENAI_API_KEY else "disabled"
         )
-        self.LLM_MODEL = os.environ.get("LLM_MODEL", "claude-opus-5-5")
+        self.LLM_PROVIDER = os.environ.get("LLM_PROVIDER", default_provider)  # anthropic | openai | disabled
+        self.LLM_MODEL = os.environ.get(
+            "LLM_MODEL", "gpt-5.5" if self.LLM_PROVIDER == "openai" else "claude-opus-5-5"
+        )
+        # OpenAI: send reasoning effort (reasoning models only); cached input billed at this ratio
+        self.LLM_REASONING = _bool("LLM_REASONING", True)
+        self.LLM_CACHED_INPUT_RATIO = _float("LLM_CACHED_INPUT_RATIO", 0.1)
         self.LLM_SELECT_EFFORT = os.environ.get("LLM_SELECT_EFFORT", "low")
         self.LLM_GENERATE_EFFORT = os.environ.get("LLM_GENERATE_EFFORT", "medium")
         self.LLM_TIMEOUT_SEC = _float("LLM_TIMEOUT_SEC", 4.0)
