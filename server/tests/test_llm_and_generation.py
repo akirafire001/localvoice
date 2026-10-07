@@ -355,10 +355,10 @@ def test_openai_adapter_truncated_output_and_web_citations(app):
     assert e.value.code == "max_tokens"
     materials, _meta = llm.research_with_web_search("xn76", (34.3, 132.3), ["宮島"])
     assert materials == [
-        {"kind": "web", "title": "Oysters", "url": "https://example.org/oysters",
+        {"kind": "web", "title": "Oysters", "url": "https://example.org/oysters", "publisher": "example.org",
          "text": "Oysters: Oysters are farmed here. A festival is held in February."},
         {"kind": "web", "title": "https://example.org/name", "url": "https://example.org/name",
-         "text": "Name: The name means shrine island."},
+         "publisher": "example.org", "text": "Name: The name means shrine island."},
     ]
 
 
@@ -477,3 +477,43 @@ def test_local_history_prompt_names_towns(app):
         "xn764e", (35.527, 139.685), [{"town": "尻手", "municipality": "神奈川県横浜市鶴見区"}])
     assert materials == [] and meta["prompt_version"] == "local-history-v1"
     assert "神奈川県横浜市鶴見区尻手" in prompts[0] and "町名の由来" in prompts[0]
+
+
+def test_store_generated_dedupes_sources_and_near_duplicate_stories(app):
+    from localvoice.models import KnowledgeSource
+    from localvoice.services.knowledge_gen import store_generated
+
+    lat, lon = 35.531, 139.695
+    mats = [
+        {"id": "m1", "kind": "web", "title": "尻手の由来", "url": "https://hamarepo.com/a", "publisher": "hamarepo.com", "text": "a"},
+        {"id": "m2", "kind": "web", "title": "尻手の由来", "url": "https://hamarepo.com/a", "publisher": "hamarepo.com", "text": "b"},
+        {"id": "m3", "kind": "web", "title": "字名", "url": "https://www.city.kawasaki.jp/x.pdf", "publisher": "city.kawasaki.jp", "text": "c"},
+    ]
+
+    def item(title, short, sids):
+        return {
+            "title": title, "title_en": "t", "category": "history", "short_ja": short, "body_ja": short * 3,
+            "short_en": "s", "body_en": "b", "lat": lat, "lon": lon, "radius_m": 1000, "fact_type": "likely",
+            "content_kind": "origin", "why_here": "町名の由来", "interest_hook": "意外な語源", "present_connection": None,
+            "claims": [{"text_ja": "c1", "text_en": "c1", "source_ids": sids}, {"text_ja": "c2", "text_en": "c2", "source_ids": ["m2"]}],
+        }
+
+    muza = "ミューザ川崎の「ミューザ」は、musicと「座」を組み合わせた名前です。市制80周年を記念して造られました。"
+    with session_scope(app) as db:
+        n = store_generated(db, "xn764e", (lat, lon), mats, [
+            item("「ミューザ」は音楽と「座」の合言葉", muza, ["m1", "m3"]),
+            item("尻手の地名の由来", "尻手は川や集落の尻のほうにある土地という説がある町名です。", ["m1"]),
+            item("堤根の地名の由来", "堤根は古多摩川の自然堤防沿いにあった耕地に由来する町名です。", ["m3"]),
+        ], {"model": "fake"})
+        assert n == 3
+        # the same story regenerated under a slightly different title is skipped
+        assert store_generated(db, "xn764e", (lat, lon), mats, [
+            item("「ミューザ」は音楽と「座」の組み合わせ", muza.replace("名前です", "造語です"), ["m1"]),
+        ], {"model": "fake"}) == 0
+        it = db.execute(select(KnowledgeItem).where(KnowledgeItem.title.like("「ミューザ」%"))).scalar_one()
+        srcs = db.execute(select(KnowledgeSource).where(KnowledgeSource.knowledge_item_id == it.id)).scalars().all()
+        assert sorted(s.url for s in srcs) == ["https://hamarepo.com/a", "https://www.city.kawasaki.jp/x.pdf"]
+        assert it.confidence_level == "medium"  # two independent sites
+        claim = db.execute(select(KnowledgeClaim).where(KnowledgeClaim.knowledge_item_id == it.id,
+                                                       KnowledgeClaim.claim_text_ja == "c1")).scalar_one()
+        assert len(claim.source_ids) == 2

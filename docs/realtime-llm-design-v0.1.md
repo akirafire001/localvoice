@@ -60,6 +60,8 @@ Flutter ──ContextSnapshot──▶ Flask /context
 - 各 `claim` は根拠となる出典IDを必ず持つ。出典IDのない主張は保存しない。
 - `confidence_level` はLLMに自己採点させず、出典の種類と独立した出典数からルールで決める（既存方針を維持）。
 - `origin=generated`、`review_status=unreviewed` で保存する。
+- web素材の発行元はURLのホスト名（`www.` を除く）とし、確度を決める「独立した出典数」に数える。同じURLの素材は1件の出典にまとめる。
+- 1km以内に同じタイトル、またはタイトルが似ていて（類似度0.7以上）短文も似ている（0.5以上）話があれば保存しない（言い回しだけ違う再生成を防ぐ）。
 
 ### 3.4 品質の扱い
 - 事前作成（`origin=curated`）と実行時生成（`origin=generated`）を区別して保存・表示・集計する。

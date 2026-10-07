@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import time
+from urllib.parse import urlparse
 
 from flask import current_app
 
@@ -329,6 +330,7 @@ class ClaudeLLM:
                     "kind": "web",
                     "title": getattr(c, "title", None) or url,
                     "url": url,
+                    "publisher": web_publisher(url),
                     "text": (getattr(c, "cited_text", "") or "")[:1500],
                 })
         meta = {"latency_ms": int((time.monotonic() - t0) * 1000),
@@ -462,15 +464,23 @@ class OpenAILLM(ClaudeLLM):
                     fact = re.sub(r"^\s*(\d+\.|[-*])\s+", "", c.text[begin:start]).replace("**", "").strip()
                     if not fact:
                         continue
+                    url = re.sub(r"[?&]utm_source=openai$", "", url)
                     materials.append({
                         "kind": "web",
                         "title": getattr(a, "title", None) or url,
-                        "url": re.sub(r"[?&]utm_source=openai$", "", url),
+                        "url": url,
+                        "publisher": web_publisher(url),
                         "text": fact[:1500],
                     })
         meta = {"latency_ms": int((time.monotonic() - t0) * 1000),
                 "cost_usd": self._cost(resp.usage, self.background_model), "model": resp.model}
         return materials, meta
+
+
+def web_publisher(url):
+    """Site of a web source (www. dropped), so independent sources can be counted for confidence_level."""
+    host = (urlparse(url).hostname or "").lower()
+    return host.removeprefix("www.") or None
 
 
 class _MetaError(Exception):
