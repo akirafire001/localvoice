@@ -113,10 +113,15 @@ class Config:
         self.LLM_BACKGROUND_MODEL = os.environ.get(
             "LLM_BACKGROUND_MODEL", self.LLM_MODEL or ("gpt-6.1-sol" if openai else "claude-opus-5-5")
         )
+        # Writing stories from researched materials is the bulk of the background calls but needs no search,
+        # so it runs on the cheaper realtime-class model unless overridden.
+        self.LLM_GENERATE_MODEL = os.environ.get(
+            "LLM_GENERATE_MODEL", self.LLM_MODEL or ("gpt-6-luna" if openai else self.LLM_BACKGROUND_MODEL)
+        )
         self.LLM_SELECT_EFFORT = os.environ.get("LLM_SELECT_EFFORT", "low")
         self.LLM_GENERATE_EFFORT = os.environ.get("LLM_GENERATE_EFFORT", "medium")
         self.LLM_TIMEOUT_SEC = _float("LLM_TIMEOUT_SEC", 4.0)
-        self.LLM_GENERATE_TIMEOUT_SEC = _float("LLM_GENERATE_TIMEOUT_SEC", 120.0)
+        self.LLM_GENERATE_TIMEOUT_SEC = _float("LLM_GENERATE_TIMEOUT_SEC", 240.0)  # up to 12 items take minutes
         self.LLM_SESSION_COST_LIMIT_USD = _float("LLM_SESSION_COST_LIMIT_USD", 5.0)
         # USD per million tokens (input, output). LLM_PRICES="model=in/out,..." adds or overrides models;
         # LLM_PRICE_*_PER_MTOK is used for models not in the table.
@@ -136,6 +141,12 @@ class Config:
         # for its name origin and local history per COVERAGE_TTL_DAYS (realtime-llm-design §3.2)
         self.NOMINATIM_URL = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org")
         self.LOCAL_HISTORY_RESEARCH_ENABLED = _bool("LOCAL_HISTORY_RESEARCH_ENABLED", True)
+        # Fewer untold stories than this around the traveller → also generate the 8 cells around them
+        self.NEARBY_GENERATION_MIN_STORIES = _int("NEARBY_GENERATION_MIN_STORIES", 3)
+        # Generation repeats ("stories not told yet") until a round adds nothing; at most this many rounds per cell
+        self.GENERATION_MAX_ROUNDS = _int("GENERATION_MAX_ROUNDS", 4)
+        # Research themes (llm.LOCAL_RESEARCH_THEMES) searched per generation job; the rest wait for later jobs
+        self.LOCAL_RESEARCH_THEMES_PER_JOB = _int("LOCAL_RESEARCH_THEMES_PER_JOB", 4)
 
         # Voice (voice-design §6-7)
         self.TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "none")  # none | silent (dev) | google

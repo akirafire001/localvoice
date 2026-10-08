@@ -46,7 +46,7 @@ class FakeLLM:
         sel.error = validate_selection(sel, inp)
         return sel
 
-    def generate_items(self, cell, center, materials):
+    def generate_items(self, cell, center, materials, already_told=None):
         lat, lon = center
         items = [
             {
@@ -138,6 +138,7 @@ def test_rule_mode_never_calls_llm(app, client):
 
 
 def test_context_enqueues_generation_and_worker_stores_attributed_items(app, client, monkeypatch):
+    app.config["LV"].NEARBY_GENERATION_MIN_STORIES = 0  # surrounding cells: see test_few_stories_left_queues_surrounding_cells
     fake = FakeLLM()
     app.extensions["lv_llm"] = fake
     t = register(client)
@@ -184,12 +185,13 @@ def test_context_enqueues_generation_and_worker_stores_attributed_items(app, cli
 
 def test_generation_failure_retries_then_fails(app, client, monkeypatch):
     class Broken(FakeLLM):
-        def generate_items(self, *a):
+        def generate_items(self, *a, **k):
             from localvoice.services.llm import LLMError
 
             raise LLMError("timeout")
 
     app.extensions["lv_llm"] = Broken()
+    app.config["LV"].NEARBY_GENERATION_MIN_STORIES = 0
     monkeypatch.setattr("localvoice.services.knowledge_gen.collect_materials", lambda *a, **k: [{"id": "m1", "kind": "wikipedia_ja", "title": "x", "url": "u", "text": "t"}])
     t = register(client)
     trip = _trip(client, t)
@@ -421,21 +423,26 @@ def test_town_of_strips_chome_and_builds_municipality():
     assert _town_of({"city": "廿日市市", "province": "広島県"}) is None
 
 
-def test_local_history_research_once_per_town(app, monkeypatch):
-    from localvoice.models import ApiUsageLog
+def test_local_history_research_themes_in_batches_per_town(app, monkeypatch):
+    from localvoice.models import ApiUsageLog, AreaCoverage
     from localvoice.services import knowledge_gen
+    from localvoice.services.llm import LOCAL_HISTORY_PROMPT_VERSION, LOCAL_RESEARCH_THEMES
+
+    keys = [k for k, _ in LOCAL_RESEARCH_THEMES]
+    app.config["LV"].LOCAL_RESEARCH_THEMES_PER_JOB = 10
 
     class Researching(FakeLLM):
         def __init__(self):
             super().__init__()
             self.researched, self.materials = [], []
 
-        def research_local_history(self, cell, center, towns):
-            self.researched.append([t["town"] for t in towns])
+        def research_local_history(self, cell, center, towns, themes=None):
+            self.researched.append(([t["town"] for t in towns], themes))
             return [{"kind": "web", "title": "尻手の地名", "url": "https://example.org/shitte",
-                     "text": "尻手は川の下流（尻）にあたることに由来するという説がある。"}], {"model": "fake", "cost_usd": 0.01}
+                     "text": "尻手は川の下流（尻）にあたることに由来するという説がある。"}], {
+                "model": "fake", "cost_usd": 0.01, "prompt_version": LOCAL_HISTORY_PROMPT_VERSION, "themes": themes}
 
-        def generate_items(self, cell, center, materials):
+        def generate_items(self, cell, center, materials, already_told=None):
             self.materials.append(materials)
             return [], {"model": "fake-model", "cost_usd": 0.0, "prompt_version": "generate-v2"}
 
@@ -447,18 +454,35 @@ def test_local_history_research_once_per_town(app, monkeypatch):
             "town": "尻手", "municipality": "神奈川県横浜市鶴見区"}
     monkeypatch.setattr(knowledge_gen, "collect_materials", lambda *a, **k: [dict(wiki, id="m1")])
     monkeypatch.setattr(knowledge_gen, "town_materials", lambda *a, **k: [dict(town)])
+    results = []
     with app.app_context():
-        for cell in ("xn764e", "xn764s"):  # neighbouring cells in the same town
+        for cell in ("xn764e", "xn764s", "xn764e"):  # neighbouring cells in the same town, then the first again
             with session_scope(app) as db:
-                knowledge_gen.generate_cell(db, cell)
-    assert fake.researched == [["尻手"]]
-    first, second = fake.materials
+                results.append(knowledge_gen._generate(db, cell))
+    # each job researches the next themes the town has not had; the town is shared by both cells
+    assert fake.researched == [(["尻手"], keys[:10]), (["尻手"], keys[10:])]
+    assert [more for _, more in results] == [True, False, False]
+    first, second, third = fake.materials
     assert [m["id"] for m in first] == ["m1", "m2", "m3"]
     assert [m["kind"] for m in first] == ["wikipedia_ja", "osm", "web"]
-    assert [m["kind"] for m in second] == ["wikipedia_ja", "osm"]  # the town was already researched
+    assert [m["kind"] for m in third] == ["wikipedia_ja", "osm"]  # every theme already researched
     with session_scope(app) as db:
         logs = db.execute(select(ApiUsageLog).where(ApiUsageLog.operation == "local_history_research")).scalars().all()
-        assert [log.details_json["towns"] for log in logs] == [["神奈川県横浜市鶴見区尻手"]]
+        assert [log.details_json["towns"] for log in logs] == [["神奈川県横浜市鶴見区尻手"]] * 2
+
+
+def test_partial_cell_is_requeued_only_when_stories_run_low(app):
+    from localvoice.models import AreaCoverage
+    from localvoice.services import geo, knowledge_gen
+
+    here = geo.geohash_encode(LAT, LON, app.config["LV"].GEOHASH_PRECISION)
+    with session_scope(app) as db:
+        db.add(AreaCoverage(area_cell=here, status="partial", item_count=5))
+    with app.app_context(), session_scope(app) as db:
+        knowledge_gen.enqueue_for_position(db, LAT, LON, None, "stationary", nearby=False)
+        assert db.get(AreaCoverage, here).status == "partial"
+        knowledge_gen.enqueue_for_position(db, LAT, LON, None, "stationary", nearby=True)
+        assert db.get(AreaCoverage, here).status == "queued"
 
 
 def test_local_history_prompt_names_towns(app):
@@ -475,8 +499,44 @@ def test_local_history_prompt_names_towns(app):
     llm = _openai_llm(app, FakeResponses())
     materials, meta = llm.research_local_history(
         "xn764e", (35.527, 139.685), [{"town": "尻手", "municipality": "神奈川県横浜市鶴見区"}])
-    assert materials == [] and meta["prompt_version"] == "local-history-v1"
-    assert "神奈川県横浜市鶴見区尻手" in prompts[0] and "町名の由来" in prompts[0]
+    from localvoice.services.llm import LOCAL_RESEARCH_THEMES
+
+    assert materials == [] and meta["prompt_version"] == "local-history-v3"
+    assert len(prompts) == len(LOCAL_RESEARCH_THEMES) == meta["searches"]  # one search per theme
+    assert all("神奈川県横浜市鶴見区尻手" in p for p in prompts)
+    assert "町名の由来" in prompts[0] and "祭り" in prompts[2]
+
+
+def test_local_history_research_survives_a_failed_theme_and_reresearches_on_new_prompt(app, monkeypatch):
+    from localvoice.models import ApiUsageLog
+    from localvoice.services import knowledge_gen
+    from localvoice.services.llm import LOCAL_RESEARCH_THEMES, LLMError, OpenAILLM
+
+    calls = []
+
+    def fake_web(self, prompt, max_uses):
+        calls.append(prompt)
+        if len(calls) == 2:
+            raise LLMError("web_search_failed:timeout")
+        return [{"kind": "web", "title": "t", "url": f"https://example.org/{len(calls)}", "text": "x"}], {
+            "model": "m", "cost_usd": 0.02, "latency_ms": 10}
+
+    monkeypatch.setattr(OpenAILLM, "_web_research", fake_web)
+    llm = OpenAILLM.__new__(OpenAILLM)
+    keys = [k for k, _ in LOCAL_RESEARCH_THEMES]
+    mats, meta = llm.research_local_history(
+        "xn764e", (35.5, 139.6), [{"town": "尻手", "municipality": "横浜市鶴見区"}], keys[:4])
+    assert len(mats) == 3 and meta["searches"] == 3 and len(meta["errors"]) == 1
+    assert meta["themes"] == [keys[0], keys[2], keys[3]]  # the failed theme stays to do
+    assert abs(meta["cost_usd"] - 0.06) < 1e-9
+
+    # a town researched with an older prompt is researched again
+    town = {"town": "尻手", "municipality": "横浜市鶴見区"}
+    with session_scope(app) as db:
+        db.add(ApiUsageLog(provider="openai", operation="local_history_research", request_units=1,
+                           estimated_cost=0, details_json={"towns": ["横浜市鶴見区尻手"], "prompt_version": "local-history-v1"}))
+    with app.app_context(), session_scope(app) as db:
+        assert len(knowledge_gen._themes_todo(db, [town])) == len(LOCAL_RESEARCH_THEMES)
 
 
 def test_store_generated_dedupes_sources_and_near_duplicate_stories(app):
@@ -517,3 +577,111 @@ def test_store_generated_dedupes_sources_and_near_duplicate_stories(app):
         claim = db.execute(select(KnowledgeClaim).where(KnowledgeClaim.knowledge_item_id == it.id,
                                                        KnowledgeClaim.claim_text_ja == "c1")).scalar_one()
         assert len(claim.source_ids) == 2
+
+
+def test_few_stories_left_queues_surrounding_cells(app, client):
+    from localvoice.services import geo
+
+    app.extensions["lv_llm"] = FakeLLM()
+    t = register(client)
+    trip = _trip(client, t)
+    # stationary with no stories around → the current cell and the 8 around it are queued
+    _send(client, t, trip, ctx(LAT, LON, speed=0, course=None, mode="stationary"))
+    here = geo.geohash_encode(LAT, LON, app.config["LV"].GEOHASH_PRECISION)
+    with session_scope(app) as db:
+        jobs = {j.area_cell: j.priority for j in db.execute(select(KnowledgeGenerationJob)).scalars()}
+    assert jobs == {here: 10, **{c: 3 for c in geo.geohash_neighbors(here)}}
+    assert len(set(geo.geohash_neighbors(here))) == 8 and here not in geo.geohash_neighbors(here)
+
+
+def test_enough_stories_left_queues_only_current_cell(app, client):
+    app.extensions["lv_llm"] = FakeLLM()
+    for i, cat in enumerate(("history", "food", "nature")):
+        add_item(app, f"話{i}", LAT + i * 0.0003, LON, category=cat)
+    t = register(client)
+    trip = _trip(client, t, selection_mode="rule")
+    _send(client, t, trip, ctx(LAT, LON, speed=0, course=None, mode="stationary"))
+    with session_scope(app) as db:
+        assert len(db.execute(select(KnowledgeGenerationJob)).scalars().all()) == 1
+
+
+def test_generation_repeats_rounds_until_nothing_new(app, monkeypatch):
+    from localvoice.services import knowledge_gen
+
+    lat, lon = 35.527, 139.685
+
+    texts = {1: ("川の流れが変わった話", "昔の多摩川は今より西を流れ、町の境はその跡に沿って引かれています。"),
+             2: ("塩をつくっていた村", "旧矢向村は海に近く、年貢の代わりに塩を納める役を負っていました。"),
+             3: ("用水に架かる夫婦橋", "二ヶ領用水の町田堀には、二本並んだ橋が夫婦橋と呼ばれて残っています。"),
+             9: ("使われないはずの話", "四回目の生成で出てくる、本来は呼ばれないはずの話の短い文です。")}
+
+    def story(n):
+        title, short = texts[n]
+        return {
+            "title": title, "title_en": "t", "category": "history",
+            "short_ja": short, "body_ja": short * 3,
+            "short_en": "s", "body_en": "b", "lat": lat, "lon": lon, "radius_m": 1000, "fact_type": "likely",
+            "content_kind": "origin", "why_here": "ここの話", "interest_hook": "意外", "present_connection": None,
+            "claims": [{"text_ja": f"事実{n}", "text_en": "f", "source_ids": ["m1"]}],
+        }
+
+    class Rounds(FakeLLM):
+        told = []
+
+        def generate_items(self, cell, center, materials, already_told=None):
+            self.told.append([t["title"] for t in already_told or []])
+            batch = {0: [story(1), story(2)], 1: [story(3)], 2: [story(3)]}.get(len(self.told) - 1, [story(9)])
+            return batch, {"model": "fake", "cost_usd": 0.01}
+
+    fake = Rounds()
+    app.extensions["lv_llm"] = fake
+    monkeypatch.setattr(knowledge_gen, "collect_materials", lambda *a, **k: [
+        {"kind": "web", "title": "x", "url": "https://example.org/x", "publisher": "example.org", "text": "t"}])
+    monkeypatch.setattr(knowledge_gen, "town_materials", lambda *a, **k: [])
+    monkeypatch.setattr(knowledge_gen.geo, "geohash_center", lambda c: (lat, lon))
+    with app.app_context(), session_scope(app) as db:
+        assert knowledge_gen.generate_cell(db, "xn764e") == 3
+    # round 3 repeated an existing story → nothing added → stop; already_told grows each round
+    t1, t2, t3 = texts[1][0], texts[2][0], texts[3][0]
+    assert fake.told == [[], [t1, t2], [t1, t2, t3]]
+
+
+def test_generation_is_told_stories_of_neighbouring_cells(app, monkeypatch):
+    # Wikipedia materials reach 3 km, so a story stored for the next cell (2.5 km away) must be passed as
+    # already told; one 5 km away is out of reach of the shared materials and is not.
+    from localvoice.services import knowledge_gen
+
+    lat, lon = 35.527, 139.685
+    add_item(app, "隣の区画のミューザの話", lat + 0.0225, lon)
+    add_item(app, "遠くの話", lat + 0.045, lon)
+
+    class Capture(FakeLLM):
+        told = None
+
+        def generate_items(self, cell, center, materials, already_told=None):
+            Capture.told = [t["title"] for t in already_told or []]
+            return [], {"model": "fake", "cost_usd": 0.0}
+
+    app.extensions["lv_llm"] = Capture()
+    monkeypatch.setattr(knowledge_gen, "collect_materials", lambda *a, **k: [
+        {"kind": "web", "title": "x", "url": "https://example.org/x", "publisher": "example.org", "text": "t"}])
+    monkeypatch.setattr(knowledge_gen, "town_materials", lambda *a, **k: [])
+    monkeypatch.setattr(knowledge_gen.geo, "geohash_center", lambda c: (lat, lon))
+    with app.app_context(), session_scope(app) as db:
+        knowledge_gen.generate_cell(db, "xn764k")
+    assert Capture.told == ["隣の区画のミューザの話"]
+
+
+def test_story_writing_uses_the_generate_model(monkeypatch):
+    from localvoice.config import Config
+
+    monkeypatch.setenv("LOCALVOICE_OPENAI_API_KEY", "k")
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_GENERATE_MODEL", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("LOCALVOICE_ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    cfg = Config()
+    assert (cfg.LLM_GENERATE_MODEL, cfg.LLM_BACKGROUND_MODEL) == ("gpt-6-luna", "gpt-6.1-sol")
+    monkeypatch.setenv("LLM_GENERATE_MODEL", "gpt-6.1-sol")
+    assert Config().LLM_GENERATE_MODEL == "gpt-6.1-sol"
