@@ -4,7 +4,9 @@
 """
 import hashlib
 import logging
+import re
 from datetime import timedelta
+from difflib import SequenceMatcher
 
 from flask import current_app
 from sqlalchemy import select, text
@@ -21,7 +23,7 @@ from ..models import (
 from ..util import now
 from . import geo
 from .llm import VISUAL_PATTERNS, LLMError, get_llm, llm_provider
-from .sources import collect_materials
+from .sources import collect_materials, town_materials
 
 log = logging.getLogger(__name__)
 
@@ -133,22 +135,52 @@ def generate_cell(db, cell):
     center = geo.geohash_center(cell)
     s, w, n, e = geo.geohash_bbox(cell)
     materials = collect_materials(center[0], center[1], (s, w, n, e))
+    if _cfg().LOCAL_HISTORY_RESEARCH_ENABLED:
+        towns = town_materials(center[0], center[1], (s, w, n, e))
+        materials += towns
+        new = _unresearched_towns(db, towns)
+        if new and hasattr(llm, "research_local_history"):
+            try:
+                extra, meta = llm.research_local_history(cell, center, new)
+                _usage(db, "local_history_research", {**meta, "towns": [_town_key(t) for t in new]}, llm)
+                materials += extra
+            except LLMError as err:
+                log.warning("local history research failed for %s: %s", cell, err)
     if len([m for m in materials if m["kind"] != "osm"]) < 2 and hasattr(llm, "research_with_web_search"):
         names = [m["title"] for m in materials if m.get("title")]
         try:
             extra, meta = llm.research_with_web_search(cell, center, names)
             _usage(db, "web_research", meta, llm)
-            base = len(materials)
-            for i, m in enumerate(extra, 1):
-                m["id"] = f"m{base + i}"
             materials += extra
         except LLMError as err:
             log.warning("web research failed for %s: %s", cell, err)
     if not materials:
         return 0
+    for i, m in enumerate(materials, 1):
+        m["id"] = f"m{i}"
     items, meta = llm.generate_items(cell, center, materials)
     _usage(db, "generate_knowledge", meta, llm)
     return store_generated(db, cell, center, materials, items, meta)
+
+
+def _town_key(t):
+    return f"{t['municipality']}{t['town']}"
+
+
+def _unresearched_towns(db, towns):
+    """Towns not researched within COVERAGE_TTL_DAYS. A town often spans several cells; its stories are
+    area-wide, so one search per town avoids paying for (and storing) the same story in every cell."""
+    if not towns:
+        return []
+    since = now() - timedelta(days=_cfg().COVERAGE_TTL_DAYS)
+    done = set()
+    for (names,) in db.execute(
+        select(ApiUsageLog.details_json["towns"]).where(
+            ApiUsageLog.operation == "local_history_research", ApiUsageLog.created_at >= since
+        )
+    ):
+        done.update(names or [])
+    return [t for t in towns if _town_key(t) not in done]
 
 
 def _usage(db, operation, meta, llm):
@@ -173,6 +205,23 @@ def _quality_check(it):
     if any(p.lower() in blob.lower() for p in VISUAL_PATTERNS):
         return False, "visual_expression"
     return True, None
+
+
+def _norm_title(t):
+    return re.sub(r"[\s「」『』（）()、。・？！?!:：,.\-]", "", t or "").lower()
+
+
+def _ratio(a, b):
+    a, b = _norm_title(a), _norm_title(b)
+    return 1.0 if a == b else (SequenceMatcher(None, a, b).ratio() if a and b else 0.0)
+
+
+def _same_story(title, short, other_title, other_short):
+    """The same story regenerated under a slightly different title (〜の合言葉 / 〜の組み合わせ). Titles alone
+    are too short to compare (尻手の地名の由来 / 堤根の地名の由来), so the short texts must match too."""
+    if _norm_title(title) == _norm_title(other_title):
+        return True
+    return _ratio(title, other_title) >= 0.7 and _ratio(short, other_short) >= 0.5
 
 
 def _confidence(source_kinds, publishers):
@@ -203,14 +252,14 @@ def store_generated(db, cell, center, materials, items, meta):
         key = f"gen:{cell}:{hashlib.sha256(title.encode()).hexdigest()[:12]}"
         if db.execute(select(KnowledgeItem.id).where(KnowledgeItem.canonical_key == key)).first():
             continue
-        dup = db.execute(
+        nearby = db.execute(
             text(
-                """SELECT 1 FROM knowledge_items WHERE title = :t
-                   AND ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, 1000) LIMIT 1"""
+                """SELECT title, short_ja FROM knowledge_items
+                   WHERE ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, 1000)"""
             ),
-            {"t": title, "lat": lat, "lon": lon},
-        ).first()
-        if dup:
+            {"lat": lat, "lon": lon},
+        ).all()
+        if any(_same_story(title, it.get("short_ja"), t, s) for t, s in nearby):
             continue
         ok, hold = _quality_check(it)
         used = sorted({sid for _, sids in claims for sid in sids})
@@ -243,9 +292,12 @@ def store_generated(db, cell, center, materials, items, meta):
         )
         db.add(item)
         db.flush()
-        src_rows = {}
+        src_rows, url_rows = {}, {}
         for sid in used:
             m = by_id[sid]
+            if m.get("url") and m["url"] in url_rows:  # several facts from one page → one source row
+                src_rows[sid] = url_rows[m["url"]]
+                continue
             row = KnowledgeSource(
                 knowledge_item_id=item.id, url=m.get("url"), publisher=m.get("publisher"), title=m.get("title"),
                 retrieved_at=now(), source_type=m["kind"], reliability_score=SOURCE_RELIABILITY.get(m["kind"], 0.4),
@@ -254,10 +306,12 @@ def store_generated(db, cell, center, materials, items, meta):
             db.add(row)
             db.flush()
             src_rows[sid] = row.id
+            if m.get("url"):
+                url_rows[m["url"]] = row.id
         for cl, sids in claims:
             db.add(KnowledgeClaim(
                 knowledge_item_id=item.id, claim_text_ja=cl.get("text_ja"), claim_text_en=cl.get("text_en"),
-                source_ids=[src_rows[s] for s in sids],
+                source_ids=list(dict.fromkeys(src_rows[s] for s in sids)),
             ))
         created += 1
     return created

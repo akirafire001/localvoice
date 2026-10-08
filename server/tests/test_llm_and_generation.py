@@ -355,10 +355,10 @@ def test_openai_adapter_truncated_output_and_web_citations(app):
     assert e.value.code == "max_tokens"
     materials, _meta = llm.research_with_web_search("xn76", (34.3, 132.3), ["宮島"])
     assert materials == [
-        {"kind": "web", "title": "Oysters", "url": "https://example.org/oysters",
+        {"kind": "web", "title": "Oysters", "url": "https://example.org/oysters", "publisher": "example.org",
          "text": "Oysters: Oysters are farmed here. A festival is held in February."},
         {"kind": "web", "title": "https://example.org/name", "url": "https://example.org/name",
-         "text": "Name: The name means shrine island."},
+         "publisher": "example.org", "text": "Name: The name means shrine island."},
     ]
 
 
@@ -410,3 +410,110 @@ def test_localvoice_key_names_take_precedence(monkeypatch):
     monkeypatch.setenv("LOCALVOICE_ANTHROPIC_API_KEY", "app-claude")
     cfg = Config()
     assert (cfg.OPENAI_API_KEY, cfg.ANTHROPIC_API_KEY) == ("app", "app-claude")
+
+
+def test_town_of_strips_chome_and_builds_municipality():
+    from localvoice.services.sources import _town_of
+
+    addr = {"neighbourhood": "尻手二丁目", "suburb": "鶴見区", "city": "横浜市", "province": "神奈川県"}
+    assert _town_of(addr) == ("尻手", "神奈川県横浜市鶴見区")
+    assert _town_of({"neighbourhood": "千代田", "city": "千代田区"}) == ("千代田", "千代田区")
+    assert _town_of({"city": "廿日市市", "province": "広島県"}) is None
+
+
+def test_local_history_research_once_per_town(app, monkeypatch):
+    from localvoice.models import ApiUsageLog
+    from localvoice.services import knowledge_gen
+
+    class Researching(FakeLLM):
+        def __init__(self):
+            super().__init__()
+            self.researched, self.materials = [], []
+
+        def research_local_history(self, cell, center, towns):
+            self.researched.append([t["town"] for t in towns])
+            return [{"kind": "web", "title": "尻手の地名", "url": "https://example.org/shitte",
+                     "text": "尻手は川の下流（尻）にあたることに由来するという説がある。"}], {"model": "fake", "cost_usd": 0.01}
+
+        def generate_items(self, cell, center, materials):
+            self.materials.append(materials)
+            return [], {"model": "fake-model", "cost_usd": 0.0, "prompt_version": "generate-v2"}
+
+    fake = Researching()
+    app.extensions["lv_llm"] = fake
+    wiki = {"kind": "wikipedia_ja", "title": "尻手駅", "url": "https://ja.wikipedia.org/wiki/尻手駅", "text": "..."}
+    town = {"kind": "osm", "title": "尻手（神奈川県横浜市鶴見区）", "url": "https://www.openstreetmap.org/node/1",
+            "publisher": "OpenStreetMap", "lat": 35.527, "lon": 139.684, "text": "町名: 尻手",
+            "town": "尻手", "municipality": "神奈川県横浜市鶴見区"}
+    monkeypatch.setattr(knowledge_gen, "collect_materials", lambda *a, **k: [dict(wiki, id="m1")])
+    monkeypatch.setattr(knowledge_gen, "town_materials", lambda *a, **k: [dict(town)])
+    with app.app_context():
+        for cell in ("xn764e", "xn764s"):  # neighbouring cells in the same town
+            with session_scope(app) as db:
+                knowledge_gen.generate_cell(db, cell)
+    assert fake.researched == [["尻手"]]
+    first, second = fake.materials
+    assert [m["id"] for m in first] == ["m1", "m2", "m3"]
+    assert [m["kind"] for m in first] == ["wikipedia_ja", "osm", "web"]
+    assert [m["kind"] for m in second] == ["wikipedia_ja", "osm"]  # the town was already researched
+    with session_scope(app) as db:
+        logs = db.execute(select(ApiUsageLog).where(ApiUsageLog.operation == "local_history_research")).scalars().all()
+        assert [log.details_json["towns"] for log in logs] == [["神奈川県横浜市鶴見区尻手"]]
+
+
+def test_local_history_prompt_names_towns(app):
+    from types import SimpleNamespace
+
+    prompts = []
+
+    class FakeResponses:
+        def create(self, **kw):
+            prompts.append(kw["input"])
+            return SimpleNamespace(status="completed", model="gpt-6.1-sol",
+                                   usage=SimpleNamespace(input_tokens=1, output_tokens=1), output=[])
+
+    llm = _openai_llm(app, FakeResponses())
+    materials, meta = llm.research_local_history(
+        "xn764e", (35.527, 139.685), [{"town": "尻手", "municipality": "神奈川県横浜市鶴見区"}])
+    assert materials == [] and meta["prompt_version"] == "local-history-v1"
+    assert "神奈川県横浜市鶴見区尻手" in prompts[0] and "町名の由来" in prompts[0]
+
+
+def test_store_generated_dedupes_sources_and_near_duplicate_stories(app):
+    from localvoice.models import KnowledgeSource
+    from localvoice.services.knowledge_gen import store_generated
+
+    lat, lon = 35.531, 139.695
+    mats = [
+        {"id": "m1", "kind": "web", "title": "尻手の由来", "url": "https://hamarepo.com/a", "publisher": "hamarepo.com", "text": "a"},
+        {"id": "m2", "kind": "web", "title": "尻手の由来", "url": "https://hamarepo.com/a", "publisher": "hamarepo.com", "text": "b"},
+        {"id": "m3", "kind": "web", "title": "字名", "url": "https://www.city.kawasaki.jp/x.pdf", "publisher": "city.kawasaki.jp", "text": "c"},
+    ]
+
+    def item(title, short, sids):
+        return {
+            "title": title, "title_en": "t", "category": "history", "short_ja": short, "body_ja": short * 3,
+            "short_en": "s", "body_en": "b", "lat": lat, "lon": lon, "radius_m": 1000, "fact_type": "likely",
+            "content_kind": "origin", "why_here": "町名の由来", "interest_hook": "意外な語源", "present_connection": None,
+            "claims": [{"text_ja": "c1", "text_en": "c1", "source_ids": sids}, {"text_ja": "c2", "text_en": "c2", "source_ids": ["m2"]}],
+        }
+
+    muza = "ミューザ川崎の「ミューザ」は、musicと「座」を組み合わせた名前です。市制80周年を記念して造られました。"
+    with session_scope(app) as db:
+        n = store_generated(db, "xn764e", (lat, lon), mats, [
+            item("「ミューザ」は音楽と「座」の合言葉", muza, ["m1", "m3"]),
+            item("尻手の地名の由来", "尻手は川や集落の尻のほうにある土地という説がある町名です。", ["m1"]),
+            item("堤根の地名の由来", "堤根は古多摩川の自然堤防沿いにあった耕地に由来する町名です。", ["m3"]),
+        ], {"model": "fake"})
+        assert n == 3
+        # the same story regenerated under a slightly different title is skipped
+        assert store_generated(db, "xn764e", (lat, lon), mats, [
+            item("「ミューザ」は音楽と「座」の組み合わせ", muza.replace("名前です", "造語です"), ["m1"]),
+        ], {"model": "fake"}) == 0
+        it = db.execute(select(KnowledgeItem).where(KnowledgeItem.title.like("「ミューザ」%"))).scalar_one()
+        srcs = db.execute(select(KnowledgeSource).where(KnowledgeSource.knowledge_item_id == it.id)).scalars().all()
+        assert sorted(s.url for s in srcs) == ["https://hamarepo.com/a", "https://www.city.kawasaki.jp/x.pdf"]
+        assert it.confidence_level == "medium"  # two independent sites
+        claim = db.execute(select(KnowledgeClaim).where(KnowledgeClaim.knowledge_item_id == it.id,
+                                                       KnowledgeClaim.claim_text_ja == "c1")).scalar_one()
+        assert len(claim.source_ids) == 2

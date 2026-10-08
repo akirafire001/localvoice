@@ -1,9 +1,11 @@
 """Material collection for runtime knowledge generation (realtime-llm-design §3.2).
 
-Programmatic fetches from Wikipedia (ja/en), Wikidata and OpenStreetMap (Overpass) come before the LLM.
+Programmatic fetches from Wikipedia (ja/en), Wikidata and OpenStreetMap (Overpass, Nominatim) come before the LLM.
 Fetched text is data; it is passed to the LLM as material, never as instructions.
 """
 import logging
+import re
+import time
 
 import requests
 from flask import current_app
@@ -16,6 +18,9 @@ OVERPASS_API = "https://overpass-api.de/api/interpreter"
 WIKI_LICENSE = "CC BY-SA 4.0 (Wikipedia)"
 OSM_LICENSE = "ODbL (OpenStreetMap contributors)"
 WIKIDATA_LICENSE = "CC0 (Wikidata)"
+# Nominatim address keys that hold a town (町・大字) name in Japan, most specific first
+TOWN_KEYS = ("neighbourhood", "quarter", "village", "hamlet")
+CHOME_RE = re.compile(r"[0-9０-９一二三四五六七八九十]+丁目$")
 
 
 def _session():
@@ -146,6 +151,60 @@ out center tags {limit};"""
             "license": OSM_LICENSE,
         })
     return out
+
+
+def _town_of(address):
+    """(town, municipality) from a Nominatim address, e.g. 尻手二丁目 → ("尻手", "神奈川県横浜市鶴見区")."""
+    name = next((address[k] for k in TOWN_KEYS if address.get(k)), None)
+    if not name:
+        return None
+    town = CHOME_RE.sub("", name.strip()).strip()
+    parts = [address.get(k) for k in ("province", "state", "city", "county", "town", "suburb")]
+    municipality = "".join(dict.fromkeys(p for p in parts if p and p != name))
+    return (town, municipality) if town else None
+
+
+def town_materials(lat, lon, bbox):
+    """Towns (町・大字) in the cell via Nominatim reverse geocoding, one material per town.
+
+    Samples the center and four inner points of the cell, one request per second (Nominatim usage policy).
+    Each material also carries `town` and `municipality` for the local-history web search.
+    """
+    cfg = current_app.config["LV"]
+    if not cfg.SOURCE_FETCH_ENABLED:
+        return []
+    s = _session()
+    south, west, north, east = bbox
+    dlat, dlon = (north - south) / 4, (east - west) / 4
+    points = [(lat, lon), (lat + dlat, lon - dlon), (lat + dlat, lon + dlon), (lat - dlat, lon - dlon), (lat - dlat, lon + dlon)]
+    towns = {}
+    for i, (plat, plon) in enumerate(points):
+        if i:
+            time.sleep(1.0)
+        try:
+            r = s.get(
+                f"{cfg.NOMINATIM_URL}/reverse",
+                params={"lat": plat, "lon": plon, "format": "jsonv2", "zoom": 16, "accept-language": "ja"},
+                timeout=10,
+            )
+            data = r.json()
+        except (requests.RequestException, ValueError) as e:
+            log.warning("nominatim reverse failed: %s", e)
+            continue
+        found = _town_of(data.get("address") or {})
+        if not found or found in towns:
+            continue
+        town, municipality = found
+        url = (f"https://www.openstreetmap.org/{data['osm_type']}/{data['osm_id']}"
+               if data.get("osm_type") and data.get("osm_id")
+               else f"https://www.openstreetmap.org/?mlat={plat:.5f}&mlon={plon:.5f}")
+        towns[found] = {
+            "kind": "osm", "title": f"{town}（{municipality}）", "url": url, "publisher": "OpenStreetMap",
+            "lat": float(data.get("lat") or plat), "lon": float(data.get("lon") or plon),
+            "text": f"町名: {town} / 所在地: {municipality}{town}", "license": OSM_LICENSE,
+            "town": town, "municipality": municipality,
+        }
+    return list(towns.values())
 
 
 def collect_materials(lat, lon, bbox):
