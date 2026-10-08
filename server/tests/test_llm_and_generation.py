@@ -670,3 +670,18 @@ def test_generation_is_told_stories_of_neighbouring_cells(app, monkeypatch):
     with app.app_context(), session_scope(app) as db:
         knowledge_gen.generate_cell(db, "xn764k")
     assert Capture.told == ["隣の区画のミューザの話"]
+
+
+def test_story_writing_uses_the_generate_model(monkeypatch):
+    from localvoice.config import Config
+
+    monkeypatch.setenv("LOCALVOICE_OPENAI_API_KEY", "k")
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_GENERATE_MODEL", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("LOCALVOICE_ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    cfg = Config()
+    assert (cfg.LLM_GENERATE_MODEL, cfg.LLM_BACKGROUND_MODEL) == ("gpt-6-luna", "gpt-6.1-sol")
+    monkeypatch.setenv("LLM_GENERATE_MODEL", "gpt-6.1-sol")
+    assert Config().LLM_GENERATE_MODEL == "gpt-6.1-sol"

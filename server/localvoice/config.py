@@ -113,6 +113,11 @@ class Config:
         self.LLM_BACKGROUND_MODEL = os.environ.get(
             "LLM_BACKGROUND_MODEL", self.LLM_MODEL or ("gpt-6.1-sol" if openai else "claude-opus-5-5")
         )
+        # Writing stories from researched materials is the bulk of the background calls but needs no search,
+        # so it runs on the cheaper realtime-class model unless overridden.
+        self.LLM_GENERATE_MODEL = os.environ.get(
+            "LLM_GENERATE_MODEL", self.LLM_MODEL or ("gpt-6-luna" if openai else self.LLM_BACKGROUND_MODEL)
+        )
         self.LLM_SELECT_EFFORT = os.environ.get("LLM_SELECT_EFFORT", "low")
         self.LLM_GENERATE_EFFORT = os.environ.get("LLM_GENERATE_EFFORT", "medium")
         self.LLM_TIMEOUT_SEC = _float("LLM_TIMEOUT_SEC", 4.0)

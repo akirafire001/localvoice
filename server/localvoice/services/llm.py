@@ -206,6 +206,10 @@ class ClaudeLLM:
     def background_model(self):
         return self.cfg.LLM_BACKGROUND_MODEL
 
+    @property
+    def generate_model(self):
+        return self.cfg.LLM_GENERATE_MODEL
+
     # ------------------------------------------------------------ core call
 
     def _cost(self, usage, model):
@@ -300,7 +304,7 @@ class ClaudeLLM:
         try:
             data, meta = self._json_call(
                 GENERATE_SYSTEM, user, GENERATE_SCHEMA, self.cfg.LLM_GENERATE_EFFORT,
-                self.cfg.LLM_GENERATE_TIMEOUT_SEC, max_tokens=24000, model=self.background_model,
+                self.cfg.LLM_GENERATE_TIMEOUT_SEC, max_tokens=24000, model=self.generate_model,
             )
         except _MetaError as e:
             raise LLMError(e.code)
