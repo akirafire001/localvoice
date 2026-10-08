@@ -88,6 +88,16 @@ def geohash_center(gh):
     return (s + n) / 2, (w + e) / 2
 
 
+def geohash_neighbors(gh):
+    """The 8 cells around gh (same precision)."""
+    s, w, n, e = geohash_bbox(gh)
+    clat, clon = (s + n) / 2, (w + e) / 2
+    return [
+        geohash_encode(clat + di * (n - s), clon + dj * (e - w), len(gh))
+        for di in (-1, 0, 1) for dj in (-1, 0, 1) if di or dj
+    ]
+
+
 # Transport classes (mvp-technical-design §9) and PoC search radii (§5)
 MANUAL_TO_CLASS = {
     "walk": "walking",

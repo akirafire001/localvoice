@@ -136,6 +136,8 @@ class Config:
         # for its name origin and local history per COVERAGE_TTL_DAYS (realtime-llm-design §3.2)
         self.NOMINATIM_URL = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org")
         self.LOCAL_HISTORY_RESEARCH_ENABLED = _bool("LOCAL_HISTORY_RESEARCH_ENABLED", True)
+        # Fewer untold stories than this around the traveller → also generate the 8 cells around them
+        self.NEARBY_GENERATION_MIN_STORIES = _int("NEARBY_GENERATION_MIN_STORIES", 3)
 
         # Voice (voice-design §6-7)
         self.TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "none")  # none | silent (dev) | google

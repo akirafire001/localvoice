@@ -269,7 +269,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     threshold = cfg.SCORE_THRESHOLD * (0.8 if manual else 1.0)
     eligible = [c for c in ranked if c.score >= threshold]
     top = eligible[: cfg.LLM_CANDIDATES]
-    _maybe_enqueue_generation(db, lat, lon, course if confident else None, tclass, len(raw))
+    _maybe_enqueue_generation(db, lat, lon, course if confident else None, tclass, len(ranked))
     if not top:
         reason = "no_candidates" if not ranked else "below_threshold"
         return _silent(db, trip, snap, reason, mode, 60, candidates=ranked[:10], trigger=trigger)
@@ -415,13 +415,16 @@ def _log_llm_usage(db, trip_id, sel, provider):
     )
 
 
-def _maybe_enqueue_generation(db, lat, lon, course, tclass, n_raw):
-    if not _cfg().KNOWLEDGE_GENERATION_ENABLED:
+def _maybe_enqueue_generation(db, lat, lon, course, tclass, n_left):
+    """n_left: stories still untold here. When few are left (typically while staying in one place),
+    the cells around the current one are queued too, so "next story" has something new to offer."""
+    cfg = _cfg()
+    if not cfg.KNOWLEDGE_GENERATION_ENABLED:
         return
     try:
         from .knowledge_gen import enqueue_for_position
 
-        enqueue_for_position(db, lat, lon, course, tclass)
+        enqueue_for_position(db, lat, lon, course, tclass, nearby=n_left < cfg.NEARBY_GENERATION_MIN_STORIES)
     except ImportError:
         pass
 

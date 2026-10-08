@@ -37,14 +37,18 @@ def _cfg():
     return current_app.config["LV"]
 
 
-def cells_for(lat, lon, course, tclass):
+def cells_for(lat, lon, course, tclass, nearby=False):
+    """Cells to generate: the current one, the look-ahead ones and, with `nearby`, the 8 around it."""
     p = _cfg().GEOHASH_PRECISION
-    cells = [(geo.geohash_encode(lat, lon, p), 10)]
+    here = geo.geohash_encode(lat, lon, p)
+    cells = [(here, 10)]
     look = geo.LOOKAHEAD_M.get(tclass, 0)
     if course is not None and look:
         for frac, prio in ((0.5, 6), (1.0, 5)):
             alat, alon = geo.destination(lat, lon, course, look * frac)
             cells.append((geo.geohash_encode(alat, alon, p), prio))
+    if nearby:
+        cells += [(c, 3) for c in geo.geohash_neighbors(here)]
     seen, out = set(), []
     for c, prio in cells:
         if c not in seen:
@@ -53,9 +57,9 @@ def cells_for(lat, lon, course, tclass):
     return out
 
 
-def enqueue_for_position(db, lat, lon, course, tclass):
+def enqueue_for_position(db, lat, lon, course, tclass, nearby=False):
     t = now()
-    for cell, prio in cells_for(lat, lon, course, tclass):
+    for cell, prio in cells_for(lat, lon, course, tclass, nearby):
         db.execute(insert(AreaCoverage).values(area_cell=cell, status="none", item_count=0).on_conflict_do_nothing())
         cov = db.execute(select(AreaCoverage).where(AreaCoverage.area_cell == cell).with_for_update(skip_locked=True)).scalar_one_or_none()
         if cov is None:

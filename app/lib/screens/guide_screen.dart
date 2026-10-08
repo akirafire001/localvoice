@@ -284,7 +284,14 @@ class _GuideCard extends StatelessWidget {
               child: Text(tr('詳しく', 'More')),
             ),
             TextButton(
-              onPressed: () => guarded(context, () => session.feedback(g, 'skip_story')),
+              onPressed: () async {
+                final r = await guarded(context, () => session.feedback(g, 'skip_story'));
+                // No untold story nearby: the server queues the surrounding area for generation
+                if (r != null && r['guide'] == null && context.mounted) {
+                  showInfo(context, tr('近くの話はもうありません。周りの話を準備しています',
+                      'No more stories nearby. Preparing stories around you'));
+                }
+              },
               child: Text(tr('次の話', 'Next')),
             ),
           ],

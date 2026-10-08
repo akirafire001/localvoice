@@ -138,6 +138,7 @@ def test_rule_mode_never_calls_llm(app, client):
 
 
 def test_context_enqueues_generation_and_worker_stores_attributed_items(app, client, monkeypatch):
+    app.config["LV"].NEARBY_GENERATION_MIN_STORIES = 0  # surrounding cells: see test_few_stories_left_queues_surrounding_cells
     fake = FakeLLM()
     app.extensions["lv_llm"] = fake
     t = register(client)
@@ -190,6 +191,7 @@ def test_generation_failure_retries_then_fails(app, client, monkeypatch):
             raise LLMError("timeout")
 
     app.extensions["lv_llm"] = Broken()
+    app.config["LV"].NEARBY_GENERATION_MIN_STORIES = 0
     monkeypatch.setattr("localvoice.services.knowledge_gen.collect_materials", lambda *a, **k: [{"id": "m1", "kind": "wikipedia_ja", "title": "x", "url": "u", "text": "t"}])
     t = register(client)
     trip = _trip(client, t)
@@ -517,3 +519,29 @@ def test_store_generated_dedupes_sources_and_near_duplicate_stories(app):
         claim = db.execute(select(KnowledgeClaim).where(KnowledgeClaim.knowledge_item_id == it.id,
                                                        KnowledgeClaim.claim_text_ja == "c1")).scalar_one()
         assert len(claim.source_ids) == 2
+
+
+def test_few_stories_left_queues_surrounding_cells(app, client):
+    from localvoice.services import geo
+
+    app.extensions["lv_llm"] = FakeLLM()
+    t = register(client)
+    trip = _trip(client, t)
+    # stationary with no stories around → the current cell and the 8 around it are queued
+    _send(client, t, trip, ctx(LAT, LON, speed=0, course=None, mode="stationary"))
+    here = geo.geohash_encode(LAT, LON, app.config["LV"].GEOHASH_PRECISION)
+    with session_scope(app) as db:
+        jobs = {j.area_cell: j.priority for j in db.execute(select(KnowledgeGenerationJob)).scalars()}
+    assert jobs == {here: 10, **{c: 3 for c in geo.geohash_neighbors(here)}}
+    assert len(set(geo.geohash_neighbors(here))) == 8 and here not in geo.geohash_neighbors(here)
+
+
+def test_enough_stories_left_queues_only_current_cell(app, client):
+    app.extensions["lv_llm"] = FakeLLM()
+    for i, cat in enumerate(("history", "food", "nature")):
+        add_item(app, f"話{i}", LAT + i * 0.0003, LON, category=cat)
+    t = register(client)
+    trip = _trip(client, t, selection_mode="rule")
+    _send(client, t, trip, ctx(LAT, LON, speed=0, course=None, mode="stationary"))
+    with session_scope(app) as db:
+        assert len(db.execute(select(KnowledgeGenerationJob)).scalars().all()) == 1
