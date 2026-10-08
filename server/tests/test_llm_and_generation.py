@@ -426,6 +426,7 @@ def test_town_of_strips_chome_and_builds_municipality():
 def test_local_history_research_once_per_town(app, monkeypatch):
     from localvoice.models import ApiUsageLog
     from localvoice.services import knowledge_gen
+    from localvoice.services.llm import LOCAL_HISTORY_PROMPT_VERSION
 
     class Researching(FakeLLM):
         def __init__(self):
@@ -435,7 +436,8 @@ def test_local_history_research_once_per_town(app, monkeypatch):
         def research_local_history(self, cell, center, towns):
             self.researched.append([t["town"] for t in towns])
             return [{"kind": "web", "title": "尻手の地名", "url": "https://example.org/shitte",
-                     "text": "尻手は川の下流（尻）にあたることに由来するという説がある。"}], {"model": "fake", "cost_usd": 0.01}
+                     "text": "尻手は川の下流（尻）にあたることに由来するという説がある。"}], {
+                "model": "fake", "cost_usd": 0.01, "prompt_version": LOCAL_HISTORY_PROMPT_VERSION}
 
         def generate_items(self, cell, center, materials):
             self.materials.append(materials)
@@ -477,8 +479,41 @@ def test_local_history_prompt_names_towns(app):
     llm = _openai_llm(app, FakeResponses())
     materials, meta = llm.research_local_history(
         "xn764e", (35.527, 139.685), [{"town": "尻手", "municipality": "神奈川県横浜市鶴見区"}])
-    assert materials == [] and meta["prompt_version"] == "local-history-v1"
-    assert "神奈川県横浜市鶴見区尻手" in prompts[0] and "町名の由来" in prompts[0]
+    from localvoice.services.llm import LOCAL_RESEARCH_THEMES
+
+    assert materials == [] and meta["prompt_version"] == "local-history-v2"
+    assert len(prompts) == len(LOCAL_RESEARCH_THEMES) == meta["searches"]  # one search per theme
+    assert all("神奈川県横浜市鶴見区尻手" in p for p in prompts)
+    assert "町名の由来" in prompts[0] and "祭り" in prompts[2]
+
+
+def test_local_history_research_survives_a_failed_theme_and_reresearches_on_new_prompt(app, monkeypatch):
+    from localvoice.models import ApiUsageLog
+    from localvoice.services import knowledge_gen
+    from localvoice.services.llm import LLMError, OpenAILLM
+
+    calls = []
+
+    def fake_web(self, prompt, max_uses):
+        calls.append(prompt)
+        if len(calls) == 2:
+            raise LLMError("web_search_failed:timeout")
+        return [{"kind": "web", "title": "t", "url": f"https://example.org/{len(calls)}", "text": "x"}], {
+            "model": "m", "cost_usd": 0.02, "latency_ms": 10}
+
+    monkeypatch.setattr(OpenAILLM, "_web_research", fake_web)
+    llm = OpenAILLM.__new__(OpenAILLM)
+    mats, meta = llm.research_local_history("xn764e", (35.5, 139.6), [{"town": "尻手", "municipality": "横浜市鶴見区"}])
+    assert len(mats) == 3 and meta["searches"] == 3 and len(meta["errors"]) == 1
+    assert abs(meta["cost_usd"] - 0.06) < 1e-9
+
+    # a town researched with an older prompt is researched again
+    town = {"town": "尻手", "municipality": "横浜市鶴見区"}
+    with session_scope(app) as db:
+        db.add(ApiUsageLog(provider="openai", operation="local_history_research", request_units=1,
+                           estimated_cost=0, details_json={"towns": ["横浜市鶴見区尻手"], "prompt_version": "local-history-v1"}))
+    with app.app_context(), session_scope(app) as db:
+        assert knowledge_gen._unresearched_towns(db, [town]) == [town]
 
 
 def test_store_generated_dedupes_sources_and_near_duplicate_stories(app):

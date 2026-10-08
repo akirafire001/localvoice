@@ -22,7 +22,7 @@ from ..models import (
 )
 from ..util import now
 from . import geo
-from .llm import VISUAL_PATTERNS, LLMError, get_llm, llm_provider
+from .llm import LOCAL_HISTORY_PROMPT_VERSION, VISUAL_PATTERNS, LLMError, get_llm, llm_provider
 from .sources import collect_materials, town_materials
 
 log = logging.getLogger(__name__)
@@ -172,15 +172,17 @@ def _town_key(t):
 
 
 def _unresearched_towns(db, towns):
-    """Towns not researched within COVERAGE_TTL_DAYS. A town often spans several cells; its stories are
-    area-wide, so one search per town avoids paying for (and storing) the same story in every cell."""
+    """Towns not researched within COVERAGE_TTL_DAYS with the current research prompt. A town often spans
+    several cells; its stories are area-wide, so one research per town avoids paying for (and storing) the
+    same story in every cell. A new prompt version researches the towns again."""
     if not towns:
         return []
     since = now() - timedelta(days=_cfg().COVERAGE_TTL_DAYS)
     done = set()
     for (names,) in db.execute(
         select(ApiUsageLog.details_json["towns"]).where(
-            ApiUsageLog.operation == "local_history_research", ApiUsageLog.created_at >= since
+            ApiUsageLog.operation == "local_history_research", ApiUsageLog.created_at >= since,
+            ApiUsageLog.details_json["prompt_version"].astext == LOCAL_HISTORY_PROMPT_VERSION,
         )
     ):
         done.update(names or [])

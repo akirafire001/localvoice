@@ -116,7 +116,7 @@ class Config:
         self.LLM_SELECT_EFFORT = os.environ.get("LLM_SELECT_EFFORT", "low")
         self.LLM_GENERATE_EFFORT = os.environ.get("LLM_GENERATE_EFFORT", "medium")
         self.LLM_TIMEOUT_SEC = _float("LLM_TIMEOUT_SEC", 4.0)
-        self.LLM_GENERATE_TIMEOUT_SEC = _float("LLM_GENERATE_TIMEOUT_SEC", 120.0)
+        self.LLM_GENERATE_TIMEOUT_SEC = _float("LLM_GENERATE_TIMEOUT_SEC", 240.0)  # up to 12 items take minutes
         self.LLM_SESSION_COST_LIMIT_USD = _float("LLM_SESSION_COST_LIMIT_USD", 5.0)
         # USD per million tokens (input, output). LLM_PRICES="model=in/out,..." adds or overrides models;
         # LLM_PRICE_*_PER_MTOK is used for models not in the table.

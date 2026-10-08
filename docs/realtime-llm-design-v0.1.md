@@ -49,7 +49,7 @@ Flutter ──ContextSnapshot──▶ Flask /context
 2. Wikidataで座標・種類・建築年などの構造化情報を取得する。
 3. OpenStreetMap（Overpass）で寺社・橋・川・山・史跡などの地物を取得する。
 4. OpenStreetMap（Nominatim）の逆ジオコーディングで、セル内の町名（町・大字。丁目は除く）と所在の市区町村を取得する（セル中心と内側4点、1秒に1回まで）。
-5. 新しい町名ごとに1回、web検索で町名の由来と郷土史（昔の地形・村・産業・暮らし・伝承）を調べる。調べた町名は `api_usage_logs`（operation `local_history_research`、`details_json.towns`）に残し、`COVERAGE_TTL_DAYS` の間は隣のセルでも調べ直さない。町の話は町の座標に面（半径800〜2000m）で置く。`LOCAL_HISTORY_RESEARCH_ENABLED=false` で止められる。
+5. 新しい町名ごとに1回、テーマ別に4回のweb検索をする（①町名の由来と町の移り変わり、②昔の地形・川・災害、③寺社・祭り・伝承・名物・商店、④産業・鉄道・用水・ゆかりの人物・豆知識）。1テーマだけだと町名の由来ばかりで、1区画2話程度にしかならなかったため（2026-10-08）。調べ方（プロンプトの版）が変わった町は調べ直す。調べた町名は `api_usage_logs`（operation `local_history_research`、`details_json.towns`）に残し、`COVERAGE_TTL_DAYS` の間は隣のセルでも調べ直さない。町の話は町の座標に面（半径800〜2000m）で置く。`LOCAL_HISTORY_RESEARCH_ENABLED=false` で止められる。
 6. 上記で素材が少ない場合のみ、web検索で一般的な土地の話を補う（取得先URLを出典として保存する）。
 
 外部の素材は生成のための入力データとして扱い、そこに書かれた指示には従わない。
