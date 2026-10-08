@@ -16,6 +16,8 @@ class SelectionInput:
     local_time: str
     trigger: str = "context"
     intents: list = field(default_factory=list)  # active P1 overrides as labels
+    # storytelling of the last stories told, newest last: {story_type, tone, length, techniques}
+    recent_stories: list = field(default_factory=list)
 
 
 @dataclass
@@ -32,3 +34,4 @@ class Selection:
     latency_ms: int | None = None
     cost_usd: float | None = None
     error: str | None = None    # set when the LLM path failed → caller falls back to rules
+    techniques: dict | None = None  # storytelling codes used in speech_text: opening, structure, style, devices, tone

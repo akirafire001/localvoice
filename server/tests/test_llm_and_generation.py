@@ -19,6 +19,16 @@ from .helpers import MIYAJIMA, add_item, ctx
 LAT, LON = MIYAJIMA
 
 
+# Spoken version fields every generated story carries (storytelling.py)
+SPEECH = {
+    "story_type": "why_here", "era": "edo", "axis": None, "axis_angle": None,
+    "punchline": "牡蠣は筏にぶら下がって育つんです",
+    "speech_ja": "牡蠣って、海の底で育つと思っていませんか。実はこの海の牡蠣は、筏から吊るされて育つんです。波の穏やかな内海だからこそできる方法です。",
+    "speech_en": "Oysters here grow hanging from rafts.",
+    "opening": "I2", "structure": "B1", "style": "plain", "devices": ["I6"], "tone": "light", "general_knowledge": [],
+}
+
+
 class FakeLLM:
     def __init__(self, behaviour="second"):
         self.behaviour = behaviour
@@ -57,6 +67,7 @@ class FakeLLM:
                 "why_here": "沿岸のため", "interest_hook": "筏で育てる理由", "present_connection": None,
                 "claims": [{"text_ja": "牡蠣の養殖が盛ん", "text_en": "oyster farming", "source_ids": ["m1"]},
                            {"text_ja": "出典なし", "text_en": "no source", "source_ids": ["m99"]}],
+                **SPEECH,
             },
             {
                 "title": "小学校の沿革", "title_en": "School history", "category": "history",
@@ -169,6 +180,9 @@ def test_context_enqueues_generation_and_worker_stores_attributed_items(app, cli
         assert "出典のない話" not in titles
         oyster = titles["牡蠣筏の話"]
         assert oyster.auto_eligible() and oyster.review_status == "unreviewed"
+        assert oyster.metadata_json["speech"] == {"ja": SPEECH["speech_ja"], "en": SPEECH["speech_en"]}
+        assert oyster.metadata_json["storytelling"]["opening"] == "I2"
+        assert oyster.metadata_json["storytelling"]["story_type"] == "why_here"
         assert oyster.confidence_level == "low"
         claims = db.execute(select(KnowledgeClaim).where(KnowledgeClaim.knowledge_item_id == oyster.id)).scalars().all()
         assert len(claims) == 1  # the unsourced claim was dropped
@@ -556,6 +570,7 @@ def test_store_generated_dedupes_sources_and_near_duplicate_stories(app):
             "short_en": "s", "body_en": "b", "lat": lat, "lon": lon, "radius_m": 1000, "fact_type": "likely",
             "content_kind": "origin", "why_here": "町名の由来", "interest_hook": "意外な語源", "present_connection": None,
             "claims": [{"text_ja": "c1", "text_en": "c1", "source_ids": sids}, {"text_ja": "c2", "text_en": "c2", "source_ids": ["m2"]}],
+            **SPEECH,
         }
 
     muza = "ミューザ川崎の「ミューザ」は、musicと「座」を組み合わせた名前です。市制80周年を記念して造られました。"
@@ -623,6 +638,7 @@ def test_generation_repeats_rounds_until_nothing_new(app, monkeypatch):
             "short_en": "s", "body_en": "b", "lat": lat, "lon": lon, "radius_m": 1000, "fact_type": "likely",
             "content_kind": "origin", "why_here": "ここの話", "interest_hook": "意外", "present_connection": None,
             "claims": [{"text_ja": f"事実{n}", "text_en": "f", "source_ids": ["m1"]}],
+            **SPEECH,
         }
 
     class Rounds(FakeLLM):
