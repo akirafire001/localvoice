@@ -644,3 +644,29 @@ def test_generation_repeats_rounds_until_nothing_new(app, monkeypatch):
     # round 3 repeated an existing story → nothing added → stop; already_told grows each round
     t1, t2, t3 = texts[1][0], texts[2][0], texts[3][0]
     assert fake.told == [[], [t1, t2], [t1, t2, t3]]
+
+
+def test_generation_is_told_stories_of_neighbouring_cells(app, monkeypatch):
+    # Wikipedia materials reach 3 km, so a story stored for the next cell (2.5 km away) must be passed as
+    # already told; one 5 km away is out of reach of the shared materials and is not.
+    from localvoice.services import knowledge_gen
+
+    lat, lon = 35.527, 139.685
+    add_item(app, "隣の区画のミューザの話", lat + 0.0225, lon)
+    add_item(app, "遠くの話", lat + 0.045, lon)
+
+    class Capture(FakeLLM):
+        told = None
+
+        def generate_items(self, cell, center, materials, already_told=None):
+            Capture.told = [t["title"] for t in already_told or []]
+            return [], {"model": "fake", "cost_usd": 0.0}
+
+    app.extensions["lv_llm"] = Capture()
+    monkeypatch.setattr(knowledge_gen, "collect_materials", lambda *a, **k: [
+        {"kind": "web", "title": "x", "url": "https://example.org/x", "publisher": "example.org", "text": "t"}])
+    monkeypatch.setattr(knowledge_gen, "town_materials", lambda *a, **k: [])
+    monkeypatch.setattr(knowledge_gen.geo, "geohash_center", lambda c: (lat, lon))
+    with app.app_context(), session_scope(app) as db:
+        knowledge_gen.generate_cell(db, "xn764k")
+    assert Capture.told == ["隣の区画のミューザの話"]

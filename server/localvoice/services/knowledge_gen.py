@@ -195,14 +195,20 @@ def _generate(db, cell):
     return created, more
 
 
-def _told_near(db, center, radius_m=1500, limit=100):
-    """Stories already stored around the cell, so a generation round does not retell them."""
+# Wikipedia materials are gathered within 3 km, so neighbouring cells share articles (ミューザ川崎 reached both
+# 尻手 and 江ケ崎). Look that far for stories already told, so one cell does not retell its neighbour's story.
+TOLD_RADIUS_M = 3500
+
+
+def _told_near(db, center, radius_m=TOLD_RADIUS_M, limit=150):
+    """Stories already stored around the cell, nearest first, so a generation round does not retell them."""
     rows = db.execute(
         text(
             """SELECT title, short_ja FROM knowledge_items
                WHERE review_status <> 'suspended'
                  AND ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
-               ORDER BY created_at LIMIT :limit"""
+               ORDER BY position <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, created_at, id
+               LIMIT :limit"""
         ),
         {"lat": center[0], "lon": center[1], "r": radius_m, "limit": limit},
     ).all()
@@ -309,9 +315,9 @@ def store_generated(db, cell, center, materials, items, meta):
         nearby = db.execute(
             text(
                 """SELECT title, short_ja FROM knowledge_items
-                   WHERE ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, 1000)"""
+                   WHERE ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)"""
             ),
-            {"lat": lat, "lon": lon},
+            {"lat": lat, "lon": lon, "r": TOLD_RADIUS_M},
         ).all()
         if any(_same_story(title, it.get("short_ja"), t, s) for t, s in nearby):
             continue
