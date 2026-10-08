@@ -1,5 +1,6 @@
 import logging
 
+import click
 from flask import Flask
 
 from .config import Config
@@ -45,6 +46,23 @@ def create_app(config=None):
         with session_scope(app) as db:
             c, u = curated.load(db)
         print(f"curated stories: {c} created, {u} updated")
+
+    @app.cli.command("rewrite-stories")
+    @click.option("--cell", default=None, help="Only stories of this geohash cell.")
+    @click.option("--limit", type=int, default=None, help="Rewrite at most this many stories.")
+    @click.option("--force", is_flag=True, help="Also rewrite stories that already have a storytelling version.")
+    @click.option("--dry-run", is_flag=True, help="Print the rewrites without saving them (the LLM is still called).")
+    def rewrite_stories_cmd(cell, limit, force, dry_run):
+        """Give stories already in the database a spoken version written with the storytelling techniques."""
+        from .db import session_scope
+        from .services.llm import get_llm
+        from .services.rewrite import rewrite_all
+
+        llm = get_llm()
+        if llm is None:
+            raise click.ClickException("LLM is disabled: set LLM_PROVIDER and its API key")
+        with session_scope(app) as db:
+            rewrite_all(db, llm, cell=cell, limit=limit, force=force, dry_run=dry_run, echo=click.echo)
 
     from .worker import register as register_worker
 

@@ -288,6 +288,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
         local_time=snap.observed_at.isoformat(),
         trigger=trigger,
         intents=[i.label for i in intents if i.label],
+        recent_stories=[_story_trace(h) for h in history[-2:]],
     )
     decision_extra = {
         "input_json": {
@@ -369,6 +370,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
             "category": item.category,
             "duplicate_group": (item.metadata_json or {}).get("duplicate_group"),
             "used_claim_ids": selection.used_claim_ids if selection else [],
+            "story_type": _storytelling(item).get("story_type"),
         },
         title=title,
         rendered_text=text,
@@ -380,6 +382,9 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
             "language": trip.language,
             "content_version": item.content_version,
             "personalized": selection is not None,
+            # recorded so the next stories avoid the same techniques, and for learning which ones work
+            "techniques": (selection.techniques if selection is not None and selection.techniques else None)
+            or _item_techniques(item),
         },
     )
     db.add(hist)
@@ -447,3 +452,26 @@ def history_payload(db, hist, user):
         hist, item, item_location(db, item),
         voice_profile_id=default_voice(user, hist.language), selection_mode=hist.selection_mode,
     )
+
+
+def _storytelling(item):
+    return (item.metadata_json or {}).get("storytelling") or {}
+
+
+def _item_techniques(item):
+    st = _storytelling(item)
+    if not st:
+        return None
+    return {k: st.get(k) for k in ("opening", "structure", "style", "devices", "tone")}
+
+
+def _story_trace(h):
+    """What the next story should not repeat: type, tone, length and techniques of a story already told."""
+    speech = h.speech_snapshot_json or {}
+    techniques = speech.get("techniques") or {}
+    return {
+        "story_type": (h.score_components or {}).get("story_type"),
+        "tone": techniques.get("tone"),
+        "length": len(speech.get("text") or ""),
+        "techniques": {k: techniques.get(k) for k in ("opening", "structure", "style") if techniques.get(k)},
+    }

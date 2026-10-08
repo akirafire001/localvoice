@@ -168,6 +168,7 @@ def score_candidates(
     recent_categories = []
     for h in history:
         recent_categories.append(h.score_components.get("category") if h.score_components else None)
+    last_story_type = (history[-1].score_components or {}).get("story_type") if history else None
     rng = random.Random(seed)
     # Serendipity: occasionally ignore the interest profile so out-of-interest stories surface.
     serendipitous = rng.random() < SERENDIPITY_LEVELS.get(serendipity, 0.2)
@@ -212,6 +213,9 @@ def score_candidates(
             pen["same_category"] = 0.08
         if len(recent_categories) >= 2 and recent_categories[-2] == cat:
             pen["same_category"] = pen.get("same_category", 0) + 0.05
+        story_type = ((item.metadata_json or {}).get("storytelling") or {}).get("story_type")
+        if story_type and story_type == last_story_type:
+            pen["same_story_type"] = 0.05  # two "place-name origin" stories in a row sound alike
         if c.relative_direction == "behind" and c.distance_m > 300 and not c.in_area:
             pen["behind"] = 0.1
         if item.category == "practical":

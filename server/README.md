@@ -13,6 +13,7 @@ flask --app localvoice init-db     # create tables
 flask --app localvoice seed        # draft curated stories (宮島・広島・尾道・奈良) — review before the trip
 flask --app localvoice run --host 0.0.0.0 --port 8000
 flask --app localvoice worker      # separate process: knowledge generation, audio, revocation retries, cleanup
+flask --app localvoice rewrite-stories [--cell xn764e] [--limit 5] [--dry-run] [--force]  # give stored stories a spoken version (services/storytelling.py)
 ```
 
 ## Main settings (environment variables)

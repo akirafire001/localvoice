@@ -22,6 +22,7 @@ from ..models import (
 )
 from ..util import now
 from . import geo
+from . import storytelling
 from .llm import LOCAL_HISTORY_PROMPT_VERSION, LOCAL_RESEARCH_THEMES, VISUAL_PATTERNS, LLMError, get_llm, llm_provider
 from .sources import collect_materials, town_materials
 
@@ -261,10 +262,47 @@ def _quality_check(it):
         return False, "generic_description"
     if len(it.get("body_ja") or "") < 40 or len(it.get("short_ja") or "") < 15:
         return False, "generic_description"
-    blob = " ".join(str(it.get(k) or "") for k in ("title", "short_ja", "body_ja", "short_en", "body_en"))
+    blob = " ".join(str(it.get(k) or "") for k in ("title", "short_ja", "body_ja", "short_en", "body_en", "speech_ja", "speech_en"))
     if any(p.lower() in blob.lower() for p in VISUAL_PATTERNS):
         return False, "visual_expression"
+    return speech_check(it)
+
+
+def speech_check(it):
+    """The spoken version must exist, carry a punchline and stay free of hedges (storytelling.SPEECH_RULES)."""
+    if not (it.get("punchline") or "").strip():
+        return False, "no_punchline"
+    speech = it.get("speech_ja") or ""
+    if len(speech) < 40:
+        return False, "no_speech"
+    if any(p in speech for p in storytelling.HEDGE_PATTERNS):
+        return False, "hedge_in_speech"
+    if it.get("tone") == "serious" and storytelling.LIGHT_ONLY & set(technique_codes(it)):
+        return False, "humour_on_serious"
     return True, None
+
+
+def technique_codes(it):
+    return [c for c in [it.get("opening"), it.get("structure"), it.get("style"), *(it.get("devices") or [])] if c]
+
+
+def speech_metadata(it):
+    """metadata_json entries for the spoken version: `speech` is what rendering.item_speech_text reads."""
+    speech = {k: (it.get(f"speech_{k}") or "").strip() for k in ("ja", "en")}
+    return {
+        "speech": {k: v for k, v in speech.items() if v},
+        "storytelling": {
+            "story_type": it.get("story_type") if it.get("story_type") in storytelling.STORY_TYPES else None,
+            "era": it.get("era") if it.get("era") in storytelling.ERAS else None,
+            "axis": (it.get("axis") or "").strip() or None,
+            "axis_angle": (it.get("axis_angle") or "").strip() or None,
+            "punchline": (it.get("punchline") or "").strip() or None,
+            "opening": it.get("opening"), "structure": it.get("structure"), "style": it.get("style"),
+            "devices": list(it.get("devices") or []),
+            "tone": it.get("tone") if it.get("tone") in ("light", "serious") else "light",
+            "general_knowledge": list(it.get("general_knowledge") or []),
+        },
+    }
 
 
 def _norm_title(t):
@@ -346,8 +384,9 @@ def store_generated(db, cell, center, materials, items, meta):
                     "content_kind": it.get("content_kind"), "why_here": it.get("why_here"),
                     "interest_hook": it.get("interest_hook"), "present_connection": it.get("present_connection"),
                     "auto_eligible": ok, "hold_reason": hold, "reviewer": "auto",
-                    "reviewed_at": now().isoformat(), "review_version": "auto-v1",
+                    "reviewed_at": now().isoformat(), "review_version": "auto-v2",
                 },
+                **speech_metadata(it),
             },
         )
         db.add(item)

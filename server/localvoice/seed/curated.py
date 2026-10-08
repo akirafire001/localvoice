@@ -356,6 +356,7 @@ def load(db):
         item.interestingness = d.get("interestingness", 0.7)
         item.novelty = d.get("novelty", 0.6)
         item.origin, item.review_status = "curated", "unreviewed"
+        told = item.metadata_json or {}
         item.metadata_json = {
             "scope": d.get("scope", "point"),
             "topics": [d["key"].split(":")[0]],
@@ -366,6 +367,8 @@ def load(db):
             },
             "speech": {"ja": d["short_ja"], "en": d["short_en"]},
             **({"season_months": d["season_months"]} if d.get("season_months") else {}),
+            # keep a spoken version written by `flask rewrite-stories` across re-seeding
+            **({k: told[k] for k in ("speech", "storytelling")} if told.get("storytelling") else {}),
         }
         db.flush()
         src_ids = []
