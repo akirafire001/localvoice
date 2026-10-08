@@ -138,6 +138,10 @@ class Config:
         self.LOCAL_HISTORY_RESEARCH_ENABLED = _bool("LOCAL_HISTORY_RESEARCH_ENABLED", True)
         # Fewer untold stories than this around the traveller → also generate the 8 cells around them
         self.NEARBY_GENERATION_MIN_STORIES = _int("NEARBY_GENERATION_MIN_STORIES", 3)
+        # Generation repeats ("stories not told yet") until a round adds nothing; at most this many rounds per cell
+        self.GENERATION_MAX_ROUNDS = _int("GENERATION_MAX_ROUNDS", 4)
+        # Research themes (llm.LOCAL_RESEARCH_THEMES) searched per generation job; the rest wait for later jobs
+        self.LOCAL_RESEARCH_THEMES_PER_JOB = _int("LOCAL_RESEARCH_THEMES_PER_JOB", 4)
 
         # Voice (voice-design §6-7)
         self.TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "none")  # none | silent (dev) | google

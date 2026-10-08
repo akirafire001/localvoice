@@ -22,7 +22,7 @@ from ..models import (
 )
 from ..util import now
 from . import geo
-from .llm import LOCAL_HISTORY_PROMPT_VERSION, VISUAL_PATTERNS, LLMError, get_llm, llm_provider
+from .llm import LOCAL_HISTORY_PROMPT_VERSION, LOCAL_RESEARCH_THEMES, VISUAL_PATTERNS, LLMError, get_llm, llm_provider
 from .sources import collect_materials, town_materials
 
 log = logging.getLogger(__name__)
@@ -64,8 +64,11 @@ def enqueue_for_position(db, lat, lon, course, tclass, nearby=False):
         cov = db.execute(select(AreaCoverage).where(AreaCoverage.area_cell == cell).with_for_update(skip_locked=True)).scalar_one_or_none()
         if cov is None:
             continue  # another request is handling it
-        expired = cov.status == "done" and cov.expires_at is not None and cov.expires_at <= t
+        expired = cov.status in ("done", "partial") and cov.expires_at is not None and cov.expires_at <= t
         if cov.status in ("queued", "generating") or (cov.status == "done" and not expired):
+            continue
+        # "partial": its towns still have research themes left; dig deeper once the traveller here runs low
+        if cov.status == "partial" and not expired and not (nearby and prio == 10):
             continue
         if cov.status == "failed" and cov.generated_at and t - cov.generated_at < timedelta(hours=6):
             continue
@@ -112,10 +115,11 @@ def run_job(db, job):
     cov = db.get(AreaCoverage, cell)
     t = now()
     try:
-        created = generate_cell(db, cell)
+        created, more = _generate(db, cell)
         job.status, job.finished_at, job.error = "done", now(), None
         if cov:
-            cov.status, cov.item_count, cov.generated_at = "done", created, t
+            cov.status = "partial" if more else "done"
+            cov.item_count, cov.generated_at = (cov.item_count or 0) + created, t
             cov.expires_at = t + timedelta(days=_cfg().COVERAGE_TTL_DAYS)
     except Exception as e:  # noqa: BLE001
         log.exception("generation failed for %s", cell)
@@ -133,20 +137,29 @@ def run_job(db, job):
 
 
 def generate_cell(db, cell):
+    return _generate(db, cell)[0]
+
+
+def _generate(db, cell):
+    """Returns (stories created, whether the cell's towns still have research themes left)."""
     llm = get_llm()
     if llm is None or not hasattr(llm, "generate_items"):
         raise LLMError("llm_disabled")
     center = geo.geohash_center(cell)
     s, w, n, e = geo.geohash_bbox(cell)
     materials = collect_materials(center[0], center[1], (s, w, n, e))
+    more = False
     if _cfg().LOCAL_HISTORY_RESEARCH_ENABLED:
         towns = town_materials(center[0], center[1], (s, w, n, e))
         materials += towns
-        new = _unresearched_towns(db, towns)
-        if new and hasattr(llm, "research_local_history"):
+        todo = _themes_todo(db, towns)
+        batch = todo[: _cfg().LOCAL_RESEARCH_THEMES_PER_JOB]
+        more = len(todo) > len(batch)
+        if batch and hasattr(llm, "research_local_history"):
+            need = [t for t in towns if set(batch) - _researched_themes(db).get(_town_key(t), set())]
             try:
-                extra, meta = llm.research_local_history(cell, center, new)
-                _usage(db, "local_history_research", {**meta, "towns": [_town_key(t) for t in new]}, llm)
+                extra, meta = llm.research_local_history(cell, center, need, batch)
+                _usage(db, "local_history_research", {**meta, "towns": [_town_key(t) for t in need]}, llm)
                 materials += extra
             except LLMError as err:
                 log.warning("local history research failed for %s: %s", cell, err)
@@ -159,34 +172,69 @@ def generate_cell(db, cell):
         except LLMError as err:
             log.warning("web research failed for %s: %s", cell, err)
     if not materials:
-        return 0
+        return 0, more
     for i, m in enumerate(materials, 1):
         m["id"] = f"m{i}"
-    items, meta = llm.generate_items(cell, center, materials)
-    _usage(db, "generate_knowledge", meta, llm)
-    return store_generated(db, cell, center, materials, items, meta)
+    # One call writes a dozen stories at most, so keep asking for stories not told yet until the materials
+    # run dry (a round adds nothing) or GENERATION_MAX_ROUNDS is reached.
+    created = 0
+    for rnd in range(_cfg().GENERATION_MAX_ROUNDS):
+        told = _told_near(db, center)
+        try:
+            items, meta = llm.generate_items(cell, center, materials, **({"already_told": told} if told else {}))
+        except LLMError:
+            if rnd == 0:
+                raise
+            log.warning("generation round %d failed for %s; keeping earlier rounds", rnd + 1, cell)
+            break
+        _usage(db, "generate_knowledge", {**meta, "round": rnd + 1}, llm)
+        added = store_generated(db, cell, center, materials, items, meta)
+        created += added
+        if not added:
+            break
+    return created, more
+
+
+def _told_near(db, center, radius_m=1500, limit=100):
+    """Stories already stored around the cell, so a generation round does not retell them."""
+    rows = db.execute(
+        text(
+            """SELECT title, short_ja FROM knowledge_items
+               WHERE review_status <> 'suspended'
+                 AND ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
+               ORDER BY created_at LIMIT :limit"""
+        ),
+        {"lat": center[0], "lon": center[1], "r": radius_m, "limit": limit},
+    ).all()
+    return [{"title": t, "summary": s} for t, s in rows]
 
 
 def _town_key(t):
     return f"{t['municipality']}{t['town']}"
 
 
-def _unresearched_towns(db, towns):
-    """Towns not researched within COVERAGE_TTL_DAYS with the current research prompt. A town often spans
-    several cells; its stories are area-wide, so one research per town avoids paying for (and storing) the
-    same story in every cell. A new prompt version researches the towns again."""
-    if not towns:
-        return []
+def _researched_themes(db):
+    """town key -> theme keys researched within COVERAGE_TTL_DAYS with the current research prompt."""
     since = now() - timedelta(days=_cfg().COVERAGE_TTL_DAYS)
-    done = set()
-    for (names,) in db.execute(
-        select(ApiUsageLog.details_json["towns"]).where(
+    done = {}
+    for (d,) in db.execute(
+        select(ApiUsageLog.details_json).where(
             ApiUsageLog.operation == "local_history_research", ApiUsageLog.created_at >= since,
             ApiUsageLog.details_json["prompt_version"].astext == LOCAL_HISTORY_PROMPT_VERSION,
         )
     ):
-        done.update(names or [])
-    return [t for t in towns if _town_key(t) not in done]
+        for town in (d or {}).get("towns") or []:
+            done.setdefault(town, set()).update((d or {}).get("themes") or [])
+    return done
+
+
+def _themes_todo(db, towns):
+    """Theme keys, in LOCAL_RESEARCH_THEMES order, that at least one of the towns has not been researched for.
+    A town often spans several cells; its stories are area-wide, so each theme is researched once per town."""
+    if not towns:
+        return []
+    done = _researched_themes(db)
+    return [k for k, _ in LOCAL_RESEARCH_THEMES if any(k not in done.get(_town_key(t), set()) for t in towns)]
 
 
 def _usage(db, operation, meta, llm):
