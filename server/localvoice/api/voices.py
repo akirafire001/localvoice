@@ -80,27 +80,45 @@ def guide_speech(history_id):
     expired = item.valid_until is not None and item.valid_until <= now()
     if item.review_status == "suspended" or expired or snap.get("content_version") != item.content_version:
         raise ApiError(410, "content_gone", "this guide is no longer valid")
-    text = snap.get("text") or h.rendered_text
-    personalized = bool(snap.get("personalized"))
-    scope = "private" if personalized else "shared"
-    if scope == "private":
+    if "body" in snap:
+        # the story from audio shared by every traveller, plus an optional short private intro
+        text, intro, scope = snap["body"] or h.rendered_text, snap.get("intro"), "shared"
+    else:  # guides recorded before intros: one text, private when the LLM wrote it
+        text, intro = snap.get("text") or h.rendered_text, None
+        scope = "private" if snap.get("personalized") else "shared"
+
+    def private_limit_reached():
         count = db.execute(
             select(func.count()).select_from(AudioAsset).where(AudioAsset.trip_session_id == trip.id)
         ).scalar_one()
-        if count >= voice.PRIVATE_ASSETS_PER_TRIP:
-            raise ApiError(429, "tts_limit", "speech generation limit reached for this trip")
-    asset, provider = voice.get_or_create_asset(
-        db, text=text, language=h.language, voice_profile_id=vid, scope=scope,
-        content_version=item.content_version, knowledge_item_id=item.id,
-        user_id=g.user.id, trip_id=trip.id, valid_until=item.valid_until,
-    )
+        return count >= voice.PRIVATE_ASSETS_PER_TRIP
+
+    def asset_for(text, scope):
+        return voice.get_or_create_asset(
+            db, text=text, language=h.language, voice_profile_id=vid, scope=scope,
+            content_version=item.content_version, knowledge_item_id=item.id,
+            user_id=g.user.id, trip_id=trip.id, valid_until=item.valid_until,
+        )
+
+    if scope == "private" and private_limit_reached():
+        raise ApiError(429, "tts_limit", "speech generation limit reached for this trip")
+    asset, provider = asset_for(text, scope)
     if asset is None:
         raise ApiError(503, "tts_unavailable", "speech synthesis is not available")
+    # past the per-trip limit the story still plays, only without its intro
+    intro_asset = asset_for(intro, "private")[0] if intro and not private_limit_reached() else None
     h.audio_asset_id = asset.id
     db.commit()
     if asset.status in ("pending", "invalidated"):
         asset = voice.synthesize_asset(db, asset, provider)
+    if intro_asset is not None and intro_asset.status in ("pending", "invalidated"):
+        intro_asset = voice.synthesize_asset(db, intro_asset, provider)
     body, status = _asset_body(asset)
+    if status == 200:
+        if intro_asset is not None and intro_asset.status not in ("ready", "failed"):
+            return jsonify({"status": "pending", "asset_id": body["asset_id"], "retry_after_sec": 2}), 202
+        # a failed intro is dropped rather than holding the story back
+        body["intro"] = _asset_body(intro_asset)[0] if intro_asset is not None and intro_asset.status == "ready" else None
     return jsonify(body), status
 
 

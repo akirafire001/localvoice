@@ -75,14 +75,8 @@ def test_rule_path_speaks_the_spoken_version(app, client):
         assert h.score_components["story_type"] == "why_here"
 
 
-def test_selection_gets_speech_and_recent_techniques_and_records_its_own(app, client):
-    class Telling(FakeLLM):
-        def select(self, inp):
-            sel = super().select(inp)
-            sel.techniques = {"opening": "A6", "structure": "B4", "style": "plain", "devices": ["C1"], "tone": "light"}
-            return sel
-
-    fake = Telling(behaviour="first")
+def test_selection_gets_speech_and_recent_techniques_of_the_story_told(app, client):
+    fake = FakeLLM(behaviour="first")
     app.extensions["lv_llm"] = fake
     for i, cat in enumerate(("history", "food", "nature")):
         add_item(app, f"話{i}", LAT + i * 0.0003, LON, category=cat, speech={"ja": f"語り{i}"},
@@ -96,7 +90,7 @@ def test_selection_gets_speech_and_recent_techniques_and_records_its_own(app, cl
 
     first, second = fake.calls
     assert first.recent_stories == []
-    assert second.recent_stories[-1]["techniques"] == {"opening": "A6", "structure": "B4", "style": "plain"}
+    assert second.recent_stories[-1]["techniques"] == {"opening": "A3"}  # the shared speech's own techniques
     assert second.recent_stories[-1]["story_type"] == "lost_trace"
     payload = build_select_payload(second)
     assert payload["recent_techniques"] == second.recent_stories
@@ -123,7 +117,7 @@ def test_same_story_type_twice_in_a_row_is_penalised():
     assert by[1].penalties == {"same_story_type": 0.05} and by[2].penalties == {}
 
 
-def test_select_adapter_parses_techniques(app):
+def test_select_adapter_parses_intro(app):
     from localvoice.services import llm as llm_mod
     from localvoice.services.selector import SelectionInput
 
@@ -132,15 +126,14 @@ def test_select_adapter_parses_techniques(app):
             self.cfg = cfg
 
         def _json_call(self, *a, **k):
-            return {"action": "stay_silent", "knowledge_id": "", "title": "", "text": "", "speech_text": "",
-                    "reason": "r", "used_claim_ids": [], "opening": None, "structure": None, "style": None,
-                    "devices": [], "tone": "light"}, {"model": "m", "latency_ms": 1, "cost_usd": 0.0}
+            return {"action": "stay_silent", "knowledge_id": "", "title": "", "text": "", "intro": " ",
+                    "reason": "r", "used_claim_ids": []}, {"model": "m", "latency_ms": 1, "cost_usd": 0.0}
 
     inp = SelectionInput(candidates=[], language="ja", detail_mode="normal", transport_class="walking",
                          course_confident=False, recent_titles=[], memory_summary=None, interests={}, boosts={},
                          local_time="2026-10-08T12:00:00+09:00")
     sel = Stub(app.config["LV"]).select(inp)
-    assert sel.action == "stay_silent" and sel.techniques["tone"] == "light"
+    assert sel.action == "stay_silent" and sel.intro == ""
 
 
 class Rewriter:

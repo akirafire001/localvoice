@@ -70,12 +70,14 @@ class AudioController extends ChangeNotifier {
         (lang == 'en' ? 'en-default' : 'ja-default');
     final deadline = DateTime.now().add(AppConfig.speechWaitLimit);
     String? audioPath;
+    String? introPath; // short line fitted to this moment, played before the story's shared audio
     String? failure;
     while (gen == _generation) {
       try {
         final r = await api.post('/api/v1/guides/${guide['history_id']}/speech', {'voice_profile_id': voice});
         if (r.status == 200) {
           audioPath = r.json['audio_path'] as String;
+          introPath = (r.json['intro'] as Map?)?['audio_path'] as String?;
           break;
         }
       } on ApiException catch (e) {
@@ -95,12 +97,15 @@ class AudioController extends ChangeNotifier {
     }
     if (audioPath != null) {
       try {
-        await _player.setAudioSource(AudioSource.uri(api.uri(audioPath), headers: api.authHeaders()));
-        if (gen != _generation) return;
-        await _player.setSpeed(rate);
-        _set(SpeechState.playing);
-        await _player.play();
-        await _player.processingStateStream.firstWhere((s) => s == ProcessingState.completed);
+        for (final path in [?introPath, audioPath]) {
+          await _player.setAudioSource(AudioSource.uri(api.uri(path), headers: api.authHeaders()));
+          if (gen != _generation) return;
+          await _player.setSpeed(rate);
+          _set(SpeechState.playing);
+          await _player.play();
+          await _player.processingStateStream.firstWhere((s) => s == ProcessingState.completed);
+          if (gen != _generation) return;
+        }
         if (gen == _generation) {
           onSpoken?.call();
           _set(SpeechState.idle);
