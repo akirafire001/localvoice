@@ -23,7 +23,15 @@ from ..models import (
 from ..util import now
 from . import geo
 from . import storytelling
-from .llm import LOCAL_HISTORY_PROMPT_VERSION, LOCAL_RESEARCH_THEMES, VISUAL_PATTERNS, LLMError, get_llm, llm_provider
+from .llm import (
+    COUNTRY_RESEARCH_THEMES,
+    LOCAL_HISTORY_PROMPT_VERSION,
+    LOCAL_RESEARCH_THEMES,
+    VISUAL_PATTERNS,
+    LLMError,
+    get_llm,
+    llm_provider,
+)
 from .sources import collect_materials, town_materials
 
 log = logging.getLogger(__name__)
@@ -31,7 +39,8 @@ log = logging.getLogger(__name__)
 CURATED_ENOUGH = 5           # cells already covered by this many curated stories nearby are skipped
 MAX_ATTEMPTS = 3
 EXCLUDED_KINDS = {"institution_history", "practical"}
-SOURCE_RELIABILITY = {"wikipedia_ja": 0.6, "wikipedia_en": 0.6, "wikidata": 0.6, "osm": 0.5, "web": 0.4}
+SOURCE_RELIABILITY = {"wikipedia": 0.6, "wikidata": 0.6, "osm": 0.5, "web": 0.4}
+TIME_SENSITIVE_DAYS = 365   # shops, menus and experiences may close: such stories expire after a year
 
 
 def _cfg():
@@ -142,16 +151,18 @@ def generate_cell(db, cell):
 
 
 def _generate(db, cell):
-    """Returns (stories created, whether the cell's towns still have research themes left)."""
+    """Returns (stories created, whether the cell's towns or country still have research themes left)."""
     llm = get_llm()
     if llm is None or not hasattr(llm, "generate_items"):
         raise LLMError("llm_disabled")
     center = geo.geohash_center(cell)
     s, w, n, e = geo.geohash_bbox(cell)
-    materials = collect_materials(center[0], center[1], (s, w, n, e))
+    research = _cfg().LOCAL_HISTORY_RESEARCH_ENABLED
+    towns = town_materials(center[0], center[1], (s, w, n, e)) if research else []
+    country = _country_of(towns)
+    materials = collect_materials(center[0], center[1], (s, w, n, e), country_code=country and country[0])
     more = False
-    if _cfg().LOCAL_HISTORY_RESEARCH_ENABLED:
-        towns = town_materials(center[0], center[1], (s, w, n, e))
+    if research:
         materials += towns
         todo = _themes_todo(db, towns)
         batch = todo[: _cfg().LOCAL_RESEARCH_THEMES_PER_JOB]
@@ -175,28 +186,80 @@ def _generate(db, cell):
             materials += extra
         except LLMError as err:
             log.warning("web research failed for %s: %s", cell, err)
+    created = _write_stories(db, llm, cell, center, materials, country=country)
+    if research and country:
+        c_created, c_more = _country_customs(db, llm, cell, center, country)
+        created += c_created
+        more = more or c_more
+    return created, more
+
+
+def _write_stories(db, llm, cell, center, materials, country=None, country_wide=False):
+    """Stories from the materials. One call writes a dozen stories at most, so keep asking for stories not told yet
+    until the materials run dry (a round adds nothing) or GENERATION_MAX_ROUNDS is reached."""
     if not materials:
-        return 0, more
+        return 0
     for i, m in enumerate(materials, 1):
         m["id"] = f"m{i}"
-    # One call writes a dozen stories at most, so keep asking for stories not told yet until the materials
-    # run dry (a round adds nothing) or GENERATION_MAX_ROUNDS is reached.
     created = 0
     for rnd in range(_cfg().GENERATION_MAX_ROUNDS):
-        told = _told_near(db, center)
+        told = _told_in_country(db, country[0]) if country_wide else _told_near(db, center)
+        kw = {"already_told": told} if told else {}
+        if country_wide:
+            kw["country"] = country[1]
         try:
-            items, meta = llm.generate_items(cell, center, materials, **({"already_told": told} if told else {}))
+            items, meta = llm.generate_items(cell, center, materials, **kw)
         except LLMError:
             if rnd == 0:
                 raise
             log.warning("generation round %d failed for %s; keeping earlier rounds", rnd + 1, cell)
             break
-        _usage(db, "generate_knowledge", {**meta, "round": rnd + 1}, llm)
-        added = store_generated(db, cell, center, materials, items, meta)
+        extra = {"country": country[0]} if country_wide else {}
+        _usage(db, "generate_knowledge", {**meta, "round": rnd + 1, **extra}, llm)
+        added = store_generated(db, cell, center, materials, items, meta, country=country and country[0],
+                                country_wide=country_wide)
         created += added
         if not added:
             break
-    return created, more
+    return created
+
+
+def _country_of(towns):
+    """(country code, country name) of the cell, from its towns; None when no town was found."""
+    for t in towns:
+        if t.get("country_code"):
+            return t["country_code"].lower(), t.get("country") or t["country_code"].upper()
+    return None
+
+
+def _country_customs(db, llm, cell, center, country):
+    """Manners common to the whole country are researched a few themes at a time, once per country, and told to
+    travellers who do not live there (ranking.fetch_candidates). Returns (stories created, themes left)."""
+    if not hasattr(llm, "research_country_customs"):
+        return 0, False
+    key = _country_key(country[0])
+    todo = _themes_todo(db, [{"key": key}], COUNTRY_RESEARCH_THEMES)
+    batch = todo[: _cfg().COUNTRY_RESEARCH_THEMES_PER_JOB]
+    if not batch:
+        return 0, False
+    state = _research_state(db).get(key, {})
+    kw = {"known": [s["title"] for s in _told_in_country(db, country[0])]} if any(state.get(k) for k in batch) else {}
+    try:
+        materials, meta = llm.research_country_customs(country[1], batch, **kw)
+    except LLMError as err:
+        log.warning("country customs research failed for %s: %s", country[0], err)
+        return 0, True
+    _usage(db, "local_history_research", {**meta, "towns": [key]}, llm)
+    try:
+        created = _write_stories(db, llm, cell, center, materials, country=country, country_wide=True)
+    except LLMError as err:
+        log.warning("country customs stories failed for %s: %s", country[0], err)
+        created = 0
+    return created, len(todo) > len(batch)
+
+
+def _country_key(code):
+    return f"country:{code}"
 
 
 # Wikipedia materials are gathered within 3 km, so neighbouring cells share articles (ミューザ川崎 reached both
@@ -219,7 +282,23 @@ def _told_near(db, center, radius_m=TOLD_RADIUS_M, limit=150):
     return [{"title": t, "summary": s} for t, s in rows]
 
 
+def _told_in_country(db, country_code, limit=150):
+    """Country-wide stories already stored for the country, so a round does not retell them."""
+    rows = db.execute(
+        text(
+            """SELECT title, short_ja FROM knowledge_items
+               WHERE review_status <> 'suspended' AND metadata_json->>'scope' = 'country'
+                 AND metadata_json->>'country' = :c
+               ORDER BY created_at, id LIMIT :limit"""
+        ),
+        {"c": country_code, "limit": limit},
+    ).all()
+    return [{"title": t, "summary": s} for t, s in rows]
+
+
 def _town_key(t):
+    if "key" in t:
+        return t["key"]  # a country researched for its country-wide manners
     return f"{t['municipality']}{t['town']}"
 
 
@@ -254,7 +333,7 @@ def _exhausted(st):
     return st["last_found"] is not None and st["last_found"] < cfg.RESEARCH_MIN_NEW_FACTS
 
 
-def _themes_todo(db, towns):
+def _themes_todo(db, towns, themes=LOCAL_RESEARCH_THEMES):
     """Theme keys that at least one of the towns can still be researched for: never-researched themes first
     (in LOCAL_RESEARCH_THEMES order), then the least-researched themes that still turned up new facts.
     A town often spans several cells; its stories are area-wide, so research is tracked per town."""
@@ -262,7 +341,7 @@ def _themes_todo(db, towns):
         return []
     state = _research_state(db)
     open_ = []
-    for i, (k, _) in enumerate(LOCAL_RESEARCH_THEMES):
+    for i, (k, _) in enumerate(themes):
         sts = [state.get(_town_key(t), {}).get(k) for t in towns]
         live = [st for st in sts if not _exhausted(st)]
         if live:
@@ -353,7 +432,9 @@ def _confidence(source_kinds, publishers):
     return "medium" if len(publishers) >= 2 else "low"
 
 
-def store_generated(db, cell, center, materials, items, meta):
+def store_generated(db, cell, center, materials, items, meta, country=None, country_wide=False):
+    """`country` (ISO code) is recorded on every story; `country_wide` stories hold for the whole country and are
+    offered anywhere in it, to travellers who do not live there."""
     by_id = {m["id"]: m for m in materials}
     created = 0
     for it in items:
@@ -373,16 +454,22 @@ def store_generated(db, cell, center, materials, items, meta):
         title = (it.get("title") or "").strip()[:300]
         if not title:
             continue
-        key = f"gen:{cell}:{hashlib.sha256(title.encode()).hexdigest()[:12]}"
+        digest = hashlib.sha256(title.encode()).hexdigest()[:12]
+        key = f"gen:country:{country}:{digest}" if country_wide else f"gen:{cell}:{digest}"
         if db.execute(select(KnowledgeItem.id).where(KnowledgeItem.canonical_key == key)).first():
             continue
-        nearby = db.execute(
-            text(
-                """SELECT title, short_ja FROM knowledge_items
-                   WHERE ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)"""
-            ),
-            {"lat": lat, "lon": lon, "r": TOLD_RADIUS_M},
-        ).all()
+        if country_wide:
+            lat, lon = center
+            nearby = [(r["title"], r["summary"]) for r in _told_in_country(db, country, limit=1000)]
+        else:
+            nearby = db.execute(
+                text(
+                    """SELECT title, short_ja FROM knowledge_items
+                       WHERE ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
+                         AND COALESCE(metadata_json->>'scope', '') <> 'country'"""
+                ),
+                {"lat": lat, "lon": lon, "r": TOLD_RADIUS_M},
+            ).all()
         if any(_same_story(title, it.get("short_ja"), t, s) for t, s in nearby):
             continue
         ok, hold = _quality_check(it)
@@ -397,7 +484,8 @@ def store_generated(db, cell, center, materials, items, meta):
             short_ja=it.get("short_ja"), body_ja=it.get("body_ja"),
             short_en=it.get("short_en"), body_en=it.get("body_en"),
             position=f"SRID=4326;POINT({lon} {lat})",
-            radius_m=max(50, min(5000, int(it.get("radius_m") or 200))),
+            radius_m=5000 if country_wide else max(50, min(5000, int(it.get("radius_m") or 200))),
+            valid_until=now() + timedelta(days=TIME_SENSITIVE_DAYS) if it.get("time_sensitive") else None,
             interestingness=0.6, novelty=0.6,
             confidence_level=_confidence({by_id[s]["kind"] for s in used}, publishers),
             fact_type=fact_type,
@@ -405,7 +493,9 @@ def store_generated(db, cell, center, materials, items, meta):
             generated_by={"model": meta.get("model"), "prompt_version": meta.get("prompt_version"),
                           "generated_at": now().isoformat()},
             metadata_json={
-                "scope": "area" if int(it.get("radius_m") or 0) >= 800 else "point",
+                "scope": "country" if country_wide else "area" if int(it.get("radius_m") or 0) >= 800 else "point",
+                **({"country": country} if country else {}),
+                **({"audience": "visitors"} if country_wide else {}),
                 "story_quality": {
                     "content_kind": it.get("content_kind"), "why_here": it.get("why_here"),
                     "interest_hook": it.get("interest_hook"), "present_connection": it.get("present_connection"),
@@ -425,7 +515,8 @@ def store_generated(db, cell, center, materials, items, meta):
                 continue
             row = KnowledgeSource(
                 knowledge_item_id=item.id, url=m.get("url"), publisher=m.get("publisher"), title=m.get("title"),
-                retrieved_at=now(), source_type=m["kind"], reliability_score=SOURCE_RELIABILITY.get(m["kind"], 0.4),
+                retrieved_at=now(), source_type=m["kind"],
+                reliability_score=SOURCE_RELIABILITY.get(m["kind"].split("_")[0], 0.4),  # wikipedia_<lang>
                 license_info=m.get("license"),
             )
             db.add(row)

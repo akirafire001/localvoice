@@ -51,6 +51,15 @@ def create_schema(app):
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
     Base.metadata.create_all(engine)
+    # create_all does not add columns to existing tables; columns added since are added here
+    with engine.begin() as conn:
+        for stmt in UPGRADES:
+            conn.execute(text(stmt))
+
+
+UPGRADES = [
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS home_country varchar(2) NOT NULL DEFAULT 'jp'",  # 2026-10-09
+]
 
 
 def drop_schema(app):

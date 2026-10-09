@@ -9,7 +9,7 @@ MVP implementation of [API設計](../docs/api-design-v0.1.md) / [DB設計](../do
 createdb localvoice && psql -d localvoice -c "create extension postgis"
 pip install -r requirements.txt
 export DATABASE_URL=postgresql+psycopg://postgres@localhost:5432/localvoice
-flask --app localvoice init-db     # create tables
+flask --app localvoice init-db     # create tables; on an existing DB it also adds columns added since (db.UPGRADES)
 flask --app localvoice seed        # draft curated stories (宮島・広島・尾道・奈良) — review before the trip
 flask --app localvoice run --host 0.0.0.0 --port 8000
 flask --app localvoice worker      # separate process: knowledge generation, audio, revocation retries, cleanup
@@ -36,6 +36,7 @@ flask --app localvoice rewrite-stories [--cell xn764e] [--limit 5] [--dry-run] [
 | `TOKEN_ENCRYPTION_KEY` | Key for encrypting Apple refresh tokens (Fernet key or passphrase), stored outside the DB |
 | `TTS_PROVIDER` | `none` (clients use device TTS if allowed), `silent` (dev), `google` (+`GOOGLE_TTS_API_KEY`) |
 | `MAIL_BACKEND` | `log` (stores mails in `outbox_mails`) or `smtp` (+`SMTP_*`) |
+| `LOCAL_RESEARCH_THEMES_PER_JOB`, `COUNTRY_RESEARCH_THEMES_PER_JOB` | Research themes (`llm.LOCAL_RESEARCH_THEMES`, 42) searched per generation job for the cell's towns (default 4), and country-wide manners (`llm.COUNTRY_RESEARCH_THEMES`, researched once per country, told only to users from other countries) per job (default 2) |
 | `SOURCE_FETCH_ENABLED` | Fetch Wikipedia/Wikidata/OSM materials for generation (default on) |
 
 ## Tests

@@ -20,6 +20,17 @@ OSM_LICENSE = "ODbL (OpenStreetMap contributors)"
 WIKIDATA_LICENSE = "CC0 (Wikidata)"
 # Nominatim address keys that hold a town (町・大字) name in Japan, most specific first
 TOWN_KEYS = ("neighbourhood", "quarter", "village", "hamlet")
+# Elsewhere a district of a city is usually a suburb or city_district; a small place is the town itself
+TOWN_KEYS_ABROAD = ("neighbourhood", "quarter", "suburb", "city_district", "village", "hamlet", "town", "city")
+# Wikipedia in the local language, besides ja and en, for towns abroad (ISO 3166 country code → wiki language)
+LOCAL_WIKI = {
+    "kr": "ko", "cn": "zh", "tw": "zh", "hk": "zh", "mo": "zh", "th": "th", "vn": "vi", "id": "id", "my": "ms",
+    "ph": "tl", "in": "hi", "fr": "fr", "be": "fr", "lu": "fr", "mc": "fr", "de": "de", "at": "de", "ch": "de",
+    "it": "it", "sm": "it", "va": "it", "es": "es", "mx": "es", "ar": "es", "cl": "es", "co": "es", "pe": "es",
+    "pt": "pt", "br": "pt", "nl": "nl", "se": "sv", "no": "no", "dk": "da", "fi": "fi", "is": "is", "pl": "pl",
+    "cz": "cs", "sk": "sk", "hu": "hu", "ro": "ro", "bg": "bg", "gr": "el", "hr": "hr", "si": "sl", "rs": "sr",
+    "ru": "ru", "ua": "uk", "tr": "tr", "il": "he", "eg": "ar", "ae": "ar", "sa": "ar", "ma": "ar", "jo": "ar",
+}
 CHOME_RE = re.compile(r"[0-9０-９一二三四五六七八九十]+丁目$")
 
 
@@ -154,7 +165,15 @@ out center tags {limit};"""
 
 
 def _town_of(address):
-    """(town, municipality) from a Nominatim address, e.g. 尻手二丁目 → ("尻手", "神奈川県横浜市鶴見区")."""
+    """(town, municipality) from a Nominatim address, e.g. 尻手二丁目 → ("尻手", "神奈川県横浜市鶴見区").
+    Abroad, e.g. マレ地区 in パリ → ("マレ地区", "パリ、イル＝ド＝フランス")."""
+    if (address.get("country_code") or "jp") != "jp":
+        name = next((address[k] for k in TOWN_KEYS_ABROAD if address.get(k)), None)
+        if not name:
+            return None
+        parts = [address.get(k) for k in ("city", "town", "county", "state")]
+        municipality = "、".join(dict.fromkeys(p for p in parts if p and p != name))
+        return (name.strip(), municipality or (address.get("country") or ""))
     name = next((address[k] for k in TOWN_KEYS if address.get(k)), None)
     if not name:
         return None
@@ -168,7 +187,8 @@ def town_materials(lat, lon, bbox):
     """Towns (町・大字) in the cell via Nominatim reverse geocoding, one material per town.
 
     Samples the center and four inner points of the cell, one request per second (Nominatim usage policy).
-    Each material also carries `town` and `municipality` for the local-history web search.
+    Each material also carries `town`, `municipality`, `country_code` (ISO 3166, lower case) and `country` (its
+    name in Japanese) for the local-history web search and the country-wide manners.
     """
     cfg = current_app.config["LV"]
     if not cfg.SOURCE_FETCH_ENABLED:
@@ -191,7 +211,8 @@ def town_materials(lat, lon, bbox):
         except (requests.RequestException, ValueError) as e:
             log.warning("nominatim reverse failed: %s", e)
             continue
-        found = _town_of(data.get("address") or {})
+        address = data.get("address") or {}
+        found = _town_of(address)
         if not found or found in towns:
             continue
         town, municipality = found
@@ -203,12 +224,13 @@ def town_materials(lat, lon, bbox):
             "lat": float(data.get("lat") or plat), "lon": float(data.get("lon") or plon),
             "text": f"町名: {town} / 所在地: {municipality}{town}", "license": OSM_LICENSE,
             "town": town, "municipality": municipality,
+            "country_code": (address.get("country_code") or "jp").lower(), "country": address.get("country") or None,
         }
     return list(towns.values())
 
 
-def collect_materials(lat, lon, bbox):
-    """Returns a list of material dicts with stable ids m1..mN."""
+def collect_materials(lat, lon, bbox, country_code=None):
+    """Returns a list of material dicts with stable ids m1..mN. Abroad, Wikipedia in the local language too."""
     cfg = current_app.config["LV"]
     if not cfg.SOURCE_FETCH_ENABLED:
         return []
@@ -216,6 +238,9 @@ def collect_materials(lat, lon, bbox):
     mats = []
     mats += wikipedia_materials(s, "ja", lat, lon)
     mats += wikipedia_materials(s, "en", lat, lon, limit=5)
+    local = LOCAL_WIKI.get((country_code or "").lower())
+    if local:
+        mats += wikipedia_materials(s, local, lat, lon, limit=5)
     mats += wikidata_materials(s, [m.get("wikidata") for m in mats])
     mats += osm_materials(s, bbox)
     for i, m in enumerate(mats, 1):

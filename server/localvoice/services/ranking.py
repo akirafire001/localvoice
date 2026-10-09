@@ -52,7 +52,15 @@ class Candidate:
         }
 
 
-def fetch_candidates(db, lat, lon, tclass, course_deg=None, course_confident=False, language="ja", t=None):
+# Country-wide stories (manners common to the whole country) sit just below the stories of this very place
+COUNTRY_WIDE_PENALTY = 0.05
+COUNTRY_WIDE_LIMIT = 50
+
+
+def fetch_candidates(db, lat, lon, tclass, course_deg=None, course_confident=False, language="ja", t=None,
+                     home_country=None):
+    """Stories around the position, plus the country-wide ones of the country it is in. Country-wide stories are
+    for travellers from elsewhere: they are left out when the country is `home_country` (ISO code)."""
     t = t or now()
     search_r = geo.SEARCH_RADIUS_M.get(tclass, 700)
     params = {"lat": lat, "lon": lon, "r": search_r, "t": t}
@@ -77,6 +85,7 @@ def fetch_candidates(db, lat, lon, tclass, course_deg=None, course_confident=Fal
               AND (valid_from IS NULL OR valid_from <= :t)
               AND (valid_until IS NULL OR valid_until > :t)
               AND COALESCE((metadata_json->'story_quality'->>'auto_eligible')::boolean, false)
+              AND COALESCE(metadata_json->>'scope', '') <> 'country'
               {lang_clause}
               AND (ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
                    OR ST_DWithin(position, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, radius_m)
@@ -93,6 +102,11 @@ def fetch_candidates(db, lat, lon, tclass, course_deg=None, course_confident=Fal
         i.id: i for i in db.execute(select(KnowledgeItem).where(KnowledgeItem.id.in_([r.id for r in rows]))).scalars()
     }
     out = []
+    country = _country_here(items.values())
+    if country and country != (home_country or "").lower():
+        for item in _country_wide(db, country, lang_clause, t):
+            # holds anywhere in the country: an area story covering the position, with no direction
+            out.append(Candidate(item=item, distance_m=float(search_r), lat=lat, lon=lon, in_area=True))
     for r in rows:
         c = Candidate(item=items[r.id], distance_m=float(r.d), lat=r.ilat, lon=r.ilon, in_area=bool(r.in_area))
         if r.d > 1:
@@ -101,6 +115,38 @@ def fetch_candidates(db, lat, lon, tclass, course_deg=None, course_confident=Fal
                 c.relative_direction = geo.relative_direction(course_deg, c.bearing)
         out.append(c)
     return out, search_r
+
+
+def _country_here(items):
+    """Country of the position: the one most nearby stories were generated in. Stories record it since
+    2026-10-09; older ones and the curated ones are all in Japan."""
+    counts = {}
+    for i in items:
+        c = (i.metadata_json or {}).get("country") or "jp"
+        counts[c] = counts.get(c, 0) + 1
+    return max(counts, key=counts.get) if counts else None
+
+
+def _country_wide(db, country, lang_clause, t):
+    ids = db.execute(
+        text(
+            f"""
+            SELECT id FROM knowledge_items
+            WHERE metadata_json->>'scope' = 'country' AND metadata_json->>'country' = :c
+              AND review_status <> 'suspended'
+              AND (valid_from IS NULL OR valid_from <= :t)
+              AND (valid_until IS NULL OR valid_until > :t)
+              AND COALESCE((metadata_json->'story_quality'->>'auto_eligible')::boolean, false)
+              {lang_clause}
+            ORDER BY created_at, id
+            LIMIT {COUNTRY_WIDE_LIMIT}
+            """
+        ),
+        {"c": country, "t": t},
+    ).scalars().all()
+    if not ids:
+        return []
+    return list(db.execute(select(KnowledgeItem).where(KnowledgeItem.id.in_(ids))).scalars())
 
 
 def load_interests(db, user_id):
@@ -244,6 +290,8 @@ def score_candidates(
             pen["behind"] = 0.1
         if item.category == "practical":
             pen["practical_auto"] = 0.1  # practical info is pulled on demand, not pushed
+        if (item.metadata_json or {}).get("scope") == "country":
+            pen["country_wide"] = COUNTRY_WIDE_PENALTY
         c.heard_before = item.id in heard_ids
         c.components = {**comp, "category": cat}
         c.penalties = pen

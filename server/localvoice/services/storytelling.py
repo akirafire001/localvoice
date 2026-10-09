@@ -18,18 +18,21 @@ STORY_TYPES = {
     "town_today": "festivals, seasonal events and local habits of today",
     "place_name": "a place-name origin, only when it has a payoff",
     "famous_person": "a well-known or locally important person with a concrete tie to this place",
+    "local_tip": "an insider tip (a spot, the best time or conditions, how to order or eat, what to buy, a craft to watch) with the reason behind it",
+    "custom_manner": "a manner, taboo or habit of the people here and why it exists",
 }
 
+# Keys follow Japanese periods; outside Japan an era is picked by its years (in brackets).
 ERAS = {
     "prehistoric": "geology and deep time",
-    "jomon_kofun": "Jomon, Yayoi and Kofun",
-    "ancient": "ancient (Asuka to Heian)",
-    "medieval": "medieval (Kamakura, Muromachi)",
-    "sengoku": "Sengoku",
-    "edo": "Edo",
-    "meiji_prewar": "Meiji to pre-war Showa",
-    "war_postwar": "war and post-war",
-    "heisei_later": "Heisei and later",
+    "jomon_kofun": "Jomon, Yayoi and Kofun (before 600)",
+    "ancient": "ancient (Asuka to Heian; 600-1185)",
+    "medieval": "medieval (Kamakura, Muromachi; 1185-1467)",
+    "sengoku": "Sengoku (1467-1603)",
+    "edo": "Edo (1603-1868)",
+    "meiji_prewar": "Meiji to pre-war Showa (1868-1936)",
+    "war_postwar": "war and post-war (1937-1988)",
+    "heisei_later": "Heisei and later (1989-)",
     "timeless": "not tied to one era",
 }
 
@@ -65,7 +68,7 @@ STRUCTURES = {
     "G6": "first, only or birthplace",
     "G7": "chain: A led to B, B led to C",
     "G8": "historical what-if, clearly framed as imagination",
-    "G9": "zoom out or in: earth, Japan, this road",
+    "G9": "zoom out or in: earth, the country, this road",
     "G10": "aftermath: end with what happened afterwards",
     "J4": "chain of whys",
     "J6": "counted hints (\"two hints\"), answered within the story",

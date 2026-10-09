@@ -1,7 +1,7 @@
 """/context pipeline: rules → (LLM) selection → validation/fallback → decision log (mvp-technical-design §7-8)."""
 import logging
 import math
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from flask import current_app
 from geoalchemy2.shape import to_shape
@@ -68,6 +68,10 @@ def parse_context(data):
         except (TypeError, ValueError):
             return None
 
+    offset = num(data.get("utc_offset_min"))  # the phone's time zone, so "morning" is morning where the user is
+    if offset is not None and not -14 * 60 <= offset <= 14 * 60:
+        offset = None
+
     return {
         "client_event_id": ev,
         "observed_at": observed,
@@ -80,6 +84,7 @@ def parse_context(data):
         "confidence": num(motion.get("confidence")),
         "course_confidence": num(motion.get("course_confidence")),
         "active_topics": topics,
+        "utc_offset_min": None if offset is None else int(offset),
     }
 
 
@@ -120,6 +125,7 @@ def store_snapshot(db, trip, ctx):
             "client_transport_mode": ctx["transport_mode"],
             "course_confidence": ctx["course_confidence"],
             "active_topics": ctx["active_topics"],
+            **({"utc_offset_min": ctx["utc_offset_min"]} if ctx.get("utc_offset_min") is not None else {}),
         },
     )
     db.add(snap)
@@ -193,6 +199,14 @@ def active_intents(db, trip_id, t):
     )
 
 
+def _local_time(snap):
+    """observed_at in the phone's time zone when it sent one (older apps send UTC only)."""
+    offset = (snap.context_json or {}).get("utc_offset_min")
+    if offset is None:
+        return snap.observed_at.isoformat()
+    return snap.observed_at.astimezone(timezone(timedelta(minutes=offset))).isoformat()
+
+
 def _course_confident(snap):
     cc = (snap.context_json or {}).get("course_confidence")
     speed = float(snap.speed_mps) if snap.speed_mps is not None else 0
@@ -247,7 +261,8 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     tclass = snap.inferred_transport_mode or "walking"
     confident = _course_confident(snap)
     course = float(snap.course_deg) if snap.course_deg is not None else None
-    raw, search_r = fetch_candidates(db, lat, lon, tclass, course, confident, trip.language, t)
+    raw, search_r = fetch_candidates(db, lat, lon, tclass, course, confident, trip.language, t,
+                                     home_country=user.home_country)
     intents = active_intents(db, trip.id, t)
     session_topics = set((snap.context_json or {}).get("active_topics") or [])
     session_topics |= set((trip.settings_json or {}).get("focus_categories") or [])
@@ -280,7 +295,8 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     # Stories heard on an earlier trip are offered only when nothing unheard is good enough here.
     unheard = [c for c in eligible if not c.heard_before]
     top = (unheard or eligible)[: cfg.LLM_CANDIDATES]
-    n_unheard = sum(1 for c in ranked if not c.heard_before)
+    # country-wide manners say nothing about this place: they do not count as stories left here
+    n_unheard = sum(1 for c in ranked if not c.heard_before and (c.item.metadata_json or {}).get("scope") != "country")
     _maybe_enqueue_generation(db, lat, lon, course if confident else None, tclass, n_unheard)
     if not top:
         reason = "no_candidates" if not ranked else "below_threshold"
@@ -297,7 +313,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
         memory_summary=trip.memory_summary,
         interests=interests,
         boosts=boosts,
-        local_time=snap.observed_at.isoformat(),
+        local_time=_local_time(snap),
         trigger=trigger,
         intents=[i.label for i in intents if i.label],
         recent_stories=[_story_trace(h) for h in history[-2:]],
