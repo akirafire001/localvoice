@@ -8,7 +8,6 @@ import '../location/track.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
 import '../widgets/track_map.dart';
-import 'history_screen.dart';
 import 'home_screen.dart';
 import 'map_screen.dart';
 
@@ -54,15 +53,10 @@ class _GuideScreenState extends State<GuideScreen> {
       ),
     );
     if (ok != true || !mounted) return;
-    final tripId = s.tripId;
-    final summary = await guarded(context, s.finishTrip);
+    await guarded(context, s.finishTrip);
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TripDetailScreen(tripId: tripId!, summary: summary),
-      ),
-    );
+    // Back to home; the finished trip stays viewable from the history screen.
+    Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
   @override
@@ -236,7 +230,8 @@ class _GuideCard extends StatelessWidget {
     final playingThis = audio.currentHistoryId == g['history_id'] && audio.state != SpeechState.idle;
     final loc = g['location'] as Map?;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      // Keep the rating buttons clear of the system navigation bar.
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 32 + MediaQuery.paddingOf(context).bottom),
       children: [
         Row(
           children: [
