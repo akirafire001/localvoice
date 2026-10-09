@@ -215,3 +215,41 @@ def test_preferences_and_interests(client):
     )
     food = [i for i in r.get_json()["interests"] if i["category"] == "food"][0]
     assert food["explicit_score"] == 1.0
+
+
+def test_new_trip_prefers_stories_not_heard_on_earlier_trips(app, client):
+    t = register(client)
+    first = add_item(app, "A", LAT + 0.0005, LON, interestingness=0.9)
+    second = add_item(app, "B", LAT - 0.001, LON, interestingness=0.6)
+    trip1 = _trip(client, t)
+    assert _send(client, t, trip1, ctx(LAT, LON))["guide"]["knowledge_id"] == first
+    assert client.post(f"/api/v1/trips/{trip1}/finish", headers=auth(t)).status_code == 200
+    # Same place, new trip: the story heard on the previous trip waits behind the unheard one,
+    # even though it scores higher.
+    trip2 = _trip(client, t)
+    res = _send(client, t, trip2, ctx(LAT, LON))
+    assert res["guide"]["knowledge_id"] == second
+    with session_scope(app) as db:
+        d = db.execute(select(GuideDecision).where(GuideDecision.trip_session_id == trip2)).scalars().one()
+        assert [c["knowledge_id"] for c in d.candidates_json] == [second]
+
+
+def test_heard_story_is_retold_when_nothing_unheard_fits(app, client):
+    t = register(client)
+    kid = add_item(app, "A", LAT + 0.0005, LON)
+    trip1 = _trip(client, t)
+    assert _send(client, t, trip1, ctx(LAT, LON))["guide"]["knowledge_id"] == kid
+    client.post(f"/api/v1/trips/{trip1}/finish", headers=auth(t))
+    trip2 = _trip(client, t)
+    res = _send(client, t, trip2, ctx(LAT, LON))
+    assert res["guide"]["knowledge_id"] == kid
+    # another user has not heard it, so it is not marked for them
+    other = register(client, "bob")
+    trip3 = _trip(client, other)
+    _send(client, other, trip3, ctx(LAT, LON))
+    with session_scope(app) as db:
+        heard = {
+            str(d.trip_session_id): d.candidates_json[0]["heard_before"]
+            for d in db.execute(select(GuideDecision)).scalars()
+        }
+    assert heard == {trip1: False, trip2: True, trip3: False}

@@ -21,7 +21,15 @@ from ..models import (
 from ..util import now, parse_datetime, parse_uuid
 from . import commands, geo
 from .prefs import CATEGORIES, NOTIFICATION_LEVELS, trip_settings
-from .ranking import active_boosts, fetch_candidates, load_interests, score_candidates, seed_for, todays_history
+from .ranking import (
+    active_boosts,
+    fetch_candidates,
+    heard_before_ids,
+    load_interests,
+    score_candidates,
+    seed_for,
+    todays_history,
+)
 from .rendering import item_speech_text, item_texts, location_payload, guide_payload
 from .selector import SelectionInput
 
@@ -264,12 +272,16 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
         serendipity=settings["serendipity"],
         seed=seed_for(snap.client_event_id) + (1 if manual else 0),
         excluded_ids=exclude_ids,
+        heard_ids=heard_before_ids(db, user.id, trip.id, [c.item.id for c in raw]),
         t=t,
     )
     threshold = cfg.SCORE_THRESHOLD * (0.8 if manual else 1.0)
     eligible = [c for c in ranked if c.score >= threshold]
-    top = eligible[: cfg.LLM_CANDIDATES]
-    _maybe_enqueue_generation(db, lat, lon, course if confident else None, tclass, len(ranked))
+    # Stories heard on an earlier trip are offered only when nothing unheard is good enough here.
+    unheard = [c for c in eligible if not c.heard_before]
+    top = (unheard or eligible)[: cfg.LLM_CANDIDATES]
+    n_unheard = sum(1 for c in ranked if not c.heard_before)
+    _maybe_enqueue_generation(db, lat, lon, course if confident else None, tclass, n_unheard)
     if not top:
         reason = "no_candidates" if not ranked else "below_threshold"
         return _silent(db, trip, snap, reason, mode, 60, candidates=ranked[:10], trigger=trigger)
