@@ -147,6 +147,8 @@ class Config:
         self.GENERATION_MAX_ROUNDS = _int("GENERATION_MAX_ROUNDS", 4)
         # Research themes (llm.LOCAL_RESEARCH_THEMES) searched per generation job; the rest wait for later jobs
         self.LOCAL_RESEARCH_THEMES_PER_JOB = _int("LOCAL_RESEARCH_THEMES_PER_JOB", 4)
+        # Country-wide manners (llm.COUNTRY_RESEARCH_THEMES) researched per job, once per country
+        self.COUNTRY_RESEARCH_THEMES_PER_JOB = _int("COUNTRY_RESEARCH_THEMES_PER_JOB", 2)
         # A theme is researched again (asking for facts other than the stories told) until a pass finds fewer
         # than RESEARCH_MIN_NEW_FACTS facts or it has been researched RESEARCH_MAX_PASSES times for a town.
         self.RESEARCH_MIN_NEW_FACTS = _int("RESEARCH_MIN_NEW_FACTS", 2)

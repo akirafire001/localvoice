@@ -1,4 +1,6 @@
 """GET/PATCH /users/me/preferences and /users/me/interests."""
+import re
+
 from flask import Blueprint, g, jsonify
 from sqlalchemy import select
 
@@ -19,6 +21,7 @@ def _prefs(user):
     vs = user.voice_settings_json or {}
     return {
         "language": user.locale,
+        "home_country": user.home_country,
         "notification_level": user.notification_level,
         "detail_mode": user.detail_mode,
         "serendipity": user.serendipity_level,
@@ -47,6 +50,11 @@ def patch_preferences():
         if data["language"] not in LANGUAGES:
             raise bad_request("language must be ja or en", {"field": "language"})
         u.locale = data["language"]
+    if "home_country" in data:
+        hc = data["home_country"]
+        if not isinstance(hc, str) or not re.fullmatch(r"[A-Za-z]{2}", hc):
+            raise bad_request("home_country must be an ISO 3166 two-letter code", {"field": "home_country"})
+        u.home_country = hc.lower()
     for key, attr, allowed in (
         ("notification_level", "notification_level", set(NOTIFICATION_LEVELS)),
         ("detail_mode", "detail_mode", DETAIL_MODES),

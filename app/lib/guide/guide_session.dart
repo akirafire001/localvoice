@@ -224,6 +224,7 @@ class GuideSession extends ChangeNotifier {
     final ctx = {
       'client_event_id': _uuid.v4(),
       'observed_at': t.toIso8601String(),
+      'utc_offset_min': p.timestamp.toLocal().timeZoneOffset.inMinutes,
       'location': {'lat': p.latitude, 'lon': p.longitude, 'accuracy_m': p.accuracy},
       'motion': m.toJson(),
       'app_state': appInForeground ? 'foreground' : 'background',

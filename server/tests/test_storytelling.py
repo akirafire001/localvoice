@@ -43,7 +43,11 @@ def test_schemas_are_strict_and_prompts_carry_the_catalogue():
         assert "B7:" not in prompt and "D4:" not in prompt  # rejected: they tie one story's timing to the next
     codes = [*storytelling.OPENINGS, *storytelling.STRUCTURES, *storytelling.STYLES, *storytelling.DEVICES]
     assert len(codes) == len(set(codes))
-    assert "famous_people" in dict(llm.LOCAL_RESEARCH_THEMES) and "specialty_deepdive" in dict(llm.LOCAL_RESEARCH_THEMES)
+    themes = dict(llm.LOCAL_RESEARCH_THEMES)
+    assert len(themes) == len(llm.LOCAL_RESEARCH_THEMES) == 42  # agreed with the user on 2026-10-09
+    assert {"people_historical", "people_modern", "people_local_heroes", "specialty_deepdive", "firsts"} <= set(themes)
+    assert "famous_people" not in themes  # split in three
+    assert llm.LOCAL_MANNER_THEMES <= set(themes) and set(llm.THEMES_ABROAD) <= set(themes)
 
 
 def test_speech_check_holds_dull_hedged_or_joking_serious_stories():

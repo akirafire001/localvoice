@@ -449,7 +449,8 @@ def test_local_history_research_themes_in_batches_per_town(app, monkeypatch):
     from localvoice.services.llm import LOCAL_HISTORY_PROMPT_VERSION, LOCAL_RESEARCH_THEMES
 
     keys = [k for k, _ in LOCAL_RESEARCH_THEMES]
-    app.config["LV"].LOCAL_RESEARCH_THEMES_PER_JOB = 10
+    half = len(keys) // 2
+    app.config["LV"].LOCAL_RESEARCH_THEMES_PER_JOB = half
 
     class Researching(FakeLLM):
         def __init__(self):
@@ -482,7 +483,7 @@ def test_local_history_research_themes_in_batches_per_town(app, monkeypatch):
             with session_scope(app) as db:
                 results.append(knowledge_gen._generate(db, cell))
     # each job researches the next themes the town has not had; the town is shared by both cells
-    assert fake.researched == [(["尻手"], keys[:10]), (["尻手"], keys[10:])]
+    assert fake.researched == [(["尻手"], keys[:half]), (["尻手"], keys[half:])]
     assert [more for _, more in results] == [True, False, False]
     first, second, third = fake.materials
     assert [m["id"] for m in first] == ["m1", "m2", "m3"]
