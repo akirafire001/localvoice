@@ -6,7 +6,7 @@ from datetime import timedelta
 
 from sqlalchemy import select, text
 
-from ..models import KnowledgeItem, NotificationHistory, TopicBoost, UserInterest
+from ..models import KnowledgeItem, NotificationHistory, TopicBoost, TripSession, UserInterest
 from ..util import now
 from . import geo
 from .prefs import MAX_SAME_CATEGORY_IN_ROW, SERENDIPITY_LEVELS
@@ -34,6 +34,7 @@ class Candidate:
     components: dict = field(default_factory=dict)
     penalties: dict = field(default_factory=dict)
     score: float = 0.0
+    heard_before: bool = False  # told to this user on an earlier trip
 
     def summary(self):
         return {
@@ -44,6 +45,7 @@ class Candidate:
             "distance_m": round(self.distance_m),
             "relative_direction": self.relative_direction,
             "in_area": self.in_area,
+            "heard_before": self.heard_before,
             "score": round(self.score, 4),
             "components": {k: round(v, 4) for k, v in self.components.items()},
             "penalties": {k: round(v, 4) for k, v in self.penalties.items()},
@@ -136,6 +138,24 @@ def todays_history(db, trip_id, t=None):
     )
 
 
+def heard_before_ids(db, user_id, trip_id, item_ids):
+    """Ids among item_ids that this user was already told on an earlier trip (any device, any day)."""
+    if not item_ids:
+        return set()
+    return set(
+        db.execute(
+            select(NotificationHistory.knowledge_item_id)
+            .join(TripSession, TripSession.id == NotificationHistory.trip_session_id)
+            .where(
+                TripSession.user_id == user_id,
+                TripSession.id != trip_id,
+                NotificationHistory.knowledge_item_id.in_(list(item_ids)),
+            )
+            .distinct()
+        ).scalars()
+    )
+
+
 def _timeliness(item, t):
     meta = item.metadata_json or {}
     months = meta.get("season_months")
@@ -159,9 +179,13 @@ def score_candidates(
     serendipity="normal",
     seed=None,
     excluded_ids=(),
+    heard_ids=(),
     t=None,
 ):
-    """Score in place, drop excluded, return sorted list (best first)."""
+    """Score in place, drop excluded, return sorted list (best first).
+
+    Stories in heard_ids (told on an earlier trip) keep their score but sort after every unheard one,
+    so a new trip on the same route does not open with the stories the user just heard."""
     t = t or now()
     shown_ids = {h.knowledge_item_id for h in history} | set(excluded_ids)
     shown_keys = set()
@@ -220,11 +244,12 @@ def score_candidates(
             pen["behind"] = 0.1
         if item.category == "practical":
             pen["practical_auto"] = 0.1  # practical info is pulled on demand, not pushed
+        c.heard_before = item.id in heard_ids
         c.components = {**comp, "category": cat}
         c.penalties = pen
         c.score = sum(WEIGHTS[k] * comp[k] for k in WEIGHTS) - sum(pen.values())
         out.append(c)
-    out.sort(key=lambda c: c.score, reverse=True)
+    out.sort(key=lambda c: (c.heard_before, -c.score))
     for c in out:
         c.components.pop("category", None)
     return out, serendipitous

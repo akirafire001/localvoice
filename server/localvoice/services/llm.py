@@ -16,7 +16,7 @@ from .selector import Selection
 
 log = logging.getLogger(__name__)
 
-SELECT_PROMPT_VERSION = "select-v2"
+SELECT_PROMPT_VERSION = "select-v3"
 GENERATE_PROMPT_VERSION = "generate-v5"
 REWRITE_PROMPT_VERSION = "rewrite-v1"
 # Kept at v3 when themes were added (2026-10-08): the version gates which themes count as researched, and the
@@ -41,6 +41,7 @@ Rules:
 - The app has no camera. Never say or imply that the traveller can see something ("見えます", "目の前", "you can see", "visible"). Describe locations as positions relative to the traveller ("進行方向右手側、約300mの位置に…") only when direction_reliable is true; otherwise do not use left/right at all.
 - Legends and traditions (fact_type tradition or legend) must be framed as such ("〜と伝えられています", "local legend says").
 - Prefer stories that connect to what was already told today, match the traveller's interests and boosted topics, and suit the transport mode (short and about the wider area when moving fast). Avoid repeating a topic just told.
+- heard_on_earlier_trip true means the traveller already heard this story on an earlier trip; such candidates are only offered when nothing new fits. Tell it only if it is clearly worth hearing again, and then briefly from a different angle.
 - Choose stay_silent when none of the candidates would be genuinely interesting right now or it would repeat what was just said. Silence is better than a weak story.
 - Write in the requested language. text: 1-3 natural sentences for the screen (around 60-140 Japanese characters or 25-60 English words; up to ~250 characters / 100 words when detail_mode is detailed). text keeps the facts exact, with any caveats.
 - speech_text is what the traveller hears, and it is the heart of the product: a story they enjoy, not a fact sheet. When the candidate has a speech (a spoken version already written with storytelling techniques), start from it and adapt it to the moment: you may open by addressing the traveller's situation (transport, local_time; technique A6), call back to a story told earlier today when trip_memory has one (B6), or shorten it when moving fast. Without a speech, write one following the speech rules below. Short sentences, natural pauses, no parentheses or symbols, place names as they are read. Converted numbers ("about a 10-minute walk", "as heavy as six grown men") and a sentence of widely known general knowledge are allowed in speech_text only; never add local facts beyond the claims.
@@ -625,6 +626,7 @@ def build_select_payload(inp):
             "distance_m": round(c.distance_m),
             "relative_direction": c.relative_direction,
             "covers_current_position": c.in_area,
+            "heard_on_earlier_trip": c.heard_before,
             "rule_score": round(c.score, 3),
             "story": (item.body_en or item.short_en) if lang == "en" else (item.body_ja or item.short_ja),
             "why_here": item.story_quality().get("why_here"),
