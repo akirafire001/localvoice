@@ -26,7 +26,8 @@ class Selection:
     knowledge_id: str | None = None
     title: str | None = None
     text: str | None = None
-    speech_text: str | None = None
+    # one spoken sentence fitted to the moment, played before the story's shared audio ("" = none)
+    intro: str | None = None
     reason: str | None = None
     used_claim_ids: list = field(default_factory=list)
     model: str | None = None
@@ -34,4 +35,3 @@ class Selection:
     latency_ms: int | None = None
     cost_usd: float | None = None
     error: str | None = None    # set when the LLM path failed → caller falls back to rules
-    techniques: dict | None = None  # storytelling codes used in speech_text: opening, structure, style, devices, tone

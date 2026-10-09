@@ -53,6 +53,7 @@ def guide_payload(history, item, location, *, voice_profile_id, selection_mode):
         "speech": {
             "enabled": True,
             "text": snap.get("text"),
+            "intro": snap.get("intro"),
             "content_version": snap.get("content_version"),
             "voice_profile_id": voice_profile_id,
             "audio": None,

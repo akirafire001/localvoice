@@ -41,21 +41,43 @@ def test_guide_speech_cache_and_access(app, client):
     assert r.status_code == 410
 
 
-def test_personalized_speech_is_private(app, client):
+def test_llm_guide_plays_a_private_intro_before_the_shared_story(app, client):
+    import uuid
+
+    from localvoice.db import session_scope
+    from localvoice.models import AudioAsset
+
     from .test_llm_and_generation import FakeLLM
 
     app.extensions["lv_llm"] = FakeLLM("first")
-    a = register(client, "alice")
-    g = _guide(app, client, a)
-    assert g["selection_mode"] == "llm"
-    r = client.post(f"/api/v1/guides/{g['history_id']}/speech", headers=auth(a), json={"voice_profile_id": "ja-default"}).get_json()
-    from localvoice.db import session_scope
-    from localvoice.models import AudioAsset
-    import uuid
-
+    add_item(app, "A", LAT, LON, speech={"ja": "語り版の本文です。"})
+    speech = {}
+    for name in ("alice", "bob"):
+        t = register(client, name)
+        trip = client.post("/api/v1/trips", headers=auth(t), json={}).get_json()["trip_id"]
+        g = client.post(f"/api/v1/trips/{trip}/context", headers=auth(t), json=ctx(LAT, LON)).get_json()["guide"]
+        assert g["selection_mode"] == "llm" and g["speech"]["intro"] == "歩きながらどうぞ。"
+        assert g["speech"]["text"] == "歩きながらどうぞ。 語り版の本文です。"
+        r = client.post(f"/api/v1/guides/{g['history_id']}/speech", headers=auth(t), json={"voice_profile_id": "ja-default"})
+        assert r.status_code == 200, r.get_json()
+        speech[name] = (t, r.get_json())
+    (ta, a), (tb, b) = speech["alice"], speech["bob"]
+    assert a["asset_id"] == b["asset_id"]  # the story is synthesised once for everyone
+    assert a["intro"]["asset_id"] != b["intro"]["asset_id"]
+    assert client.get(a["intro"]["audio_path"], headers=auth(ta)).status_code == 200
+    assert client.get(a["intro"]["audio_path"], headers=auth(tb)).status_code == 404
     with session_scope(app) as db:
-        asset = db.get(AudioAsset, uuid.UUID(r["asset_id"]))
-        assert asset.scope == "private" and str(asset.owner_user_id) == a["user"]["id"]
+        story = db.get(AudioAsset, uuid.UUID(a["asset_id"]))
+        intro = db.get(AudioAsset, uuid.UUID(a["intro"]["asset_id"]))
+        assert story.scope == "shared" and story.synthesis_settings_json["text"] == "語り版の本文です。"
+        assert intro.scope == "private" and intro.synthesis_settings_json["text"] == "歩きながらどうぞ。"
+
+
+def test_rule_guide_has_no_intro(app, client):
+    t = register(client)
+    g = _guide(app, client, t)
+    r = client.post(f"/api/v1/guides/{g['history_id']}/speech", headers=auth(t), json={"voice_profile_id": "ja-default"})
+    assert r.status_code == 200 and r.get_json()["intro"] is None
 
 
 def test_tts_unavailable(app, client):

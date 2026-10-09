@@ -48,7 +48,7 @@ class FakeLLM:
         sel = Selection(
             action="speak", knowledge_id=str(c.item.id), title="LLMタイトル",
             text="すぐそばの話です。" if self.behaviour != "visual" else "目の前に見えます。",
-            speech_text="すぐそばの話です。", reason="test", used_claim_ids=claim_ids,
+            intro="歩きながらどうぞ。", reason="test", used_claim_ids=claim_ids,
             model="fake-model", prompt_version="select-v1", latency_ms=12, cost_usd=0.002,
         )
         from localvoice.services.llm import validate_selection
@@ -247,8 +247,8 @@ def test_validate_selection_rules(app):
                              course_confident=False, recent_titles=[], memory_summary=None, interests={}, boosts={},
                              local_time="")
 
-        def check(text, ids=None):
-            return validate_selection(Selection(action="speak", knowledge_id=kid, text=text, speech_text=text,
+        def check(text, ids=None, intro=""):
+            return validate_selection(Selection(action="speak", knowledge_id=kid, text=text, intro=intro,
                                                 used_claim_ids=ids or [claim]), inp)
 
         assert check("約300mの位置にある話です。") is None
@@ -256,6 +256,12 @@ def test_validate_selection_rules(app):
         assert check("1234年に建てられました。") == "unsupported_number"
         assert check("ここから見える景色") == "visual_expression"
         assert check("ok", ids=[str(uuid.uuid4())]) == "invalid_claims"
+        # the spoken intro is held to the same rules, and kept short
+        assert check("ok", intro="約300m先の話です。") is None
+        assert check("ok", intro="目の前に見えるのは") == "visual_expression"
+        assert check("ok", intro="右手の話です。") == "direction_without_confidence"
+        assert check("ok", intro="1234年の話です。") == "unsupported_number"
+        assert check("ok", intro="あ" * 81) == "too_long"
         inp.course_confident = True
         assert check("進行方向右手側にあります。") is None
 

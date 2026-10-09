@@ -348,11 +348,14 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
 
     item = chosen.item
     title, text, body = item_texts(item, trip.language, settings["detail_mode"])
+    # The story is heard from audio shared by every traveller; the LLM only adds a short intro for this moment,
+    # so a personalised guide costs one short private synthesis instead of the whole story.
     speech_text = item_speech_text(item, trip.language, text)
+    intro = ""
     if selection is not None:
         title = selection.title or title
         text = selection.text or text
-        speech_text = selection.speech_text or text
+        intro = selection.intro or ""
     decision = GuideDecision(
         trip_session_id=trip.id,
         context_snapshot_id=snap.id,
@@ -390,13 +393,14 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
         language=trip.language,
         selection_mode="llm" if selection is not None else "rule",
         speech_snapshot_json={
-            "text": speech_text,
+            "text": f"{intro} {speech_text}" if intro else speech_text,  # all that is heard (device TTS reads it)
+            "intro": intro or None,
+            "body": speech_text,
             "language": trip.language,
             "content_version": item.content_version,
-            "personalized": selection is not None,
+            "personalized": bool(intro),
             # recorded so the next stories avoid the same techniques, and for learning which ones work
-            "techniques": (selection.techniques if selection is not None and selection.techniques else None)
-            or _item_techniques(item),
+            "techniques": _item_techniques(item),
         },
     )
     db.add(hist)

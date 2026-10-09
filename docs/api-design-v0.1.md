@@ -137,11 +137,11 @@ MVPの許可リストはChirp 3 HDの日英音声に限定する。`voice_profil
 
 キャッシュ未命中時はサーバーからChirp 3 HDへ通常のテキスト合成を要求し、MP3の保存を完了してからreadyへ進める。Google Cloudの認証・合成パラメータはサーバー内部に限定する。同じ原稿を未選択の全声で生成せず、利用者が選んだ1声だけを取得・必要時生成する。
 
-- ready: `200 {"status":"ready","asset_id":"uuid","audio_path":"/api/v1/speech-assets/uuid","audio_format":"audio/mpeg","valid_until":null,"attribution":[]}`。
+- ready: `200 {"status":"ready","asset_id":"uuid","audio_path":"/api/v1/speech-assets/uuid","audio_format":"audio/mpeg","valid_until":null,"attribution":[],"intro":null}`。トップレベルは話の本文の音声。LLMが状況に合わせた導入の一言を書いた案内では、`intro`にその個人用音声（同じ形の`asset_id`・`audio_path`等）が入り、クライアントは導入→本文の順に流す。導入の音声が準備中の間は全体をpendingとして返し、導入の生成に失敗したときや個人音声の上限に達したときは`intro`をnullにして本文だけを返す。
 - pending: `202 {"status":"pending","asset_id":"uuid","retry_after_sec":2}`。再度同じPOSTで状態を取得できる。同じキーの同時/再送要求は一つのジョブへ集約する。
 - 期限切れ/削除/訂正済み原稿は410。未知の声/言語の不一致は400。原価/頻度上限は429。生成の一時失敗は503とし、再試行待ちを返す。
 
-本文版・原稿hash・読み辞書版・Provider/model/声/設定/形式・shared/private範囲を含むキーで生成する。個人化原稿はprivateにし、user/tripをキーに含める。共有静的音声でも本文の有効性と案内のアクセス権を確認する。再生速度の端末設定変更だけで再合成しない。
+本文版・原稿hash・読み辞書版・Provider/model/声/設定/形式・shared/private範囲を含むキーで生成する。本文は全利用者共通のshared、LLMが書いた導入の一言はprivateにし、privateはuser/tripをキーに含める。共有静的音声でも本文の有効性と案内のアクセス権を確認する。再生速度の端末設定変更だけで再合成しない。
 
 ## GET /speech-assets/{asset_id}
 
