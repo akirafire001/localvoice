@@ -450,11 +450,13 @@ def test_local_history_research_themes_in_batches_per_town(app, monkeypatch):
             super().__init__()
             self.researched, self.materials = [], []
 
-        def research_local_history(self, cell, center, towns, themes=None):
+        def research_local_history(self, cell, center, towns, themes=None, known=None):
             self.researched.append(([t["town"] for t in towns], themes))
+            # one fact per theme: too few to be worth researching the theme again
             return [{"kind": "web", "title": "尻手の地名", "url": "https://example.org/shitte",
                      "text": "尻手は川の下流（尻）にあたることに由来するという説がある。"}], {
-                "model": "fake", "cost_usd": 0.01, "prompt_version": LOCAL_HISTORY_PROMPT_VERSION, "themes": themes}
+                "model": "fake", "cost_usd": 0.01, "prompt_version": LOCAL_HISTORY_PROMPT_VERSION, "themes": themes,
+                "found": {k: 1 for k in themes}}
 
         def generate_items(self, cell, center, materials, already_told=None):
             self.materials.append(materials)
@@ -701,3 +703,71 @@ def test_story_writing_uses_the_generate_model(monkeypatch):
     assert (cfg.LLM_GENERATE_MODEL, cfg.LLM_BACKGROUND_MODEL) == ("gpt-6-luna", "gpt-6.1-sol")
     monkeypatch.setenv("LLM_GENERATE_MODEL", "gpt-6.1-sol")
     assert Config().LLM_GENERATE_MODEL == "gpt-6.1-sol"
+
+
+def test_theme_is_researched_again_until_it_runs_dry(app, monkeypatch):
+    from localvoice.services import knowledge_gen
+    from localvoice.services.llm import LOCAL_HISTORY_PROMPT_VERSION, LOCAL_RESEARCH_THEMES
+
+    keys = [k for k, _ in LOCAL_RESEARCH_THEMES]
+    app.config["LV"].LOCAL_RESEARCH_THEMES_PER_JOB = len(keys)
+    lat, lon = 35.527, 139.685
+    add_item(app, "尻手の地名の由来", lat, lon)
+    found_per_pass = [5, 3, 1]  # facts found per theme by each pass: the third pass runs dry
+
+    class Researching(FakeLLM):
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        def research_local_history(self, cell, center, towns, themes=None, known=None):
+            n = found_per_pass[len(self.calls)]
+            self.calls.append((themes, known))
+            return [{"kind": "web", "title": f"事実{i}", "url": f"https://example.org/{len(self.calls)}/{i}",
+                     "text": "x"} for i in range(n)], {
+                "model": "fake", "cost_usd": 0.01, "prompt_version": LOCAL_HISTORY_PROMPT_VERSION, "themes": themes,
+                "found": {k: n for k in themes}}
+
+        def generate_items(self, cell, center, materials, already_told=None):
+            return [], {"model": "fake", "cost_usd": 0.0}
+
+    fake = Researching()
+    app.extensions["lv_llm"] = fake
+    town = {"kind": "osm", "title": "尻手", "url": "https://www.openstreetmap.org/node/1", "publisher": "OpenStreetMap",
+            "lat": lat, "lon": lon, "text": "町名: 尻手", "town": "尻手", "municipality": "神奈川県横浜市鶴見区"}
+    monkeypatch.setattr(knowledge_gen, "collect_materials", lambda *a, **k: [])
+    monkeypatch.setattr(knowledge_gen, "town_materials", lambda *a, **k: [dict(town)])
+    monkeypatch.setattr(knowledge_gen.geo, "geohash_center", lambda c: (lat, lon))
+    more = []
+    with app.app_context():
+        for _ in range(4):
+            with session_scope(app) as db:
+                more.append(knowledge_gen._generate(db, "xn764e")[1])
+    # first pass: every theme, nothing known yet; later passes repeat the themes, asking for other facts
+    assert [themes for themes, _ in fake.calls] == [keys] * 3
+    assert fake.calls[0][1] is None and fake.calls[1][1] == ["尻手の地名の由来"]
+    # the pass that found only 1 fact per theme used the themes up: nothing is left to research
+    assert more == [False, False, False, False]
+    with session_scope(app) as db, app.app_context():
+        assert knowledge_gen._themes_todo(db, [town]) == []
+
+
+def test_theme_research_stops_after_max_passes(app):
+    from localvoice.models import ApiUsageLog
+    from localvoice.services import knowledge_gen
+    from localvoice.services.llm import LOCAL_HISTORY_PROMPT_VERSION, LOCAL_RESEARCH_THEMES
+
+    keys = [k for k, _ in LOCAL_RESEARCH_THEMES]
+    town = {"town": "尻手", "municipality": "横浜市鶴見区"}
+    with session_scope(app) as db:
+        for _ in range(app.config["LV"].RESEARCH_MAX_PASSES):
+            db.add(ApiUsageLog(provider="openai", operation="local_history_research", request_units=1, estimated_cost=0,
+                               details_json={"towns": ["横浜市鶴見区尻手"], "prompt_version": LOCAL_HISTORY_PROMPT_VERSION,
+                                             "themes": keys[:1], "found": {keys[0]: 10}}))
+        db.add(ApiUsageLog(provider="openai", operation="local_history_research", request_units=1, estimated_cost=0,
+                           details_json={"towns": ["横浜市鶴見区尻手"], "prompt_version": LOCAL_HISTORY_PROMPT_VERSION,
+                                         "themes": keys[1:2]}))  # logged before facts were counted
+    with app.app_context(), session_scope(app) as db:
+        todo = knowledge_gen._themes_todo(db, [town])
+    # the first theme is used up; never-researched themes come before the one researched once
+    assert keys[0] not in todo and todo[:-1] == keys[2:] and todo[-1] == keys[1]

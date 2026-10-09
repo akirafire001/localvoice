@@ -22,6 +22,7 @@ REWRITE_PROMPT_VERSION = "rewrite-v1"
 # Kept at v3 when themes were added (2026-10-08): the version gates which themes count as researched, and the
 # existing themes' searches are still valid, so only the new themes get searched.
 LOCAL_HISTORY_PROMPT_VERSION = "local-history-v3"
+KNOWN_IN_RESEARCH = 60  # titles of stories already told, passed when a theme is researched again
 SUMMARY_PROMPT_VERSION = "summary-v1"
 
 # Expressions that presume what the user can see (mvp-technical-design §10)
@@ -399,29 +400,35 @@ class ClaudeLLM:
         )
         return self._web_research(prompt, max_uses=3)
 
-    def research_local_history(self, cell, center, towns, themes=None):
+    def research_local_history(self, cell, center, towns, themes=None, known=None):
         """One web search per theme (keys of LOCAL_RESEARCH_THEMES; all when None) about the cell's towns.
-        Returns material dicts with URLs, and meta with the theme keys that were searched."""
+        `known` lists stories already told there, so a theme researched before is searched for other facts.
+        Returns material dicts with URLs, and meta with the theme keys searched and the facts found per theme."""
         names = "、".join(f"{t['municipality']}{t['town']}" for t in towns[:MAX_RESEARCH_TOWNS])
-        materials, metas, errors, done = [], [], [], []
+        avoid = ""
+        if known:
+            avoid = "\n\n次の話はもう知っています。これらとは別の事実（別の場所・人・出来事）を探してください:\n" + "\n".join(
+                f"- {k}" for k in known[:KNOWN_IN_RESEARCH])
+        materials, metas, errors, done, found_n = [], [], [], [], {}
         for key, theme in LOCAL_RESEARCH_THEMES:
             if themes is not None and key not in themes:
                 continue
             try:
-                found, meta = self._web_research(LOCAL_HISTORY_PROMPT.format(towns=names, theme=theme), max_uses=4)
+                found, meta = self._web_research(LOCAL_HISTORY_PROMPT.format(towns=names, theme=theme) + avoid, max_uses=4)
             except LLMError as e:
                 errors.append(str(e))
                 continue
             materials += found
             metas.append(meta)
             done.append(key)
+            found_n[key] = len(found)
         if not metas:
             raise LLMError(errors[0] if errors else "web_search_failed")
         return materials, {
             "model": metas[0].get("model"), "prompt_version": LOCAL_HISTORY_PROMPT_VERSION,
             "latency_ms": sum(m.get("latency_ms") or 0 for m in metas),
             "cost_usd": sum(m.get("cost_usd") or 0 for m in metas),
-            "searches": len(metas), "errors": errors, "themes": done,
+            "searches": len(metas), "errors": errors, "themes": done, "found": found_n,
         }
 
     def _web_research(self, prompt, max_uses):

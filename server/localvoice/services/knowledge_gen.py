@@ -157,9 +157,12 @@ def _generate(db, cell):
         batch = todo[: _cfg().LOCAL_RESEARCH_THEMES_PER_JOB]
         more = len(todo) > len(batch)
         if batch and hasattr(llm, "research_local_history"):
-            need = [t for t in towns if set(batch) - _researched_themes(db).get(_town_key(t), set())]
+            state = _research_state(db)
+            need = [t for t in towns if any(not _exhausted(state.get(_town_key(t), {}).get(k)) for k in batch)]
+            again = any(state.get(_town_key(t), {}).get(k) for t in need for k in batch)
+            kw = {"known": [s["title"] for s in _told_near(db, center)]} if again else {}
             try:
-                extra, meta = llm.research_local_history(cell, center, need, batch)
+                extra, meta = llm.research_local_history(cell, center, need, batch, **kw)
                 _usage(db, "local_history_research", {**meta, "towns": [_town_key(t) for t in need]}, llm)
                 materials += extra
             except LLMError as err:
@@ -220,28 +223,51 @@ def _town_key(t):
     return f"{t['municipality']}{t['town']}"
 
 
-def _researched_themes(db):
-    """town key -> theme keys researched within COVERAGE_TTL_DAYS with the current research prompt."""
+def _research_state(db):
+    """town key -> theme key -> {"passes": n, "last_found": facts found by the latest pass, or None if unknown},
+    for research within COVERAGE_TTL_DAYS with the current research prompt."""
     since = now() - timedelta(days=_cfg().COVERAGE_TTL_DAYS)
-    done = {}
+    state = {}
     for (d,) in db.execute(
         select(ApiUsageLog.details_json).where(
             ApiUsageLog.operation == "local_history_research", ApiUsageLog.created_at >= since,
             ApiUsageLog.details_json["prompt_version"].astext == LOCAL_HISTORY_PROMPT_VERSION,
-        )
+        ).order_by(ApiUsageLog.created_at, ApiUsageLog.id)
     ):
-        for town in (d or {}).get("towns") or []:
-            done.setdefault(town, set()).update((d or {}).get("themes") or [])
-    return done
+        d = d or {}
+        found = d.get("found") or {}
+        for town in d.get("towns") or []:
+            for theme in d.get("themes") or []:
+                st = state.setdefault(town, {}).setdefault(theme, {"passes": 0, "last_found": None})
+                st["passes"] += 1
+                st["last_found"] = found.get(theme)
+    return state
+
+
+def _exhausted(st):
+    """A theme is used up for a town once a pass finds too few new facts, or after RESEARCH_MAX_PASSES."""
+    if not st:
+        return False
+    cfg = _cfg()
+    if st["passes"] >= cfg.RESEARCH_MAX_PASSES:
+        return True
+    return st["last_found"] is not None and st["last_found"] < cfg.RESEARCH_MIN_NEW_FACTS
 
 
 def _themes_todo(db, towns):
-    """Theme keys, in LOCAL_RESEARCH_THEMES order, that at least one of the towns has not been researched for.
-    A town often spans several cells; its stories are area-wide, so each theme is researched once per town."""
+    """Theme keys that at least one of the towns can still be researched for: never-researched themes first
+    (in LOCAL_RESEARCH_THEMES order), then the least-researched themes that still turned up new facts.
+    A town often spans several cells; its stories are area-wide, so research is tracked per town."""
     if not towns:
         return []
-    done = _researched_themes(db)
-    return [k for k, _ in LOCAL_RESEARCH_THEMES if any(k not in done.get(_town_key(t), set()) for t in towns)]
+    state = _research_state(db)
+    open_ = []
+    for i, (k, _) in enumerate(LOCAL_RESEARCH_THEMES):
+        sts = [state.get(_town_key(t), {}).get(k) for t in towns]
+        live = [st for st in sts if not _exhausted(st)]
+        if live:
+            open_.append((min(st["passes"] if st else 0 for st in live), i, k))
+    return [k for _, _, k in sorted(open_)]
 
 
 def _usage(db, operation, meta, llm):

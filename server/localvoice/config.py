@@ -147,6 +147,10 @@ class Config:
         self.GENERATION_MAX_ROUNDS = _int("GENERATION_MAX_ROUNDS", 4)
         # Research themes (llm.LOCAL_RESEARCH_THEMES) searched per generation job; the rest wait for later jobs
         self.LOCAL_RESEARCH_THEMES_PER_JOB = _int("LOCAL_RESEARCH_THEMES_PER_JOB", 4)
+        # A theme is researched again (asking for facts other than the stories told) until a pass finds fewer
+        # than RESEARCH_MIN_NEW_FACTS facts or it has been researched RESEARCH_MAX_PASSES times for a town.
+        self.RESEARCH_MIN_NEW_FACTS = _int("RESEARCH_MIN_NEW_FACTS", 2)
+        self.RESEARCH_MAX_PASSES = _int("RESEARCH_MAX_PASSES", 4)
 
         # Voice (voice-design §6-7)
         self.TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "none")  # none | silent (dev) | google
