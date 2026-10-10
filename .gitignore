@@ -38,3 +38,6 @@ desktop.ini
 
 # AI subscription generation work files (tools/subgen)
 .subgen/
+
+# Gemini research trial output (tools/research_trial)
+.research_trial/
