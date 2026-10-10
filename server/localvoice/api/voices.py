@@ -1,4 +1,4 @@
-"""GET /voices, POST /guides/{id}/speech, GET /speech-assets/{id} (api-design 音声)."""
+"""GET /languages, GET /voices, POST /guides/{id}/speech, GET /speech-assets/{id} (api-design 音声)."""
 from flask import Blueprint, Response, g, jsonify, request
 from sqlalchemy import func, select
 
@@ -6,7 +6,8 @@ from ..auth.sessions import require_auth
 from ..db import get_db
 from ..errors import ApiError, bad_request, not_found
 from ..models import AudioAsset, KnowledgeItem, NotificationHistory, TripSession
-from ..services import voice
+from ..services import languages, translation, voice
+from ..services.prefs import trip_settings
 from ..util import json_body, now, parse_uuid
 from .guides import get_owned_history
 
@@ -27,6 +28,13 @@ def _asset_body(asset):
     if asset.status == "failed":
         raise ApiError(503, "tts_failed", "speech generation failed", headers={"Retry-After": "30"})
     return {"status": "pending", "asset_id": str(asset.id), "retry_after_sec": 2}, 202
+
+
+@bp.get("/languages")
+@require_auth
+def list_languages():
+    """Languages for the settings screen: the app's screens (one) and narration (several, in order)."""
+    return jsonify(languages.catalog())
 
 
 @bp.get("/voices")
@@ -71,16 +79,30 @@ def guide_speech(history_id):
     h, trip = get_owned_history(db, history_id)
     data = json_body()
     vid = data.get("voice_profile_id")
+    # one of the guide's narration languages; without it, the screen language (apps before narration languages)
+    lang = data.get("language") or h.language
     if vid not in voice.VOICE_PROFILES:
         raise bad_request("unknown voice_profile_id", {"field": "voice_profile_id"})
-    if voice.VOICE_PROFILES[vid]["language"] != h.language:
+    if voice.VOICE_PROFILES[vid]["language"] != lang:
         raise bad_request("voice language does not match the guide", {"field": "voice_profile_id"})
     item = db.get(KnowledgeItem, h.knowledge_item_id)
     snap = h.speech_snapshot_json or {}
     expired = item.valid_until is not None and item.valid_until <= now()
     if item.review_status == "suspended" or expired or snap.get("content_version") != item.content_version:
         raise ApiError(410, "content_gone", "this guide is no longer valid")
-    if "body" in snap:
+    narration = next((n for n in snap.get("narrations") or [] if n.get("language") == lang), None)
+    if narration is None and lang != h.language:
+        raise bad_request("the guide is not told in this language", {"field": "language"})
+    if narration is not None:
+        text, intro, scope = narration.get("body"), narration.get("intro"), "shared"
+        if text is None:
+            story = translation.ensure_story(db, item, lang, trip_id=trip.id)
+            if story is None:
+                raise ApiError(503, "translation_unavailable", "this story is not available in this language")
+            text = translation.spoken_text(story, trip_settings(trip, g.user)["detail_mode"])
+            h.speech_snapshot_json = {**snap, "narrations": [
+                {**n, "body": text} if n is narration else n for n in snap["narrations"]]}
+    elif "body" in snap:
         # the story from audio shared by every traveller, plus an optional short private intro
         text, intro, scope = snap["body"] or h.rendered_text, snap.get("intro"), "shared"
     else:  # guides recorded before intros: one text, private when the LLM wrote it
@@ -95,7 +117,7 @@ def guide_speech(history_id):
 
     def asset_for(text, scope):
         return voice.get_or_create_asset(
-            db, text=text, language=h.language, voice_profile_id=vid, scope=scope,
+            db, text=text, language=lang, voice_profile_id=vid, scope=scope,
             content_version=item.content_version, knowledge_item_id=item.id,
             user_id=g.user.id, trip_id=trip.id, valid_until=item.valid_until,
         )
@@ -107,7 +129,8 @@ def guide_speech(history_id):
         raise ApiError(503, "tts_unavailable", "speech synthesis is not available")
     # past the per-trip limit the story still plays, only without its intro
     intro_asset = asset_for(intro, "private")[0] if intro and not private_limit_reached() else None
-    h.audio_asset_id = asset.id
+    if lang == h.language:
+        h.audio_asset_id = asset.id
     db.commit()
     if asset.status in ("pending", "invalidated"):
         asset = voice.synthesize_asset(db, asset, provider)
@@ -133,11 +156,11 @@ def get_asset(asset_id):
         if asset.owner_user_id != g.user.id:
             raise not_found("audio not found")
     elif not (asset.synthesis_settings_json or {}).get("sample"):
-        # shared story audio: only for users who actually received this guide
+        # shared story audio: only for users who actually received this story (in any of its languages)
         owned = db.execute(
             select(NotificationHistory.id)
             .join(TripSession, TripSession.id == NotificationHistory.trip_session_id)
-            .where(NotificationHistory.audio_asset_id == asset.id, TripSession.user_id == g.user.id)
+            .where(NotificationHistory.knowledge_item_id == asset.knowledge_item_id, TripSession.user_id == g.user.id)
             .limit(1)
         ).first()
         if owned is None:

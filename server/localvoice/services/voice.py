@@ -32,10 +32,22 @@ VOICE_PROFILES = {
                    "google": {"languageCode": "en-US", "name": "en-US-Chirp3-HD-Aoede"}, "voice_version": "1"},
     "en-warm": {"language": "en", "display_name": "Owen (warm narrator)",
                 "google": {"languageCode": "en-US", "name": "en-US-Chirp3-HD-Charon"}, "voice_version": "1"},
+    "zh-default": {"language": "zh", "display_name": "小云（沉稳的讲述）",
+                   "google": {"languageCode": "cmn-CN", "name": "cmn-CN-Chirp3-HD-Aoede"}, "voice_version": "1"},
+    "ko-default": {"language": "ko", "display_name": "하나 (차분한 이야기)",
+                   "google": {"languageCode": "ko-KR", "name": "ko-KR-Chirp3-HD-Aoede"}, "voice_version": "1"},
+    "es-default": {"language": "es", "display_name": "Lucía (narradora serena)",
+                   "google": {"languageCode": "es-ES", "name": "es-ES-Chirp3-HD-Aoede"}, "voice_version": "1"},
+    "fr-default": {"language": "fr", "display_name": "Claire (narratrice posée)",
+                   "google": {"languageCode": "fr-FR", "name": "fr-FR-Chirp3-HD-Aoede"}, "voice_version": "1"},
 }
 SAMPLE_TEXT = {
     "ja": "宮島の大鳥居は、海の底に埋められているわけではなく、自分の重さで立っています。",
     "en": "The great torii of Miyajima is not buried in the seabed. It stands by its own weight.",
+    "zh": "宫岛的大鸟居并没有埋在海底，而是靠自身的重量矗立在那里。",
+    "ko": "미야지마의 큰 도리이는 바닷속에 묻혀 있는 것이 아니라, 자신의 무게로 서 있습니다.",
+    "es": "El gran torii de Miyajima no está enterrado en el fondo del mar: se sostiene por su propio peso.",
+    "fr": "Le grand torii de Miyajima n'est pas enfoui dans le fond marin : il tient debout par son propre poids.",
 }
 MAX_ATTEMPTS = 3
 PRIVATE_ASSETS_PER_TRIP = 300

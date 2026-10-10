@@ -113,7 +113,9 @@ Guide:
    "confidence":{"level":"high","fact_type":"verified_fact"},
    "sources":[{"title":"...","publisher":"...","url":"..."}],
    "image":null,
-   "speech":{"enabled":true,"text":"...","content_version":"v1","voice_profile_id":"ja-default","audio":null},
+   "speech":{"enabled":true,"text":"...","content_version":"v1","voice_profile_id":"ja-default","audio":null,
+             "narrations":[{"language":"en","text":"...","intro":"...","voice_profile_id":"en-default","tts_locale":"en-US"},
+                           {"language":"ja","text":"...","intro":null,"voice_profile_id":"ja-default","tts_locale":"ja-JP"}]},
    "origin":"generated",
    "selection_mode":"llm"
  },
@@ -123,7 +125,13 @@ Guide:
 
 サーバーは毎回guideを返す義務を持たない。`guide:null` が正常系。
 
+`language`・`title`・`text`は画面の言語（表示言語）。`speech.narrations`は解説の言語を話す順に並べたもので、クライアントは各言語を順に「導入→本文」で続けて流す。日本語・英語以外の言語（または英語版のない話）は初めて必要になったときに翻訳してその話に保存し、以後は全員が同じ翻訳と共有音声を使う。未翻訳の言語は`text`がnullで、音声要求時に翻訳する。
+
 `speech.enabled`はこの案内が音声対応であることを示す。自動再生は端末の音声ON/OFFと再生要求に従う。`speech.text`は意味を保ってレビューした音声用原稿。サーバーに確定原稿を保存し、音声OFFの端末は個別生成を要求しない。
+
+## GET /languages
+
+設定画面用の言語一覧。`ui`（表示言語、単一選択）と`narration`（解説の言語、複数選択・順序あり）、`max_narration_languages`。各言語は`code`・自言語名`name`・`name_ja`・`name_en`・端末TTS用`tts_locale`。言語の追加はサーバーの一覧と声の許可リストへの追加だけで済み、アプリの変更は要らない。
 
 ## GET /voices
 
@@ -133,7 +141,7 @@ MVPの許可リストはChirp 3 HDの日英音声に限定する。`voice_profil
 
 ## POST /guides/{history_id}/speech
 
-認証済み本人の親tripへの所有者チェック後、指定案内の確定原稿とvoice_profile_idから音声を取得・必要時生成する。Request: `{"voice_profile_id":"ja-default"}`。本文、任意のモデル、外部URLをクライアントから受け取らない。許可された言語/声の組み合わせだけを使う。
+認証済み本人の親tripへの所有者チェック後、指定案内の確定原稿とvoice_profile_idから音声を取得・必要時生成する。Request: `{"voice_profile_id":"en-default","language":"en"}`。`language`は案内の解説言語のどれか（省略時は画面の言語）で、声はその言語のもの。翻訳できないときは`503 translation_unavailable`を返し、クライアントはその言語を飛ばして次へ進む。本文、任意のモデル、外部URLをクライアントから受け取らない。許可された言語/声の組み合わせだけを使う。
 
 キャッシュ未命中時はサーバーからChirp 3 HDへ通常のテキスト合成を要求し、MP3の保存を完了してからreadyへ進める。Google Cloudの認証・合成パラメータはサーバー内部に限定する。同じ原稿を未選択の全声で生成せず、利用者が選んだ1声だけを取得・必要時生成する。
 
@@ -203,7 +211,7 @@ Action:
 `skip_story`は「次の話」。現在の案内の音声を停止し、最新の有効なcontextから別の適格候補を要求する。現在の項目をセッション内で既出として扱うが、その話題全体や長期趣向を下げない。明示操作なので通常の自動通知cooldownとは分ける一方、品質・鮮度・重複・API/原価上限は維持する。次候補がなければ`guide:null`と理由を返し、話を捏造しない。端末は現在の音声要求を失効してから新しい案内を再生する。
 
 ## GET/PATCH /users/me/preferences
-通知頻度、情報量、セレンディピティ、言語、言語別voice_profile_id、再生速度、端末TTS代替の許可等。voiceはサーバーの許可リストから選ぶ。再生速度は端末の対応範囲に制限する。
+通知頻度、情報量、セレンディピティ、表示言語`language`（ja/en、単一）、解説の言語`narration_languages`（話す順の配列、最大4、未設定なら表示言語）、言語別voice_profile_id、再生速度、端末TTS代替の許可等。voiceはサーバーの許可リストから選ぶ。再生速度は端末の対応範囲に制限する。
 
 ## GET/PATCH /users/me/interests
 カテゴリ別の明示趣向。

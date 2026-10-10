@@ -18,6 +18,12 @@ class SelectionInput:
     intents: list = field(default_factory=list)  # active P1 overrides as labels
     # storytelling of the last stories told, newest last: {story_type, tone, length, techniques}
     recent_stories: list = field(default_factory=list)
+    # languages the story is spoken in, one after another (language above is the screen's)
+    narration_languages: list = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.narration_languages:
+            self.narration_languages = [self.language]
 
 
 @dataclass
@@ -26,8 +32,8 @@ class Selection:
     knowledge_id: str | None = None
     title: str | None = None
     text: str | None = None
-    # one spoken sentence fitted to the moment, played before the story's shared audio ("" = none)
-    intro: str | None = None
+    # per narration language: one spoken sentence fitted to the moment, played before the story's shared audio
+    intros: dict = field(default_factory=dict)
     reason: str | None = None
     used_claim_ids: list = field(default_factory=list)
     model: str | None = None

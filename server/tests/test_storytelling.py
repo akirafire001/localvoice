@@ -130,14 +130,14 @@ def test_select_adapter_parses_intro(app):
             self.cfg = cfg
 
         def _json_call(self, *a, **k):
-            return {"action": "stay_silent", "knowledge_id": "", "title": "", "text": "", "intro": " ",
+            return {"action": "stay_silent", "knowledge_id": "", "title": "", "text": "", "intros": [{"language": "ja", "intro": " "}],
                     "reason": "r", "used_claim_ids": []}, {"model": "m", "latency_ms": 1, "cost_usd": 0.0}
 
     inp = SelectionInput(candidates=[], language="ja", detail_mode="normal", transport_class="walking",
                          course_confident=False, recent_titles=[], memory_summary=None, interests={}, boosts={},
                          local_time="2026-10-08T12:00:00+09:00")
     sel = Stub(app.config["LV"]).select(inp)
-    assert sel.action == "stay_silent" and sel.intro == ""
+    assert sel.action == "stay_silent" and sel.intros == {}
 
 
 class Rewriter:

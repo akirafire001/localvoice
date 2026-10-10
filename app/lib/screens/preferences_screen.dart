@@ -81,6 +81,13 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   List<Map<String, dynamic>> _interests = [];
   List<Map<String, dynamic>> _voices = [];
   bool _ttsAvailable = false;
+  // From the server, so adding a language there needs no app change.
+  List<Map<String, dynamic>> _uiLanguages = const [
+    {'code': 'ja', 'name': '日本語'},
+    {'code': 'en', 'name': 'English'},
+  ];
+  List<Map<String, dynamic>> _narrationLanguages = const [];
+  int _maxNarrationLanguages = 4;
 
   ApiClient get _api => context.read<ApiClient>();
 
@@ -95,8 +102,12 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       final p = (await _api.get('/api/v1/users/me/preferences')).json;
       final i = (await _api.get('/api/v1/users/me/interests')).json;
       final v = (await _api.get('/api/v1/voices')).json;
+      final l = (await _api.get('/api/v1/languages')).json;
       if (!mounted) return;
       setState(() {
+        _uiLanguages = (l['ui'] as List).cast<Map<String, dynamic>>();
+        _narrationLanguages = (l['narration'] as List).cast<Map<String, dynamic>>();
+        _maxNarrationLanguages = (l['max_narration_languages'] as num?)?.toInt() ?? 4;
         _prefs = p;
         _interests = (i['interests'] as List).cast<Map<String, dynamic>>();
         _voices = (v['voices'] as List).cast<Map<String, dynamic>>();
@@ -162,23 +173,37 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     }
     final voice = (p['voice'] as Map).cast<String, dynamic>();
     final language = p['language'] as String? ?? 'ja';
-    final selectedVoice = ((voice['voices'] ?? {}) as Map)[language] as String?;
-    final langVoices = _voices.where((v) => v['language'] == language).toList();
-    final audio = context.read<AudioController>();
+    final narration = ((p['narration_languages'] ?? [language]) as List).cast<String>();
     return Scaffold(
       appBar: LvAppBar(title: Text(tr('設定', 'Settings'))),
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 16, 16, bottomGap(context)),
         children: [
           _choice(
-            tr('言語', 'Language'),
-            const {
-              'ja': ['日本語', '日本語'],
-              'en': ['English', 'English'],
+            tr('表示言語', 'App language'),
+            {
+              for (final l in _uiLanguages) l['code'] as String: [l['name'] as String, l['name'] as String],
             },
             language,
             (v) => _patch({'language': v}),
             icon: LvIconKind.language,
+          ),
+          _NarrationLanguages(
+            selected: narration,
+            catalog: _narrationLanguages,
+            max: _maxNarrationLanguages,
+            voices: _voices,
+            chosenVoices: ((voice['voices'] ?? {}) as Map).cast<String, dynamic>(),
+            ttsAvailable: _ttsAvailable,
+            onChanged: (langs) {
+              setState(() => p['narration_languages'] = langs); // a reorder shows at once
+              _patch({'narration_languages': langs});
+            },
+            onVoice: (lang, id) => _patch({
+              'voice': {
+                'voices': {lang: id},
+              },
+            }),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
@@ -274,36 +299,6 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               ),
               style: Theme.of(context).textTheme.bodySmall,
             ),
-          RadioGroup<String>(
-            groupValue: selectedVoice ?? (langVoices.isEmpty ? null : langVoices.first['voice_profile_id'] as String),
-            onChanged: (id) => _patch({
-              'voice': {
-                'voices': {language: id},
-              },
-            }),
-            child: Column(
-              children: [
-                for (final v in langVoices)
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    value: v['voice_profile_id'] as String,
-                    title: Text(v['display_name'] as String? ?? v['voice_profile_id'] as String),
-                    secondary: IconButton(
-                      icon: const LvIcon(LvIconKind.play),
-                      tooltip: tr('試聴', 'Sample'),
-                      onPressed: _ttsAvailable
-                          ? () async {
-                              final err = await audio.playSample(v['voice_profile_id'] as String);
-                              if (err != null && context.mounted) {
-                                showInfo(context, tr('試聴できませんでした', 'Sample unavailable'));
-                              }
-                            }
-                          : null,
-                    ),
-                  ),
-              ],
-            ),
-          ),
           Row(
             children: [
               const LvIcon(LvIconKind.speed),
@@ -344,5 +339,234 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     if (v < 0.625) return tr('ふつう', 'Normal');
     if (v < 0.875) return tr('好き', 'Like');
     return tr('大好き', 'Love');
+  }
+}
+
+/// Languages the guide speaks, in order: each story is told in the first, then the next, and so on.
+/// The list comes from the server, so it grows without app changes; adding is a searchable sheet.
+class _NarrationLanguages extends StatelessWidget {
+  const _NarrationLanguages({
+    required this.selected,
+    required this.catalog,
+    required this.max,
+    required this.voices,
+    required this.chosenVoices,
+    required this.ttsAvailable,
+    required this.onChanged,
+    required this.onVoice,
+  });
+
+  final List<String> selected;
+  final List<Map<String, dynamic>> catalog;
+  final int max;
+  final List<Map<String, dynamic>> voices;
+  final Map<String, dynamic> chosenVoices;
+  final bool ttsAvailable;
+  final void Function(List<String>) onChanged;
+  final void Function(String lang, String voiceId) onVoice;
+
+  Map<String, dynamic>? _entry(String code) {
+    for (final l in catalog) {
+      if (l['code'] == code) return l;
+    }
+    return null;
+  }
+
+  /// Native name, with the name in the app language when it differs ("한국어 · 韓国語").
+  String _label(String code) {
+    final e = _entry(code);
+    if (e == null) return code;
+    final native = e['name'] as String;
+    final local = tr(e['name_ja'] as String? ?? native, e['name_en'] as String? ?? native);
+    return local == native ? native : '$native · $local';
+  }
+
+  Future<void> _add(BuildContext context) async {
+    final rest = catalog.where((l) => !selected.contains(l['code'])).toList();
+    final code = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _LanguagePicker(options: rest, label: _label),
+    );
+    if (code != null) onChanged([...selected, code]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final audio = context.read<AudioController>();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LvSectionTitle(tr('解説の言語', 'Narration languages'), LvIconKind.voice),
+          Text(
+            tr(
+              '選んだ言語で、上から順に続けて話します。ドラッグで順番を変えられます。',
+              'Each story is told in every language below, top to bottom. Drag to reorder.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          ReorderableListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            onReorder: (from, to) {
+              final next = [...selected];
+              final moved = next.removeAt(from);
+              next.insert(to > from ? to - 1 : to, moved);
+              onChanged(next);
+            },
+            children: [
+              for (var i = 0; i < selected.length; i++) _languageRow(context, audio, i, selected[i]),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: const Icon(Icons.add),
+              label: Text(
+                selected.length >= max
+                    ? tr('言語は$max個まで選べます', 'Up to $max languages')
+                    : tr('言語を追加', 'Add a language'),
+              ),
+              onPressed: selected.length >= max || selected.length >= catalog.length ? null : () => _add(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _languageRow(BuildContext context, AudioController audio, int i, String code) {
+    final langVoices = voices.where((v) => v['language'] == code).toList();
+    final chosen = chosenVoices[code] as String?;
+    final voiceId = langVoices.any((v) => v['voice_profile_id'] == chosen)
+        ? chosen
+        : (langVoices.isEmpty ? null : langVoices.first['voice_profile_id'] as String);
+    return Card(
+      key: ValueKey(code),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+        child: Row(
+          children: [
+            CircleAvatar(radius: 14, child: Text('${i + 1}')),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_label(code), style: Theme.of(context).textTheme.titleSmall),
+                  if (langVoices.isNotEmpty)
+                    Row(
+                      children: [
+                        Flexible(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            isDense: true,
+                            underline: const SizedBox.shrink(),
+                            value: voiceId,
+                            items: [
+                              for (final v in langVoices)
+                                DropdownMenuItem(
+                                  value: v['voice_profile_id'] as String,
+                                  child: Text(
+                                    v['display_name'] as String? ?? v['voice_profile_id'] as String,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (id) {
+                              if (id != null) onVoice(code, id);
+                            },
+                          ),
+                        ),
+                        IconButton(
+                          icon: const LvIcon(LvIconKind.play),
+                          tooltip: tr('試聴', 'Sample'),
+                          onPressed: ttsAvailable && voiceId != null
+                              ? () async {
+                                  final err = await audio.playSample(voiceId);
+                                  if (err != null && context.mounted) {
+                                    showInfo(context, tr('試聴できませんでした', 'Sample unavailable'));
+                                  }
+                                }
+                              : null,
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const LvIcon(LvIconKind.close),
+              tooltip: tr('外す', 'Remove'),
+              onPressed: selected.length > 1 ? () => onChanged([...selected]..remove(code)) : null,
+            ),
+            ReorderableDragStartListener(
+              index: i,
+              child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.drag_handle)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguagePicker extends StatefulWidget {
+  const _LanguagePicker({required this.options, required this.label});
+  final List<Map<String, dynamic>> options;
+  final String Function(String code) label;
+
+  @override
+  State<_LanguagePicker> createState() => _LanguagePickerState();
+}
+
+class _LanguagePickerState extends State<_LanguagePicker> {
+  String _query = '';
+
+  bool _matches(Map<String, dynamic> l) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return [l['code'], l['name'], l['name_ja'], l['name_en']].any((v) => '${v ?? ''}'.toLowerCase().contains(q));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = widget.options.where(_matches).toList();
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                autofocus: false,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: tr('言語を検索', 'Search languages'),
+                ),
+                onChanged: (v) => setState(() => _query = v),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: [
+                  for (final l in shown)
+                    ListTile(
+                      title: Text(widget.label(l['code'] as String)),
+                      onTap: () => Navigator.of(context).pop(l['code'] as String),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

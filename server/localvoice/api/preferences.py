@@ -8,6 +8,7 @@ from ..auth.sessions import require_auth
 from ..db import get_db
 from ..errors import bad_request
 from ..models import UserInterest
+from ..services import languages
 from ..services.prefs import CATEGORIES, DETAIL_MODES, LANGUAGES, NOTIFICATION_LEVELS, SERENDIPITY_LEVELS
 from ..services.voice import allowed_voice_ids
 from ..util import json_body, now
@@ -20,7 +21,9 @@ PLAYBACK_RATE_RANGE = (0.75, 1.5)
 def _prefs(user):
     vs = user.voice_settings_json or {}
     return {
-        "language": user.locale,
+        "language": user.locale,  # the app's screens
+        # spoken one after another, in this order; the first is the main one
+        "narration_languages": languages.narration_languages(user),
         "home_country": user.home_country,
         "notification_level": user.notification_level,
         "detail_mode": user.detail_mode,
@@ -48,8 +51,13 @@ def patch_preferences():
     u = g.user
     if "language" in data:
         if data["language"] not in LANGUAGES:
-            raise bad_request("language must be ja or en", {"field": "language"})
+            raise bad_request(f"language must be one of {sorted(LANGUAGES)}", {"field": "language"})
         u.locale = data["language"]
+    if "narration_languages" in data:
+        langs, err = languages.validate_narration_languages(data["narration_languages"])
+        if err:
+            raise bad_request(err, {"field": "narration_languages"})
+        u.voice_settings_json = {**(u.voice_settings_json or {}), "narration_languages": langs}
     if "home_country" in data:
         hc = data["home_country"]
         if not isinstance(hc, str) or not re.fullmatch(r"[A-Za-z]{2}", hc):
@@ -84,7 +92,7 @@ def patch_preferences():
         if "voices" in v:
             voices = dict(vs.get("voices", {}))
             for lang, vid in (v["voices"] or {}).items():
-                if lang not in LANGUAGES or vid not in allowed_voice_ids(lang):
+                if lang not in languages.LANGUAGES or vid not in allowed_voice_ids(lang):
                     raise bad_request(f"voice {vid!r} is not available for {lang!r}", {"field": "voices"})
                 voices[lang] = vid
             vs["voices"] = voices
