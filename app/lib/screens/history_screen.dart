@@ -48,6 +48,7 @@ class _TripListScreenState extends State<TripListScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
+                padding: EdgeInsets.only(bottom: bottomGap(context)),
                 children: [
                   for (final t in trips)
                     ListTile(
@@ -128,7 +129,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       body: items == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.fromLTRB(12, 12, 12, bottomGap(context)),
               children: [
                 if (s != null)
                   Card(

@@ -168,7 +168,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     return Scaffold(
       appBar: LvAppBar(title: Text(tr('設定', 'Settings'))),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, bottomGap(context)),
         children: [
           _choice(
             tr('言語', 'Language'),

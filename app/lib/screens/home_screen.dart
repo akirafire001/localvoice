@@ -83,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomGap(context)),
         children: [
           Text(
             tr('こんにちは、${user?.displayName ?? ''}さん', 'Hello, ${user?.displayName ?? ''}'),

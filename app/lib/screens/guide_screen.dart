@@ -266,8 +266,7 @@ class GuideStoryCard extends StatelessWidget {
     final playingThis = audio.currentHistoryId == g['history_id'] && audio.state != SpeechState.idle;
     final loc = g['location'] as Map?;
     return ListView(
-      // Keep the rating buttons clear of the system navigation bar.
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 32 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomGap(context)),
       children: [
         Wrap(
           spacing: 8,
@@ -527,7 +526,7 @@ class _CompanionsState extends State<_Companions> {
   Widget build(BuildContext context) {
     final s = context.watch<GuideSession>();
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + bottomGap(context)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

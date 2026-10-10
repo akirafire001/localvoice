@@ -132,30 +132,34 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          TrackMap(
-            points: _points,
-            guides: _guides,
-            follow: showCurrent,
-            current: showCurrent ? TrackPoint(pos.timestamp, pos.latitude, pos.longitude, pos.accuracy) : null,
-            currentAccuracyM: showCurrent ? pos.accuracy : null,
-          ),
-          if (_loading) const Center(child: CircularProgressIndicator()),
-          if (!_loading && _points.isEmpty)
-            Center(
-              child: Card(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 320),
-                  child: LvEmptyState(
-                    artwork: LvArtwork.emptyMap,
-                    compact: true,
-                    message: tr('表示できる移動記録がありません', 'No track to show'),
+      // Keep the map's attribution button above the system navigation bar.
+      body: SafeArea(
+        top: false,
+        child: Stack(
+          children: [
+            TrackMap(
+              points: _points,
+              guides: _guides,
+              follow: showCurrent,
+              current: showCurrent ? TrackPoint(pos.timestamp, pos.latitude, pos.longitude, pos.accuracy) : null,
+              currentAccuracyM: showCurrent ? pos.accuracy : null,
+            ),
+            if (_loading) const Center(child: CircularProgressIndicator()),
+            if (!_loading && _points.isEmpty)
+              Center(
+                child: Card(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: LvEmptyState(
+                      artwork: LvArtwork.emptyMap,
+                      compact: true,
+                      message: tr('表示できる移動記録がありません', 'No track to show'),
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
