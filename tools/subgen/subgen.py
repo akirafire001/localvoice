@@ -8,6 +8,7 @@ searches and story writing), writes them to files, and sends the agent's answers
     python tools/subgen/subgen.py next   --agent codex --model gpt-x  # start or resume a cell, write the steps
     python tools/subgen/subgen.py submit --agent codex              # send the answers, write the next steps
     python tools/subgen/subgen.py abandon --agent codex             # give the current cell back
+    python tools/subgen/subgen.py set-reset --agent codex --at "2026-10-16 21:00"  # the quota's next reset
 
 Settings: LOCALVOICE_SERVER (default https://localvoice.ideaworks.tech) and LOCALVOICE_EXTERNAL_GEN_TOKEN
 (environment variables, or the files .subgen/server and .subgen/token). See docs/external-generation.md.
@@ -201,6 +202,33 @@ def hours_to_monthly_reset(day, t):
     return 24 * 31
 
 
+def parse_reset_at(value):
+    """"2026-10-16 21:00" (local time) or None."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).strip().replace("T", " "))
+    except ValueError:
+        print(f"ignored next_reset {value!r}: write it like 2026-10-16 21:00", file=sys.stderr)
+        return None
+
+
+def cmd_set_reset(a):
+    """Write the agent's next quota reset to .subgen/schedule.json, keeping everything else in it."""
+    at = parse_reset_at(a.at)
+    if at is None:
+        sys.exit("--at must look like 2026-10-16 21:00 (local time)")
+    local = WORK / "schedule.json"
+    cfg = json.loads(local.read_text(encoding="utf-8")) if local.exists() else {}
+    agents = cfg.setdefault("agents", {})
+    agents.setdefault(a.agent, {})["next_reset"] = at.strftime("%Y-%m-%d %H:%M")
+    agents[a.agent]["checked_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    WORK.mkdir(exist_ok=True)
+    local.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"{a.agent}: next reset {agents[a.agent]['next_reset']} written to {local}")
+    return 0
+
+
 def cmd_plan(a):
     cfg = json.loads(SCHEDULE.read_text(encoding="utf-8"))
     local = WORK / "schedule.json"
@@ -209,7 +237,10 @@ def cmd_plan(a):
             cfg["agents"][k] = {**cfg["agents"].get(k, {}), **v}
     ag = cfg["agents"].get(a.agent) or cfg["agents"]["default"]
     t = datetime.now()
-    if ag.get("monthly_reset"):
+    nxt = parse_reset_at(ag.get("next_reset"))
+    if nxt and nxt > t:  # the date the agent read off its usage page today
+        left, span = (nxt - t).total_seconds() / 3600, "next"
+    elif ag.get("monthly_reset"):
         left, span = hours_to_monthly_reset(int(ag["monthly_reset"]), t), "monthly"
     else:
         left, span = hours_to_reset(ag["weekly_reset"], t), "weekly"
@@ -223,13 +254,16 @@ def cmd_plan(a):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("plan", "next", "submit", "abandon"):
+    for name in ("plan", "next", "submit", "abandon", "set-reset"):
         s = sub.add_parser(name)
         s.add_argument("--agent", required=True, help="codex / claude / gemini / cursor ...")
         if name == "next":
             s.add_argument("--model", default=None, help="model the agent runs on, recorded with each story")
+        if name == "set-reset":
+            s.add_argument("--at", required=True, help='next quota reset, local time: "2026-10-16 21:00"')
     a = p.parse_args()
-    return {"plan": cmd_plan, "next": cmd_next, "submit": cmd_submit, "abandon": cmd_abandon}[a.cmd](a)
+    return {"plan": cmd_plan, "next": cmd_next, "submit": cmd_submit, "abandon": cmd_abandon,
+            "set-reset": cmd_set_reset}[a.cmd](a)
 
 
 if __name__ == "__main__":
