@@ -15,6 +15,17 @@ SpotMemoと同じCodemagicのPersonal Accountと、既存のApple Developer連�
 - ビルド番号: Codemagicの `PROJECT_BUILD_NUMBER`。同一アプリで一意に増加する。Androidの番号とは独立。
 - App Store Connectへのアップロードを有効化。外部TestFlight審査と正式App Store審査の自動提出は無効。
 
+## 初回セットアップの記録（2026-10-11）
+
+- Apple App ID `tech.ideaworks.localvoice` を登録し、Sign in with Appleを有効化済み。
+- Google Cloudの既存iOS OAuthクライアントのBundle IDを上記へ変更し、保存を確認済み。
+- App Store Connectアプリ: `LocalVoice`、Apple ID `6821467770`、SKU `localvoice-ios`、日本語。
+- Appleの配布プロファイル `LocalVoice App Store` を既存配布証明書で作成し、Codemagicへ `localvoice_app_store` として取り込み済み。
+- CodemagicアプリID: `6acabdc634b7f3fd846ddadd`。GitHub連携にLocalVoiceを追加済み。
+- 初回ビルドは `codex/localvoice-ios-testflight` ブランチで起動。外部テストを希望するため、TestFlightのベータ説明・連絡先・専用審査アカウント情報を保存済み。
+- 本番APIで審査専用アカウントのログインを確認済み。秘密情報は無視対象の `docs/store/ios/` に保存し、Gitには含めない。
+- 初回時点のAppleログインは `/api/v1/auth/apple/start` が503。Apple用鍵とサーバー環境変数を設定し、成功を確認してから外部審査へ提出する。
+
 ## 初回登録
 
 1. Apple Developerの更新された契約にAccount Holderが同意する。
