@@ -29,10 +29,10 @@ def _prefs(user):
         "detail_mode": user.detail_mode,
         "serendipity": user.serendipity_level,
         "voice": {
-            "enabled": bool(vs.get("enabled", False)),  # never auto-enable audio (flutter-ux §8)
+            "enabled": bool(vs.get("enabled", True)),
             "voices": vs.get("voices", {}),
             "playback_rate": vs.get("playback_rate", 1.0),
-            "allow_device_tts_fallback": bool(vs.get("allow_device_tts_fallback", False)),
+            "allow_device_tts_fallback": bool(vs.get("allow_device_tts_fallback", True)),
         },
     }
 
