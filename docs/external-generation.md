@@ -38,6 +38,12 @@ ChatGPT（Codex）・Claude（Claude Code）・Gemini（Antigravity）・Cursor 
 {"agents": {"codex": {"weekly_reset": "thu 21:00"}, "claude": {"weekly_reset": "sat 08:00", "final_cells": 12}}}
 ```
 
+リセット日が変わることがあるときは、予約実行のたびにAI自身が次のリセット日時を書き込みます（下のプロンプトの手順0）。`set-reset` が `.subgen/schedule.json` の `next_reset` だけを書き換え、ほかの設定は残します。`next_reset` が未来の日時なら、`weekly_reset`・`monthly_reset` より優先されます。
+
+```
+python tools/subgen/subgen.py set-reset --agent codex --at "2026-10-16 21:00"
+```
+
 週の枠のリセットまで `final_hours`（既定24時間）を切ると、1回で作るセル数が `cells`（既定1）から `final_cells`（既定8）に増えます。Cursor のように月単位の枠は `monthly_reset`（日にち）で指定します。
 
 ## 予約実行に登録するプロンプト
@@ -47,6 +53,9 @@ ChatGPT（Codex）・Claude（Claude Code）・Gemini（Antigravity）・Cursor 
 ```
 LocalVoice の話づくりを手伝ってください。このリポジトリのルートで作業します。
 
+0. このサブスクの利用状況（使用量の画面や、/status・/usage などのコマンド）で、週の利用枠が次にリセットされる日時を確認し、
+   `python tools/subgen/subgen.py set-reset --agent <名前> --at "YYYY-MM-DD HH:MM"`（このPCの時刻）で書き込んでください。
+   確認できなければ、この手順は飛ばしてかまいません。
 1. `python tools/subgen/subgen.py plan --agent <名前>` を実行し、CELLS= の数を確認してください。
 2. その数のセルが終わるまで、次を繰り返してください。
    a. `python tools/subgen/subgen.py next --agent <名前> --model <モデル>` を実行する。
