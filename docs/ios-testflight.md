@@ -25,6 +25,8 @@ SpotMemoと同じCodemagicのPersonal Accountと、既存のApple Developer連�
 - 初回ビルドは `codex/localvoice-ios-testflight` ブランチで起動。外部テストを希望するため、TestFlightのベータ説明・連絡先・専用審査アカウント情報を保存済み。
 - 本番APIで審査専用アカウントのログインを確認済み。秘密情報は無視対象の `docs/store/ios/` に保存し、Gitには含めない。
 - Appleログイン用のLocalVoice専用鍵を発行し、本番環境変数を設定済み。APIとworkerの再起動後、`/api/v1/auth/apple/start` は503から201となり、審査専用アカウントのログインも200を確認。Appleの認可画面から戻る実機の一連の動作は未確認。
+- Codemagicの初回ビルドはMac割り当て待ち。本人の希望により、予約 `localvoice-iphone`（このチャット、5分ごと）でビルドの確認、必要な修復、外部TestFlight審査と参加リンクの準備を続ける。待機状態が変わらない間は通知しない。
+- 外部テストに必要な内部グループ `LocalVoice Internal` は作成済み。IPA生成・アップロード確認・外部審査への提出・参加リンクの有効化は、ビルド開始後の残作業。
 
 ## 初回登録
 
