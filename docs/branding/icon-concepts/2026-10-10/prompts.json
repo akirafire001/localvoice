@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-10",
+  "method": "built-in image_gen",
+  "status": "selection concepts; not installed as application assets",
+  "variants": [
+    {
+      "key": "A",
+      "name": "pin-wave",
+      "prompt": "Use case: logo-brand. Create one polished square app icon concept for LocalVoice, a location-aware audio guide that tells interesting local stories while walking or travelling. Flat vector-like bitmap, bold simple silhouette, precise smooth curves, strong contrast, readable as a tiny 16px favicon. Full-bleed square background, centered emblem occupying about 68 percent of image, generous safe margins. Single icon only. No words, labels, typography, device mockup, presentation sheet, watermark, texture, fine details, 3D or drop shadows. The mark must look purpose-designed and balanced. Direction A: combine a recognizable location pin silhouette with an audio waveform cut out of its upper center. Background deep forest green #075747, emblem warm ivory #FFF8E8. The white pin has a short gently pointed lower tip, and three thick green negative-space vertical rounded bars of differing heights inside its wide round upper body. Make the inner waveform clearly legible rather than complicated. Quiet premium travel identity.",
+      "file": "A-pin-wave.png"
+    },
+    {
+      "key": "B",
+      "name": "talking-place",
+      "prompt": "Use case: logo-brand. Create one polished square app icon concept for LocalVoice, a location-aware audio guide that tells interesting local stories while walking or travelling. Flat vector-like bitmap, bold simple silhouette, precise smooth curves, strong contrast, readable as a tiny 16px favicon. Full-bleed square background, centered emblem occupying about 68 percent of image, generous safe margins. Single icon only. No words, labels, typography, device mockup, presentation sheet, watermark, texture, fine details, 3D or drop shadows. The mark must look purpose-designed and balanced. Direction B: an original integrated speech bubble and location pin. Warm ivory #FFF8E8 background; deep green #075747 emblem. One bold filled circular speech bubble, its tail pointing down to suggest a map pin; inside, a simple ivory rounded horizontal dash and a second shorter dash convey a little story, not a face. Subtle friendly rounded form. Distinctly conversational and local, elegant and warm.",
+      "file": "B-talking-place.png"
+    },
+    {
+      "key": "C",
+      "name": "lv-monogram",
+      "prompt": "Use case: logo-brand. Create one polished square app icon concept for LocalVoice, a location-aware audio guide that tells interesting local stories while walking or travelling. Flat vector-like bitmap, bold simple silhouette, precise smooth curves, strong contrast, readable as a tiny 16px favicon. Full-bleed square background, centered emblem occupying about 68 percent of image, generous safe margins. Single icon only. No words, labels, typography, device mockup, presentation sheet, watermark, texture, fine details, 3D or drop shadows. The mark must look purpose-designed and balanced. Direction C: create a bold custom LV monogram as a single geometric emblem. Deep teal #116A72 background with warm ivory strokes. Merge uppercase L and V using very thick rounded geometry, with the V resembling a simple downward location pointer and the L resembling a walking path. Only the abstract monogram, no brand name or other typography. Clear optical balance and a distinctive readable silhouette, uncluttered and modern.",
+      "file": "C-lv-monogram.png"
+    },
+    {
+      "key": "D",
+      "name": "discovery-compass",
+      "prompt": "Use case: logo-brand. Create one polished square app icon concept for LocalVoice, a location-aware audio guide that tells interesting local stories while walking or travelling. Flat vector-like bitmap, bold simple silhouette, precise smooth curves, strong contrast, readable as a tiny 16px favicon. Full-bleed square background, centered emblem occupying about 68 percent of image, generous safe margins. Single icon only. No words, labels, typography, device mockup, presentation sheet, watermark, texture, fine details, 3D or drop shadows. The mark must look purpose-designed and balanced. Direction D: a minimal discovery compass with storytelling cue. Muted warm ochre #D69935 full-bleed background, deep forest green #075747 emblem and tiny warm ivory accent. A thick simple circular compass ring with a short lower-left speech-bubble tail and a single bold diagonal compass needle inside. Use a clean large needle, green with one ivory triangle half. No compass tick marks, cardinal letters, map or scenery. Inviting outdoor discovery, simple premium mark.",
+      "file": "D-discovery-compass.png"
+    }
+  ]
+}
