@@ -228,7 +228,7 @@ def post_context(trip_id):
     db.commit()
     if prepare_more:
         next_story.kick(current_app._get_current_object(), trip.id)
-    return jsonify(result)
+    return jsonify(engine.describe_pacing(result, trip, g.user))
 
 
 @bp.get("/trips/<trip_id>/history")

@@ -189,7 +189,10 @@ def test_finish_and_late_points(app, client):
     assert lst[0]["trip_id"] == trip
 
 
-def test_hourly_limit_and_notification_level(app, client):
+def test_hourly_limit_and_notification_level(app, client, monkeypatch):
+    from localvoice.services.prefs import NOTIFICATION_LEVELS
+
+    monkeypatch.setitem(NOTIFICATION_LEVELS["quiet"], "hourly_limit", 3)  # the default (1000) is effectively off
     t = register(client)
     for i in range(5):
         add_item(app, f"I{i}", LAT + i * 0.0003, LON, category=["history", "food", "nature", "culture", "industry"][i])
@@ -267,3 +270,77 @@ def test_heard_story_is_retold_when_nothing_unheard_fits(app, client):
             for d in db.execute(select(GuideDecision)).scalars()
         }
     assert heard == {trip1: False, trip2: True, trip3: False}
+
+
+def test_pacing_is_explained_and_speaking_is_not_interrupted(app, client):
+    t = register(client)
+    add_item(app, "A", LAT + 0.001, LON)
+    add_item(app, "B", LAT - 0.001, LON)
+    trip = _trip(client, t)
+    first = _send(client, t, trip, ctx(LAT, LON))
+    d = first["decision"]
+    assert first["guide"] is not None
+    assert d["notification_level"] == "normal" and d["cooldown_sec"] == 360 and d["next_check_after_sec"] == 360
+    res = _send(client, t, trip, dict(ctx(LAT, LON), speaking=True))
+    assert res["decision"]["reason"] == "cooldown"  # the cooldown is what the app should show
+    from datetime import timedelta
+    from localvoice.models import NotificationHistory
+
+    with session_scope(app) as db:
+        for h in db.execute(select(NotificationHistory)).scalars():
+            h.shown_at = h.shown_at - timedelta(minutes=7)
+    res = _send(client, t, trip, dict(ctx(LAT, LON), speaking=True))
+    assert res["guide"] is None and res["decision"]["reason"] == "speaking"
+    assert res["decision"]["cooldown_sec"] == 360
+
+
+def test_no_candidates_reports_search_state(app, client, monkeypatch):
+    t = register(client)
+    trip = _trip(client, t)
+    res = _send(client, t, trip, ctx(LAT, LON))
+    # generation is enabled in tests' config or not; either way the app is told whether stories are being looked for
+    assert res["decision"]["reason"] == "no_candidates" and isinstance(res["decision"]["searching"], bool)
+    from localvoice.services import engine
+
+    monkeypatch.setattr(engine, "_generation_running", lambda *a: True)
+    res = _send(client, t, trip, ctx(LAT, LON))
+    assert res["decision"]["searching"] is True and res["decision"]["next_check_after_sec"] == 30
+
+
+def test_continuous_mode_moves_on_without_skip(app, client):
+    from localvoice.models import NotificationHistory
+
+    t = register(client)
+    for i in range(3):
+        add_item(app, f"C{i}", LAT + i * 0.0004, LON, category=["history", "food", "nature"][i])
+    trip = _trip(client, t, notification_level="continuous")
+    first = _send(client, t, trip, ctx(LAT, LON))
+    assert first["guide"] is not None and first["decision"]["cooldown_sec"] == 15
+    r = client.post(f"/api/v1/guides/{first['guide']['history_id']}/feedback", headers=auth(t),
+                    json={"action": "continue"}).get_json()
+    second = r["guide"]
+    assert second is not None and second["knowledge_id"] != first["guide"]["knowledge_id"]
+    assert r["decision"]["notification_level"] == "continuous"
+    # continuing from an older story does not start a second one on top of the newest
+    again = client.post(f"/api/v1/guides/{first['guide']['history_id']}/feedback", headers=auth(t),
+                        json={"action": "continue"}).get_json()
+    assert again["guide"] is None and again["decision"]["reason"] == "superseded"
+    with session_scope(app) as db:
+        rows = db.execute(select(NotificationHistory).order_by(NotificationHistory.shown_at)).scalars().all()
+        assert not rows[0].skipped  # heard to the end, not skipped
+        assert all(h.channel == "auto" for h in rows)
+    # the short cooldown keeps a location update from cutting in right after the continued story starts
+    res = _send(client, t, trip, ctx(LAT, LON))
+    assert res["guide"] is None and res["decision"]["reason"] == "cooldown"
+
+
+def test_continue_respects_quiet_mode(app, client):
+    t = register(client)
+    add_item(app, "Q1", LAT + 0.001, LON)
+    add_item(app, "Q2", LAT - 0.001, LON, category="food")
+    trip = _trip(client, t, notification_level="continuous")
+    first = _send(client, t, trip, ctx(LAT, LON))["guide"]
+    assert client.post(f"/api/v1/trips/{trip}/states", headers=auth(t), json={"type": "quiet", "minutes": 30}).status_code in (200, 201)
+    r = client.post(f"/api/v1/guides/{first['history_id']}/feedback", headers=auth(t),
+                    json={"action": "continue"}).get_json()
+    assert r["guide"] is None and r["decision"]["reason"] == "quiet_mode"

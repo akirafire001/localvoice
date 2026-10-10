@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -153,6 +155,7 @@ class _GuideScreenState extends State<GuideScreen> {
                 ),
               ),
               _StatusBar(session: s),
+              _ActivityBar(session: s, audio: audio),
               Expanded(
                 child: g == null
                     ? LvEmptyState(
@@ -284,6 +287,159 @@ class _StatusBar extends StatelessWidget {
     'high_speed' => tr('高速移動', 'High speed'),
     _ => tr('移動を判定中', 'Detecting movement'),
   };
+}
+
+/// What the guide is doing right now, or why it is waiting and for how long, so it never just looks stopped.
+class _ActivityBar extends StatefulWidget {
+  const _ActivityBar({required this.session, required this.audio});
+  final GuideSession session;
+  final AudioController audio;
+  @override
+  State<_ActivityBar> createState() => _ActivityBarState();
+}
+
+class _ActivityBarState extends State<_ActivityBar> {
+  late final Timer _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {}); // the countdown
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = activityOf(widget.session, widget.audio, DateTime.now());
+    if (a == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      color: theme.colorScheme.secondaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          if (a.busy)
+            const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          else
+            LvIcon(a.icon, size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(a.text, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSecondaryContainer)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class Activity {
+  const Activity(this.text, {this.busy = false, this.icon = LvIconKind.guide});
+  final String text;
+  final bool busy;
+  final LvIconKind icon;
+}
+
+const _levelNames = {
+  'quiet': ['900秒おき', 'every 900 s'],
+  'normal': ['360秒おき', 'every 360 s'],
+  'talkative': ['180秒おき', 'every 180 s'],
+  'chatty': ['90秒おき', 'every 90 s'],
+};
+
+String _clock(Duration d) {
+  final s = d.inSeconds < 0 ? 0 : d.inSeconds;
+  return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+}
+
+/// The line under the status bar. Null when the status bar already says everything (no GPS, offline).
+Activity? activityOf(GuideSession s, AudioController audio, DateTime now) {
+  if (!s.active || s.offline || s.gps != GpsState.on) return null;
+  if (s.feedbackBusy && s.feedbackAction == 'skip_story') {
+    return Activity(tr('次の話を選んでいます…', 'Choosing the next story…'), busy: true);
+  }
+  if (s.continuing) return Activity(tr('続けて次の話を用意しています…', 'Getting the next story ready…'), busy: true);
+  if (audio.state == SpeechState.preparing) return Activity(tr('音声を準備しています…', 'Preparing the audio…'), busy: true);
+  if (audio.state == SpeechState.playing) {
+    return Activity(
+      s.continuous
+          ? tr('再生中です。終わったら続けて次の話に進みます。', 'Playing. The next story follows right after.')
+          : tr('再生中です。', 'Playing.'),
+      icon: LvIconKind.play,
+    );
+  }
+  if (s.selecting) return Activity(tr('近くの話を選んでいます…', 'Choosing a story nearby…'), busy: true);
+  final d = s.decision;
+  if (d == null) {
+    return Activity(tr('位置を送って、近くの話を探しています…', 'Looking for stories around you…'), busy: true);
+  }
+  final left = s.nextCheckAt == null ? Duration.zero : s.nextCheckAt!.difference(now);
+  if (left.inSeconds <= 0) return Activity(tr('まもなく次の話を確認します…', 'Checking for the next story…'), busy: true);
+  final t = _clock(left);
+  final reason = d['reason'] as String?;
+  switch (reason) {
+    case 'selected':
+    case 'cooldown':
+    case 'speaking':
+      if (s.continuous) {
+        return Activity(tr('あと $t で次の話を確認します（連続）', 'Checking for the next story in $t (continuous)'), icon: LvIconKind.frequency);
+      }
+      final cool = d['cooldown_sec'];
+      final name = _levelNames[s.notificationLevel];
+      final pace = name != null
+          ? tr(name[0], name[1])
+          : cool is num
+          ? tr('${cool.toInt()}秒おき', 'every ${cool.toInt()} s')
+          : '';
+      return Activity(
+        tr('次の話まで あと $t（話しかける頻度：$pace）', 'Next story in $t (pace: $pace)'),
+        icon: LvIconKind.frequency,
+      );
+    case 'no_candidates':
+    case 'below_threshold':
+      if (d['searching'] == true) {
+        return Activity(
+          tr(
+            'この辺りの話は今ありません。新しい話を探しています。見つかったらガイドを再開します（次の確認まで $t）',
+            'No stories here right now. Looking for new ones; the guide resumes when they are found (next check in $t).',
+          ),
+          busy: true,
+        );
+      }
+      return Activity(
+        tr(
+          'この辺りでお話しできる話はもうありません。移動すると、その場所の話をお届けします（次の確認まで $t）',
+          'No more stories here. Move on and you will hear about the next place (next check in $t).',
+        ),
+        icon: LvIconKind.map,
+      );
+    case 'llm_silent':
+      return Activity(
+        tr('今の状況に合う話がなかったので見送りました。あと $t でもう一度選びます', 'Nothing fitted this moment, so the guide held back. Choosing again in $t.'),
+        icon: LvIconKind.frequency,
+      );
+    case 'quiet_mode':
+      return Activity(tr('静かにするモード中です。あと $t で再開します', 'Quiet mode. The guide resumes in $t.'), icon: LvIconKind.quiet);
+    case 'hourly_limit':
+      final n = d['hourly_limit'];
+      return Activity(
+        tr('1時間の上限（${n ?? '-'}話）に達しました。あと $t で再開します', 'Hourly limit (${n ?? '-'} stories) reached. Resuming in $t.'),
+        icon: LvIconKind.frequency,
+      );
+    case 'low_accuracy':
+      return Activity(tr('位置の精度が低いため待っています。あと $t で確認します', 'Location is too rough; checking again in $t.'), icon: LvIconKind.gpsSearching);
+    case 'no_context':
+      return Activity(tr('位置情報を待っています…', 'Waiting for location…'), busy: true);
+    default:
+      return Activity(tr('次の確認まで あと $t', 'Next check in $t'), icon: LvIconKind.frequency);
+  }
 }
 
 class GuideStoryCard extends StatelessWidget {

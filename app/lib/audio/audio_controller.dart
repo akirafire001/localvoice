@@ -51,10 +51,10 @@ class AudioController extends ChangeNotifier {
     _set(SpeechState.idle);
   }
 
-  /// Auto-play for a newly arrived guide; only when the user enabled audio.
-  Future<void> autoPlay(Map<String, dynamic> guide) async {
-    if (!enabled) return;
-    await play(guide);
+  /// Auto-play for a newly arrived guide; only when the user enabled audio. True when it was told to the end.
+  Future<bool> autoPlay(Map<String, dynamic> guide) async {
+    if (!enabled) return false;
+    return play(guide);
   }
 
   /// The guide's languages in the order they are spoken (one entry for servers without narration languages).
@@ -73,7 +73,8 @@ class AudioController extends ChangeNotifier {
 
   /// Tells the story in each narration language, one after another. Every language's audio is asked for at
   /// once, so a language that must first be translated is usually ready by the time the one before it ends.
-  Future<void> play(Map<String, dynamic> guide, {void Function()? onSpoken}) async {
+  /// True when the story was told to the end (false when stopped, replaced by another, or shown as text only).
+  Future<bool> play(Map<String, dynamic> guide, {void Function()? onSpoken}) async {
     final gen = ++_generation;
     await _player.stop();
     await _tts.stop();
@@ -87,37 +88,38 @@ class AudioController extends ChangeNotifier {
       final n = narrations[i];
       final fetch = fetches[i]..waitFromNow();
       final r = await fetch.result;
-      if (gen != _generation) return;
+      if (gen != _generation) return false;
       if (r.failure == 'content_gone') {
         _set(SpeechState.textOnly, 'gone');
-        return;
+        return false;
       }
       if (r.paths != null && await _playFiles(r.paths!, gen)) {
         spoke = true;
         continue;
       }
-      if (gen != _generation) return;
+      if (gen != _generation) return false;
       final text = n['text'] as String?;
       if (allowDeviceTts && text != null && text.isNotEmpty) {
         await _tts.setLanguage(n['tts_locale'] as String? ?? _deviceLocale(n['language'] as String?));
         await _tts.setSpeechRate((0.5 * rate).clamp(0.2, 1.0));
         await _tts.awaitSpeakCompletion(true);
-        if (gen != _generation) return;
+        if (gen != _generation) return false;
         _set(SpeechState.playing, 'device_tts');
         await _tts.speak(text);
-        if (gen != _generation) return;
+        if (gen != _generation) return false;
         spoke = true;
         continue;
       }
       failure ??= r.failure;
     }
-    if (gen != _generation) return;
+    if (gen != _generation) return false;
     if (spoke) {
       onSpoken?.call();
       _set(SpeechState.idle);
     } else {
       _set(SpeechState.textOnly, failure);
     }
+    return spoke;
   }
 
   static String _deviceLocale(String? lang) => lang == 'en' ? 'en-US' : (lang == null || lang == 'ja' ? 'ja-JP' : lang);
