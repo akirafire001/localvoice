@@ -150,17 +150,22 @@ def generate_cell(db, cell):
     return _generate(db, cell)[0]
 
 
-def _generate(db, cell):
-    """Returns (stories created, whether the cell's towns or country still have research themes left)."""
-    llm = get_llm()
+def _generate(db, cell, llm=None, sources=None):
+    """Returns (stories created, whether the cell's towns or country still have research themes left).
+
+    `llm` replaces get_llm() and `sources` (an object with town_materials and collect_materials) the live source
+    fetches: external_gen runs this same pipeline with answers written by a subscription's agent."""
+    llm = llm or get_llm()
     if llm is None or not hasattr(llm, "generate_items"):
         raise LLMError("llm_disabled")
+    fetch_towns = sources.town_materials if sources else town_materials
+    fetch_materials = sources.collect_materials if sources else collect_materials
     center = geo.geohash_center(cell)
     s, w, n, e = geo.geohash_bbox(cell)
     research = _cfg().LOCAL_HISTORY_RESEARCH_ENABLED
-    towns = town_materials(center[0], center[1], (s, w, n, e)) if research else []
+    towns = fetch_towns(center[0], center[1], (s, w, n, e)) if research else []
     country = _country_of(towns)
-    materials = collect_materials(center[0], center[1], (s, w, n, e), country_code=country and country[0])
+    materials = fetch_materials(center[0], center[1], (s, w, n, e), country_code=country and country[0])
     more = False
     if research:
         materials += towns

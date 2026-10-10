@@ -1,0 +1,10 @@
+{
+  "_comment": "Cells per scheduled run. weekly_reset is when the agent's weekly quota resets (local time, e.g. \"mon 09:00\"); For a monthly quota (Cursor) give monthly_reset (day of the month) instead. Within final_hours of the reset a run does final_cells so the quota left is not wasted. Put your own values in .subgen/schedule.json (same shape, not in Git).",
+  "agents": {
+    "default": {"weekly_reset": "mon 09:00", "cells": 1, "final_cells": 8, "final_hours": 24},
+    "codex":   {"weekly_reset": "mon 09:00", "cells": 1, "final_cells": 8, "final_hours": 24},
+    "claude":  {"weekly_reset": "mon 09:00", "cells": 1, "final_cells": 8, "final_hours": 24},
+    "gemini":  {"weekly_reset": "mon 09:00", "cells": 1, "final_cells": 8, "final_hours": 24},
+    "cursor":  {"monthly_reset": 1, "cells": 1, "final_cells": 8, "final_hours": 48}
+  }
+}
