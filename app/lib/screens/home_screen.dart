@@ -5,6 +5,7 @@ import '../auth/auth_service.dart';
 import '../guide/guide_session.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
+import '../widgets/home_banner.dart';
 import '../widgets/visuals.dart';
 import 'account_screen.dart';
 import 'guide_screen.dart';
@@ -37,7 +38,8 @@ String labelOf(Map<String, List<String>> m, String? k) {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.banner = LvHomeBanner.coast});
+  final LvHomeBanner banner;
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -106,19 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           else ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: AspectRatio(
-                aspectRatio: 2,
-                child: Image.asset(
-                  LvArtwork.homeDiscoveryBanner.asset,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.medium,
-                  excludeFromSemantics: true,
-                ),
-              ),
-            ),
+            LvHomeBannerImage(widget.banner),
             const SizedBox(height: 16),
             Text(tr('目的', 'Purpose'), style: Theme.of(context).textTheme.titleSmall),
             Wrap(

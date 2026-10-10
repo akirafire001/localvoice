@@ -24,6 +24,8 @@ import 'package:localvoice/util/i18n.dart';
 import 'package:localvoice/ui_theme.dart';
 import 'package:localvoice/widgets/common.dart';
 import 'package:localvoice/widgets/visuals.dart';
+import 'package:localvoice/widgets/home_banner.dart';
+import 'package:localvoice/main.dart';
 
 final storeCapture = Platform.environment['LOCALVOICE_CAPTURE_STORE_UI'] == '1';
 final capture = Platform.environment['LOCALVOICE_CAPTURE_UI'] == '1' || storeCapture;
@@ -183,16 +185,61 @@ void main() {
         'assets/branding/app-icon.png',
         ...LvIconKind.values.map((i) => i.asset),
         ...LvArtwork.values.map((a) => a.asset),
+        ...LvHomeBanner.values.map((b) => b.asset),
       ]) {
         final data = await rootBundle.load(asset);
         final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
         final frame = await codec.getNextFrame();
         expect(frame.image.width, greaterThan(0), reason: asset);
+        if (asset.startsWith('assets/s1/home_banners/')) {
+          expect(frame.image.width, 1774, reason: asset);
+          expect(frame.image.height, 887, reason: asset);
+        }
         frame.image.dispose();
         codec.dispose();
       }
     });
   });
+  testWidgets(
+    'launch banner remains stable through language rebuilds and navigation',
+    (tester) async {
+      final fixture = _Fixture();
+      addTearDown(fixture.audio.dispose);
+      addTearDown(() => lang.set('ja'));
+      await tester.pumpWidget(
+        LocalVoiceApp(
+          api: fixture.api,
+          auth: fixture.auth,
+          audio: fixture.audio,
+          session: fixture.session,
+        ),
+      );
+      await settleImages(tester);
+      final selected = tester
+          .widget<LvHomeBannerImage>(find.byType(LvHomeBannerImage))
+          .banner;
+      for (var i = 0; i < 12; i++) {
+        lang.set(i.isEven ? 'en' : 'ja');
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<LvHomeBannerImage>(find.byType(LvHomeBannerImage))
+              .banner,
+          selected,
+        );
+      }
+      await tester.tap(find.byTooltip('設定'));
+      await settleImages(tester);
+      await tester.pageBack();
+      await settleImages(tester);
+      expect(
+        tester.widget<LvHomeBannerImage>(find.byType(LvHomeBannerImage)).banner,
+        selected,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   final scenes = <String, Widget Function(_Fixture)>{
     'login': (_) => const LoginScreen(),
     'home': (_) => const HomeScreen(),

@@ -10,6 +10,7 @@ import 'screens/auth_screens.dart';
 import 'screens/home_screen.dart';
 import 'util/i18n.dart';
 import 'ui_theme.dart';
+import 'widgets/home_banner.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +37,7 @@ class LocalVoiceApp extends StatefulWidget {
 }
 
 class _LocalVoiceAppState extends State<LocalVoiceApp> with WidgetsBindingObserver {
+  final _homeBanner = LvHomeBanner.pick();
   String? _attachedUser;
 
   @override
@@ -95,7 +97,7 @@ class _LocalVoiceAppState extends State<LocalVoiceApp> with WidgetsBindingObserv
           home: switch (auth.state) {
             AuthState.unknown => const Scaffold(body: Center(child: CircularProgressIndicator())),
             AuthState.signedOut => const LoginScreen(),
-            AuthState.signedIn => const HomeScreen(),
+            AuthState.signedIn => HomeScreen(banner: _homeBanner),
           },
         ),
       ),
