@@ -13,12 +13,17 @@ CATEGORIES = [
     "practical",      # 実用・安全
 ]
 
+# Effectively no hourly cap for now; free users get a real cap back when paid plans exist.
+HOURLY_LIMIT = 1000
 NOTIFICATION_LEVELS = {
     # cooldown seconds between automatic guides, max automatic guides per hour
-    "quiet": {"cooldown_sec": 900, "hourly_limit": 3},
-    "normal": {"cooldown_sec": 360, "hourly_limit": 6},
-    "talkative": {"cooldown_sec": 180, "hourly_limit": 12},
-    "chatty": {"cooldown_sec": 90, "hourly_limit": 20},
+    "quiet": {"cooldown_sec": 900, "hourly_limit": HOURLY_LIMIT},
+    "normal": {"cooldown_sec": 360, "hourly_limit": HOURLY_LIMIT},
+    "talkative": {"cooldown_sec": 180, "hourly_limit": HOURLY_LIMIT},
+    "chatty": {"cooldown_sec": 90, "hourly_limit": HOURLY_LIMIT},
+    # The app asks for the next story as soon as one finishes ("continue"); the short cooldown only keeps a
+    # location update from cutting in right after a story starts.
+    "continuous": {"cooldown_sec": 15, "hourly_limit": HOURLY_LIMIT},
 }
 DETAIL_MODES = {"auto", "short", "summary", "detailed"}
 SERENDIPITY_LEVELS = {"low": 0.1, "normal": 0.2, "high": 0.35}

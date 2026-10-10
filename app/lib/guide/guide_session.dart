@@ -78,6 +78,25 @@ class GuideSession extends ChangeNotifier {
   Timer? _retry;
   bool appInForeground = true;
 
+  /// "How often to talk" (server NOTIFICATION_LEVELS key). "continuous" asks for the next story as one ends.
+  String notificationLevel = 'normal';
+  bool get continuous => notificationLevel == 'continuous';
+
+  /// The server's latest answer on why nothing is being told (reason, cooldown_sec, searching, ...) and when
+  /// the app will ask again. The guide screen explains the wait from these.
+  Map<String, dynamic>? decision;
+  DateTime? nextCheckAt;
+
+  /// True while the server is choosing a story for the current position.
+  bool get selecting => _liveSends > 0;
+  int _liveSends = 0;
+
+  /// True while continuous mode is fetching the story after the one that just ended.
+  bool continuing = false;
+
+  /// Asks again when the server said to, even when standing still (the GPS stream is silent then).
+  Timer? _heartbeat;
+
   String? get tripId => trip?['trip_id'] as String?;
   bool get active => trip != null && trip!['ended_at'] == null;
 
@@ -106,6 +125,9 @@ class GuideSession extends ChangeNotifier {
 
   /// Sign-out / user change: stop GPS and audio, and drop every in-memory trace of the user.
   Future<void> detach() async {
+    _cancelHeartbeat();
+    decision = null;
+    nextCheckAt = null;
     await stopGps();
     await audio.stop();
     await notifier.cancelAll();
@@ -129,6 +151,8 @@ class GuideSession extends ChangeNotifier {
     overrides = [];
     participants = [];
     current = null;
+    decision = null;
+    nextCheckAt = null;
     throttle.reset();
     motion.clear();
     await store!.set('active_trip_id', tripId);
@@ -138,6 +162,7 @@ class GuideSession extends ChangeNotifier {
 
   Future<Map<String, dynamic>?> finishTrip() async {
     if (trip == null) return null;
+    _cancelHeartbeat();
     await stopGps();
     await audio.stop();
     // Close the trip before uploading leftover points. A fresh point sent first would
@@ -153,6 +178,16 @@ class GuideSession extends ChangeNotifier {
   Future<void> updateTrip(Map<String, dynamic> body) async {
     trip = (await api.patch('/api/v1/trips/$tripId', body)).json;
     throttle.reset();
+    _scheduleHeartbeat(const Duration(seconds: 2));
+    notifyListeners();
+  }
+
+  /// Settings that change the guide's pace (from the preferences API).
+  void applyPrefs(Map<String, dynamic> prefs) {
+    final level = prefs['notification_level'];
+    if (level is! String || level == notificationLevel) return;
+    notificationLevel = level;
+    if (active) _scheduleHeartbeat(const Duration(seconds: 2)); // the wait shown is for the old pace
     notifyListeners();
   }
 
@@ -225,22 +260,77 @@ class GuideSession extends ChangeNotifier {
     notifyListeners();
     if (!active || store == null) return;
     if (!throttle.shouldSend(t, p.latitude, p.longitude, m.mode)) return;
+    await _sendPosition(p, t, m);
+  }
+
+  Future<void> _sendPosition(Position p, DateTime t, Motion m) async {
     throttle.sent(t, p.latitude, p.longitude, m.mode);
     final ctx = {
       'client_event_id': _uuid.v4(),
       'observed_at': t.toIso8601String(),
-      'utc_offset_min': p.timestamp.toLocal().timeZoneOffset.inMinutes,
+      'utc_offset_min': t.toLocal().timeZoneOffset.inMinutes,
       'location': {'lat': p.latitude, 'lon': p.longitude, 'accuracy_m': p.accuracy},
       'motion': m.toJson(),
       'app_state': appInForeground ? 'foreground' : 'background',
+      // the server never starts a new story over one that is still being told
+      'speaking': audio.state == SpeechState.preparing || audio.state == SpeechState.playing,
     };
     await store!.addPoint(tripId!, ctx);
     await _send(ctx, live: true);
   }
 
+  void _cancelHeartbeat() {
+    _heartbeat?.cancel();
+    _heartbeat = null;
+  }
+
+  void _scheduleHeartbeat(Duration after) {
+    _cancelHeartbeat();
+    if (!active) return;
+    _heartbeat = Timer(after, _pulse);
+  }
+
+  /// Re-sends the last known position when the server's wait is over and no new fix has come
+  /// (standing still, or moving less than the send distance).
+  Future<void> _pulse() async {
+    _heartbeat = null;
+    final p = lastPosition;
+    if (!active || store == null || p == null || gps != GpsState.on) {
+      _scheduleHeartbeat(const Duration(seconds: 15));
+      return;
+    }
+    if (selecting || continuing || feedbackBusy) {
+      _scheduleHeartbeat(const Duration(seconds: 5));
+      return;
+    }
+    await _sendPosition(p, DateTime.now().toUtc(), lastMotion ?? motion.estimate());
+  }
+
+  /// Remembers why nothing is being told and asks again when the server says to.
+  void _applyDecision(Map d) {
+    final reason = d['reason'] as String?;
+    if (reason == 'trip_finished') {
+      _cancelHeartbeat();
+      return;
+    }
+    final level = d['notification_level'];
+    if (level is String) notificationLevel = level;
+    // answers about an older point or story say nothing about now
+    if (reason == 'duplicate_event' || reason == 'stale_event' || reason == 'superseded') return;
+    decision = d.cast<String, dynamic>();
+    final next = d['next_check_after_sec'];
+    final wait = Duration(seconds: next is num ? next.toInt().clamp(1, 24 * 3600) : 60);
+    nextCheckAt = DateTime.now().add(wait);
+    _scheduleHeartbeat(wait);
+  }
+
   Future<void> _send(Map<String, dynamic> ctx, {required bool live}) async {
     final id = tripId;
     if (id == null) return;
+    if (live) {
+      _liveSends++;
+      notifyListeners();
+    }
     try {
       final r = (await api.post('/api/v1/trips/$id/context', ctx)).json;
       await store?.markSent(ctx['client_event_id'] as String);
@@ -255,6 +345,7 @@ class GuideSession extends ChangeNotifier {
       if (d['reason'] == 'trip_finished') {
         await stopGps();
       }
+      if (live) _applyDecision(d);
       final g = r['guide'];
       if (g is Map && live) await _onGuide(g.cast<String, dynamic>());
       notifyListeners();
@@ -265,10 +356,16 @@ class GuideSession extends ChangeNotifier {
           _retry = null;
           _flushUnsent();
         });
+        if (live) _scheduleHeartbeat(const Duration(seconds: 30));
       } else if (e.status == 409 || e.status == 410 || e.status == 400) {
         await store?.markSent(ctx['client_event_id'] as String); // never resend a rejected point
       }
       notifyListeners();
+    } finally {
+      if (live) {
+        _liveSends--;
+        notifyListeners();
+      }
     }
   }
 
@@ -286,21 +383,40 @@ class GuideSession extends ChangeNotifier {
     }
   }
 
-  Future<void> _onGuide(Map<String, dynamic> g, {bool waitForAudio = true}) async {
+  /// Shows a new story and starts telling it. Returns once it is on screen; playback runs on.
+  Future<void> _onGuide(Map<String, dynamic> g) async {
     guides.add(g);
     current = g;
     await store?.saveGuide(tripId!, g);
     notifyListeners();
     if (!appInForeground) await notifier.showGuide(g);
-    final playing = audio.autoPlay(g);
-    if (waitForAudio) {
-      await playing;
-    } else {
-      unawaited(() async {
-        try {
-          await playing;
-        } catch (_) {}
-      }());
+    unawaited(() async {
+      var toTheEnd = false;
+      try {
+        toTheEnd = await audio.autoPlay(g);
+      } catch (_) {}
+      // Continuous mode: heard to the end (not stopped or replaced), so go straight on to the next one.
+      if (toTheEnd && continuous && active && identical(current, g)) await _continueAfter(g);
+    }());
+  }
+
+  Future<void> _continueAfter(Map<String, dynamic> g) async {
+    if (continuing || feedbackBusy) return;
+    continuing = true;
+    _cancelHeartbeat();
+    notifyListeners();
+    try {
+      final r = (await api.post('/api/v1/guides/${g['history_id']}/feedback', {'action': 'continue'})).json;
+      final d = r['decision'];
+      if (d is Map) _applyDecision(d);
+      final next = r['guide'];
+      if (next is Map && active) await _onGuide(next.cast<String, dynamic>());
+    } catch (_) {
+      _scheduleHeartbeat(const Duration(seconds: 10)); // ask through a location update instead
+    } finally {
+      continuing = false;
+      if (_heartbeat == null && active) _scheduleHeartbeat(const Duration(seconds: 60));
+      notifyListeners();
     }
   }
 
@@ -322,8 +438,10 @@ class GuideSession extends ChangeNotifier {
       if (action == 'more_detail' && r['detail_text'] != null) {
         guide['detail_text'] = r['detail_text'];
       }
+      final d = r['decision'];
+      if (d is Map) _applyDecision(d);
       final g = r['guide'];
-      if (g is Map) await _onGuide(g.cast<String, dynamic>(), waitForAudio: false);
+      if (g is Map) await _onGuide(g.cast<String, dynamic>());
       notifyListeners();
       return r;
     } finally {
@@ -351,6 +469,7 @@ class GuideSession extends ChangeNotifier {
     final r = (await api.post('/api/v1/trips/$tripId/commands', {'text': text})).json;
     overrides = (r['active'] as List).cast<Map<String, dynamic>>();
     throttle.reset(); // re-evaluate soon with the new instruction
+    _scheduleHeartbeat(const Duration(seconds: 2));
     if (overrides.any((o) => o['type'] == 'quiet')) await audio.stop();
     notifyListeners();
     return r;
@@ -360,6 +479,7 @@ class GuideSession extends ChangeNotifier {
     overrides = ((await api.delete('/api/v1/trips/$tripId/overrides/$id')).json['active'] as List)
         .cast<Map<String, dynamic>>();
     throttle.reset();
+    _scheduleHeartbeat(const Duration(seconds: 2));
     notifyListeners();
   }
 
@@ -369,6 +489,7 @@ class GuideSession extends ChangeNotifier {
     final r = (await api.post('/api/v1/trips/$tripId/states', {'type': 'quiet', 'minutes': minutes})).json;
     overrides = (r['active'] as List).cast<Map<String, dynamic>>();
     await audio.stop();
+    _scheduleHeartbeat(const Duration(seconds: 2)); // so the screen shows the quiet time left
     notifyListeners();
   }
 

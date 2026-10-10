@@ -201,6 +201,7 @@ Action:
 - `like`
 - `dislike`
 - `skip_story`
+- `continue`
 - `interesting`（知らなかった・面白い）
 - `knew_it`（知っていた）
 - `not_interesting`（興味なし）
@@ -209,6 +210,10 @@ Action:
 `more_detail` は詳細文を返してよい。`more_related` はtopic boostを生成。`enough_topic` は当該topic boostを終了するが長期趣向を下げない。
 
 `skip_story`は「次の話」。現在の案内の音声を停止し、最新の有効なcontextから別の適格候補を要求する。現在の項目をセッション内で既出として扱うが、その話題全体や長期趣向を下げない。明示操作なので通常の自動通知cooldownとは分ける一方、品質・鮮度・重複・API/原価上限は維持する。次候補がなければ`guide:null`と理由を返し、話を捏造しない。端末は現在の音声要求を失効してから新しい案内を再生する。
+
+`continue`は話しかける頻度「連続」（`notification_level: continuous`）で、案内を最後まで聞き終えたときに端末が送る。`skip_story`と違い飛ばした扱いにせず、cooldownを待たずに次の話を返す（静かにするモードは守る）。対象がその旅行の最新の案内でなければ`reason: superseded`で何も返さない。
+
+`/context`と`skip_story`/`continue`の`decision`には、待ちを画面で説明するために`notification_level`と`cooldown_sec`（自動の話の間隔・秒）が付く。近くに話がない（`no_candidates`/`below_threshold`）ときは`searching`（この場所の話を生成中か）も付く。端末が`speaking: true`を送った位置更新では、再生中の話に割り込まず`reason: speaking`を返す。1時間あたりの上限は当面1000（実質無制限）。
 
 ## GET/PATCH /users/me/preferences
 通知頻度、情報量、セレンディピティ、表示言語`language`（ja/en、単一）、解説の言語`narration_languages`（話す順の配列、最大4、未設定なら表示言語）、言語別voice_profile_id、再生速度、端末TTS代替の許可等。voiceはサーバーの許可リストから選ぶ。再生速度は端末の対応範囲に制限する。
@@ -239,4 +244,4 @@ Responseは構造化されたoverrideとUI表示用ラベルを返す。曖昧�
 モバイル通信断を想定し、contextの `client_event_id`（UUID）をMVPで必須にする。端末は間引いた記録点を送信前にローカル保存し、通信回復後も同じIDとobserved_atで再送する。サーバーは `(trip_session_id, client_event_id)` でcontext_snapshotsの重複を防ぎ、同一イベント再送でnotification_historyを二重生成・再通知しない。再送時はguideを返さず `guide:null`、decision.reason=`duplicate_event` とする。過去時刻の未処理点のうちガイド対象の鮮度閾値を超えた点は履歴保存のみ行い、現在のガイド選択・移動状態を巻き戻さない。鮮度閾値はPoCで調整する。同じIDで異なる内容を送った場合は競合エラーとする。セッション終了後も保持期間内の未送信点は履歴として受け付け、ガイドは生成しない。保持期限後の点は受け付けず、期限切れを返す。
 
 ## Rate control
-端末はサーバー指定 `next_check_after_sec` を尊重する。移動状態が変化した場合は早期送信可能。サーバー側にもrate limitを置く。
+端末はサーバー指定 `next_check_after_sec` を尊重し、その時間が来たら新しい測位がなくても（立ち止まっていても）最後の位置を送り直す。移動状態が変化した場合は早期送信可能。サーバー側にもrate limitを置く。

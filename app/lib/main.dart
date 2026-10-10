@@ -71,6 +71,7 @@ class _LocalVoiceAppState extends State<LocalVoiceApp> with WidgetsBindingObserv
     try {
       final prefs = (await widget.api.get('/api/v1/users/me/preferences')).json;
       widget.audio.applyPrefs(prefs);
+      widget.session.applyPrefs(prefs);
       lang.set(prefs['language'] as String? ?? uiLanguageForDevice());
     } catch (_) {}
     if (widget.session.active) await widget.session.startGps();

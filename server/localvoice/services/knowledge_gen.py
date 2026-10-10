@@ -9,7 +9,7 @@ from datetime import timedelta
 from difflib import SequenceMatcher
 
 from flask import current_app
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from ..models import (
@@ -97,6 +97,16 @@ def enqueue_for_position(db, lat, lon, course, tclass, nearby=False):
             continue
         cov.status = "queued"
         db.add(KnowledgeGenerationJob(area_cell=cell, priority=prio))
+
+
+def generation_running(db, lat, lon, course, tclass):
+    """True while the cell here, the ones ahead or the ones around are queued or being generated."""
+    cells = [c for c, _ in cells_for(lat, lon, course, tclass, nearby=True)]
+    busy = db.execute(
+        select(func.count()).select_from(AreaCoverage)
+        .where(AreaCoverage.area_cell.in_(cells), AreaCoverage.status.in_(("queued", "generating")))
+    ).scalar_one()
+    return busy > 0
 
 
 def claim_job(db):

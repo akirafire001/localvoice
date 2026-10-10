@@ -87,14 +87,16 @@ def note_position(db, trip, snap):
     return schedule(db, trip, upcoming["anchor_history_id"], snap, keep_stories=[])
 
 
-def take(db, trip, user, snap, history_id):
-    """Publish the prepared next story when it still matches this request. None when the caller should select now."""
+def take(db, trip, user, snap, history_id, trigger="skip_story"):
+    """Publish the prepared next story when it still matches this request. None when the caller should select now.
+
+    trigger: "skip_story" for a tap on "next", "continue" when continuous mode moves on after a story ends."""
     trip = db.execute(select(TripSession).where(TripSession.id == trip.id).with_for_update()).scalar_one()
     upcoming = _upcoming(trip)
     stories = list(upcoming.get("stories") or [])
     if upcoming.get("anchor_history_id") != str(history_id) or not stories or not close_enough(snap, upcoming):
         return None
-    published = engine.materialize(db, trip, user, snap, stories[0])
+    published = engine.materialize(db, trip, user, snap, {**stories[0], "trigger": trigger})
     if published is None:
         upcoming["stories"] = stories[1:]
         _write(trip, upcoming)

@@ -64,6 +64,7 @@ def parse_context(data):
     acc = loc.get("accuracy_m")
     motion = data.get("motion") or {}
     topics = [t for t in (data.get("active_topics") or []) if t in CATEGORIES]
+    speaking = data.get("speaking") is True  # the app is still telling the previous story
 
     def num(v):
         try:
@@ -88,6 +89,7 @@ def parse_context(data):
         "course_confidence": num(motion.get("course_confidence")),
         "active_topics": topics,
         "utc_offset_min": None if offset is None else int(offset),
+        "speaking": speaking,
     }
 
 
@@ -129,6 +131,7 @@ def store_snapshot(db, trip, ctx):
             "course_confidence": ctx["course_confidence"],
             "active_topics": ctx["active_topics"],
             **({"utc_offset_min": ctx["utc_offset_min"]} if ctx.get("utc_offset_min") is not None else {}),
+            **({"speaking": True} if ctx.get("speaking") else {}),
         },
     )
     db.add(snap)
@@ -161,8 +164,10 @@ def latest_snapshot(db, trip):
 # ---------------------------------------------------------------- decision
 
 
-def _silent(db, trip, snap, reason, mode, next_after=60, candidates=None, rule_choice=None, *, record=True, **extra):
-    decision = {"reason": reason, "next_check_after_sec": next_after}
+def _silent(db, trip, snap, reason, mode, next_after=60, candidates=None, rule_choice=None, *, record=True, info=None,
+            **extra):
+    # info: what the app shows while waiting (e.g. whether new stories are being looked for); not logged
+    decision = {"reason": reason, "next_check_after_sec": next_after, **(info or {})}
     if not record:
         # A prepared "nothing to say" is not a decision the traveller has been shown.
         return {"guide": None, "draft": None, "decision": decision}
@@ -225,6 +230,17 @@ def _course_confident(snap):
     return speed >= 1.0
 
 
+def quiet_state(db, trip, t):
+    return db.execute(
+        select(TemporaryState).where(
+            TemporaryState.trip_session_id == trip.id,
+            TemporaryState.state_type == "quiet",
+            TemporaryState.ended_at.is_(None),
+            TemporaryState.expires_at > t,
+        )
+    ).scalar_one_or_none()
+
+
 def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=True, extra_history=(), seed_extra=0):
     """Decide whether to speak for this snapshot. Always records a GuideDecision."""
     cfg = _cfg()
@@ -232,7 +248,9 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     settings = trip_settings(trip, user)
     mode = trip.selection_mode
     level = dict(NOTIFICATION_LEVELS.get(settings["notification_level"], NOTIFICATION_LEVELS["normal"]))
-    manual = trigger != "context"
+    # "continue": continuous mode asking for the next story as one ends. It skips the cooldown like a tap on
+    # "next", but quiet mode still holds and it counts as an automatic guide.
+    manual = trigger not in ("context", "continue")
     state_topics, cooldown_factor, detail_override = commands.state_effects(commands.active_states(db, trip.id, t))
     if cooldown_factor != 1.0:
         level["cooldown_sec"] = int(level["cooldown_sec"] * cooldown_factor)
@@ -243,14 +261,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     if snap.accuracy_m is not None and float(snap.accuracy_m) > cfg.MAX_ACCURACY_M:
         return _silent(db, trip, snap, "low_accuracy", mode, 30, trigger=trigger, record=record)
 
-    quiet = db.execute(
-        select(TemporaryState).where(
-            TemporaryState.trip_session_id == trip.id,
-            TemporaryState.state_type == "quiet",
-            TemporaryState.ended_at.is_(None),
-            TemporaryState.expires_at > t,
-        )
-    ).scalar_one_or_none()
+    quiet = quiet_state(db, trip, t)
     if quiet is not None and not manual:
         return _silent(db, trip, snap, "quiet_mode", mode, int((quiet.expires_at - t).total_seconds()), trigger=trigger, record=record)
 
@@ -258,12 +269,21 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     auto_hist = [h for h in history if h.channel == "auto"]
     if not manual and auto_hist:
         since_last = (t - auto_hist[-1].shown_at).total_seconds()
-        if since_last < level["cooldown_sec"]:
+        if trigger == "context" and since_last < level["cooldown_sec"]:
             return _silent(db, trip, snap, "cooldown", mode, int(level["cooldown_sec"] - since_last) + 1, trigger=trigger, record=record)
         last_hour = [h for h in auto_hist if h.shown_at > t - timedelta(hours=1)]
         if len(last_hour) >= level["hourly_limit"]:
             wait = int((last_hour[0].shown_at + timedelta(hours=1) - t).total_seconds()) + 1
-            return _silent(db, trip, snap, "hourly_limit", mode, max(wait, 60), trigger=trigger, record=record)
+            return _silent(db, trip, snap, "hourly_limit", mode, max(wait, 60), trigger=trigger, record=record,
+                           info={"hourly_limit": level["hourly_limit"]})
+    if trigger == "context" and (snap.context_json or {}).get("speaking"):
+        # never cut into a story that is still being told; check again shortly
+        return _silent(db, trip, snap, "speaking", mode, 15, trigger=trigger, record=record)
+    if trigger == "context" and record:
+        # the next stories were chosen (and voiced) while the last one played; use them when still nearby
+        prepared = _take_prepared(db, trip, user, snap)
+        if prepared is not None:
+            return prepared
 
     lat, lon = snapshot_point(snap)
     tclass = snap.inferred_transport_mode or "walking"
@@ -298,7 +318,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
         heard_ids=heard_before_ids(db, user.id, trip.id, [c.item.id for c in raw]),
         t=t,
     )
-    threshold = cfg.SCORE_THRESHOLD * (0.8 if manual else 1.0)
+    threshold = cfg.SCORE_THRESHOLD * (0.8 if trigger != "context" else 1.0)
     eligible = [c for c in ranked if c.score >= threshold]
     # Stories heard on an earlier trip are offered only when nothing unheard is good enough here.
     unheard = [c for c in eligible if not c.heard_before]
@@ -308,7 +328,10 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     _maybe_enqueue_generation(db, lat, lon, course if confident else None, tclass, n_unheard)
     if not top:
         reason = "no_candidates" if not ranked else "below_threshold"
-        return _silent(db, trip, snap, reason, mode, 60, candidates=ranked[:10], trigger=trigger, record=record)
+        searching = _generation_running(db, lat, lon, course if confident else None, tclass)
+        # while new stories are being written here, look again sooner so the guide resumes once they are ready
+        return _silent(db, trip, snap, reason, mode, 30 if searching else 60, candidates=ranked[:10], trigger=trigger,
+                       record=record, info={"searching": searching})
 
     rule_choice = top[0]
     narr_langs = narration_languages(user)
@@ -430,6 +453,24 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     return materialize(db, trip, user, snap, draft)
 
 
+def _take_prepared(db, trip, user, snap):
+    from . import next_story  # local import to avoid cycles
+
+    latest = db.execute(
+        select(NotificationHistory.id)
+        .where(NotificationHistory.trip_session_id == trip.id)
+        .order_by(NotificationHistory.shown_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if latest is None:
+        return None
+    taken = next_story.take(db, trip, user, snap, latest, trigger="context")
+    if not taken or not taken["result"]:
+        return None
+    # the caller keeps the rest of the queue ("_keep" is removed before the response is sent)
+    return {**taken["result"], "_keep": taken["remaining"]}
+
+
 def materialize(db, trip, user, snap, draft):
     """Turn a prepared story into the guide the traveller is actually shown."""
     item = db.get(KnowledgeItem, uuid.UUID(draft["knowledge_item_id"]))
@@ -464,7 +505,7 @@ def materialize(db, trip, user, snap, draft):
         trip_session_id=trip.id,
         knowledge_item_id=item.id,
         guide_decision_id=decision.id,
-        channel="manual" if trigger != "context" else "auto",
+        channel="auto" if trigger in ("context", "continue") else "manual",
         score=draft["score"],
         score_components=draft.get("score_components") or {},
         title=draft["title"],
@@ -487,7 +528,8 @@ def materialize(db, trip, user, snap, draft):
             "reason": "selected",
             "decision_id": str(decision.id),
             "fallback": bool(draft.get("fallback")),
-            "next_check_after_sec": 60,
+            # the next automatic story cannot come before the cooldown ends, so the app need not ask sooner
+            "next_check_after_sec": max(60, cooldown_sec(trip, user)) if hist.channel == "auto" else 60,
         },
     }
 
@@ -505,6 +547,33 @@ def _log_llm_usage(db, trip_id, sel, provider):
             details_json={"model": sel.model, "latency_ms": sel.latency_ms, "error": sel.error},
         )
     )
+
+
+def cooldown_sec(trip, user):
+    level = trip_settings(trip, user)["notification_level"]
+    return NOTIFICATION_LEVELS.get(level, NOTIFICATION_LEVELS["normal"])["cooldown_sec"]
+
+
+def describe_pacing(result, trip, user):
+    """Adds what the app needs to explain the wait before the next story (level and its cooldown in seconds)."""
+    decision = result.setdefault("decision", {})
+    level = trip_settings(trip, user)["notification_level"]
+    if level not in NOTIFICATION_LEVELS:
+        level = "normal"
+    decision["notification_level"] = level
+    decision["cooldown_sec"] = NOTIFICATION_LEVELS[level]["cooldown_sec"]
+    return result
+
+
+def _generation_running(db, lat, lon, course, tclass):
+    """True while stories for this spot (or right around it) are queued or being written."""
+    if not _cfg().KNOWLEDGE_GENERATION_ENABLED:
+        return False
+    try:
+        from .knowledge_gen import generation_running
+    except ImportError:
+        return False
+    return generation_running(db, lat, lon, course, tclass)
 
 
 def _maybe_enqueue_generation(db, lat, lon, course, tclass, n_left):

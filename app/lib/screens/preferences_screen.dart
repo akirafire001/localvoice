@@ -3,15 +3,18 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../audio/audio_controller.dart';
+import '../guide/guide_session.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
 import '../widgets/visuals.dart';
 
+// The seconds are the server's cooldowns between automatic stories (services/prefs.py NOTIFICATION_LEVELS).
 const _levels = {
-  'quiet': ['控えめ', 'Quiet'],
-  'normal': ['ふつう', 'Normal'],
-  'talkative': ['多め', 'Talkative'],
-  'chatty': ['たくさん', 'Chatty'],
+  'quiet': ['900秒（15分）おき', 'Every 900 s (15 min)'],
+  'normal': ['360秒（6分）おき', 'Every 360 s (6 min)'],
+  'talkative': ['180秒（3分）おき', 'Every 180 s (3 min)'],
+  'chatty': ['90秒おき', 'Every 90 s'],
+  'continuous': ['連続（聞き終えたらすぐ次）', 'Continuous (next one right away)'],
 };
 const _details = {
   'auto': ['自動', 'Auto'],
@@ -122,10 +125,12 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
 
   Future<void> _patch(Map<String, dynamic> body) async {
     final audio = context.read<AudioController>();
+    final session = context.read<GuideSession>();
     final r = await guarded(context, () => _api.patch('/api/v1/users/me/preferences', body));
     if (r == null || !mounted) return;
     setState(() => _prefs = r.json);
     audio.applyPrefs(r.json);
+    session.applyPrefs(r.json);
     lang.set(r.json['language'] as String? ?? uiLanguageForDevice());
   }
 
@@ -242,6 +247,13 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             p['notification_level'] as String?,
             (v) => _patch({'notification_level': v}),
             icon: LvIconKind.frequency,
+          ),
+          Text(
+            tr(
+              '前の話が始まってから次の話までの間隔です。立ち止まっていても、時間が来れば次の話を探します。',
+              'Time from the start of one story to the next. Even when you stand still, the next story is looked for on time.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall,
           ),
           _choice(
             tr('説明の長さ', 'Detail'),

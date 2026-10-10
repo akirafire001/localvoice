@@ -15,7 +15,8 @@ from ..util import json_body, now, parse_uuid
 bp = Blueprint("guides", __name__)
 
 RATINGS = {"interesting", "knew_it", "not_interesting", "wrong_info"}
-ACTIONS = RATINGS | {"more_detail", "more_related", "enough_topic", "like", "dislike", "skip_story", "opened", "spoken"}
+ACTIONS = RATINGS | {"more_detail", "more_related", "enough_topic", "like", "dislike", "skip_story", "continue", "opened",
+                     "spoken"}
 LEARN = {"interesting": 0.1, "like": 0.1, "more_detail": 0.05, "more_related": 0.05, "not_interesting": -0.1, "dislike": -0.1}
 # These change which story should come next, so anything already prepared is dropped.
 INVALIDATE_NEXT = {"more_related", "enough_topic", "not_interesting", "dislike", "wrong_info"}
@@ -119,6 +120,19 @@ def feedback(history_id):
                     memory.maybe_update(db, trip)
                     prepare_more = next_story.schedule(db, trip, result["guide"]["history_id"], snap, keep_stories=keep)
                 resp.update(result)
+        elif action == "continue":
+            # Continuous mode: this story was heard to the end, so tell the next one (not a skip).
+            if trip.ended_at is not None:
+                raise ApiError(409, "trip_finished", "trip already finished")
+            result, keep = _continue(db, trip, h)
+            if result["guide"] is not None:
+                memory.maybe_update(db, trip)
+                prepare_more = next_story.schedule(db, trip, result["guide"]["history_id"], result.pop("_snap"),
+                                                   keep_stories=keep)
+            result.pop("_snap", None)
+            resp.update(engine.describe_pacing(result, trip, g.user))
+    if action == "skip_story" and "decision" in resp:
+        engine.describe_pacing(resp, trip, g.user)
     if action in INVALIDATE_NEXT and trip.ended_at is None:
         snap = engine.latest_snapshot(db, trip)
         if snap is not None:
@@ -127,3 +141,35 @@ def feedback(history_id):
     if prepare_more:
         next_story.kick(current_app._get_current_object(), trip.id)
     return jsonify(resp)
+
+
+def _continue(db, trip, h):
+    """The story after h for continuous mode. Returns (result, prepared stories to keep)."""
+    # serialize with location updates for this trip, so the two never start a story each
+    db.execute(select(TripSession.id).where(TripSession.id == trip.id).with_for_update())
+    latest = db.execute(
+        select(NotificationHistory.id)
+        .where(NotificationHistory.trip_session_id == trip.id)
+        .order_by(NotificationHistory.shown_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if latest != h.id:
+        # a newer story already started (e.g. from a location update); it is the one playing now
+        return {"guide": None, "decision": {"reason": "superseded", "next_check_after_sec": 60}}, []
+    snap = engine.latest_snapshot(db, trip)
+    if snap is None:
+        return {"guide": None, "decision": {"reason": "no_context", "next_check_after_sec": 30}}, []
+    quiet = engine.quiet_state(db, trip, now())
+    if quiet is not None:
+        wait = int((quiet.expires_at - now()).total_seconds())
+        return {"guide": None, "decision": {"reason": "quiet_mode", "next_check_after_sec": wait}}, []
+    taken = next_story.take(db, trip, g.user, snap, h.id, trigger="continue")
+    if taken and taken["result"]:
+        result, keep = taken["result"], taken["remaining"]
+    else:
+        result = engine.evaluate(db, trip, g.user, snap, trigger="continue", exclude_ids=[h.knowledge_item_id])
+        keep = []
+    if result is None:  # the chosen story was withdrawn meanwhile
+        result = {"guide": None, "decision": {"reason": "no_candidates", "next_check_after_sec": 30}}
+    result["_snap"] = snap
+    return result, keep

@@ -219,16 +219,17 @@ def post_context(trip_id):
         db.commit()
         return jsonify({"guide": None, "decision": {"reason": "stale_event", "next_check_after_sec": 60}})
     result = engine.evaluate(db, trip, g.user, snap)
+    keep = result.pop("_keep", [])  # prepared stories still queued after the one just taken
     prepare_more = False
     if result["guide"] is not None:
         memory.maybe_update(db, trip)
-        prepare_more = next_story.schedule(db, trip, result["guide"]["history_id"], snap)
+        prepare_more = next_story.schedule(db, trip, result["guide"]["history_id"], snap, keep_stories=keep)
     elif next_story.note_position(db, trip, snap):
         prepare_more = True
     db.commit()
     if prepare_more:
         next_story.kick(current_app._get_current_object(), trip.id)
-    return jsonify(result)
+    return jsonify(engine.describe_pacing(result, trip, g.user))
 
 
 @bp.get("/trips/<trip_id>/history")
