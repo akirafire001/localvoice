@@ -1,0 +1,67 @@
+{% extends "web/base.html" %}
+{% block title %}利用状況 — LocalVoice{% endblock %}
+{% block content %}
+<section class="panel">
+  <p class="eyebrow">YOUR LOCALVOICE</p>
+  <h1>{{ usage.display_name }}さんの利用状況</h1>
+  <p class="lead">{{ usage.joined }} から利用中です。ログイン方法は {{ usage.methods|join('、') or '未設定' }}。</p>
+  <div class="cards">
+    <article><p>旅行</p><strong>{{ usage.trips }}</strong><span>進行中 {{ usage.active_trips }}</span></article>
+    <article><p>受け取ったガイド</p><strong>{{ usage.guides }}</strong><span>再生済み {{ usage.spoken }}</span></article>
+    <article><p>スキップ</p><strong>{{ usage.skipped }}</strong><span>届いたガイドのうち</span></article>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>言語ごとのガイド</h2>
+  {% if usage.languages %}
+  <ul class="bars">
+    {% for row in usage.languages %}
+    <li data-language="{{ row.code }}" data-count="{{ row.count }}">
+      <span>{{ row.name }}</span>
+      <span class="track"><span class="fill" style="width: {{ row.percent }}%"></span></span>
+      <span class="count">{{ row.count }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">まだガイドを受け取っていません。</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>最近のガイド</h2>
+  {% if usage.recent %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>日時</th><th>タイトル</th><th>言語</th><th>状態</th></tr></thead>
+      <tbody>
+        {% for row in usage.recent %}
+        <tr>
+          <td>{{ row.when }}</td>
+          <td>{{ row.title }}</td>
+          <td>{{ row.language }}</td>
+          <td>{{ row.state }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">旅を始めると、ここに届いたガイドが並びます。</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>興味</h2>
+  {% if usage.interests %}
+  <ul class="chips">
+    {% for row in usage.interests %}
+    <li>{{ row.name }}<span>学習 {{ '%.1f'|format(row.learned) }}{% if row.explicit is not none %} / 指定 {{ '%.1f'|format(row.explicit) }}{% endif %}</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">アプリで選んだ興味がここに出ます。</p>
+  {% endif %}
+</section>
+{% endblock %}

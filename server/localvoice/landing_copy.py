@@ -13,6 +13,7 @@ _ROWS = {
  'how': ('使い方','How it works','使用方法','사용 방법','Cómo funciona','Comment ça marche'),
  'faq': ('よくある質問','FAQ','常见问题','자주 묻는 질문','Preguntas frecuentes','Questions fréquentes'),
  'try': ('ガイドを体験','Try a story','试听故事','이야기 체험','Escuchar','Écouter'),
+ 'login': ('ログイン','Log in','登录','로그인','Entrar','Connexion'),
  'try_long': ('ガイドを体験する','Listen to a local story','听一段当地故事','지역 이야기 듣기','Escuchar una historia','Écouter une histoire'),
  'language': ('言語','Language','语言','언어','Idioma','Langue'),
  'apply': ('変更','Apply','切换','변경','Aplicar','Appliquer'),

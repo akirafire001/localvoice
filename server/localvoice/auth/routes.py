@@ -4,7 +4,7 @@ import logging
 from datetime import timedelta
 from urllib.parse import urlencode
 
-from flask import Blueprint, current_app, g, jsonify, redirect, request
+from flask import Blueprint, current_app, g, jsonify, redirect, request, url_for
 from sqlalchemy import delete, func, select
 
 from ..db import get_db
@@ -171,12 +171,8 @@ def register():
     return jsonify(resp), 201
 
 
-@bp.post("/auth/login")
-def login():
-    db = get_db()
-    data = json_body()
-    login_id = data.get("login_id")
-    password = data.get("password")
+def login_with_password(db, login_id, password):
+    """Check ID and password, then issue a session. The caller receives the token payload."""
     if not isinstance(login_id, str) or not isinstance(password, str):
         raise unauthorized("invalid credentials", "invalid_credentials")
     norm = normalize_login_id(login_id)
@@ -192,7 +188,13 @@ def login():
         raise unauthorized("invalid credentials", "invalid_credentials")
     resp = issue_session(db, user, "password")
     db.commit()
-    return jsonify(resp)
+    return resp
+
+
+@bp.post("/auth/login")
+def login():
+    data = json_body()
+    return jsonify(login_with_password(get_db(), data.get("login_id"), data.get("password")))
 
 
 @bp.post("/auth/refresh")
@@ -249,11 +251,17 @@ def _verify_google(token):
     return claims
 
 
-@bp.post("/auth/google")
-def google_login():
-    db = get_db()
-    data = json_body()
-    claims = _verify_google(data.get("id_token"))
+def _grant_admin(user, claims):
+    """The operator is one verified Google account. An unverified or client-supplied address does not count."""
+    email = str(claims.get("email") or "").strip().lower()
+    verified = claims.get("email_verified")
+    if email and email == _cfg().ADMIN_GOOGLE_EMAIL and verified in (True, "true"):
+        user.is_admin = True
+
+
+def login_with_google(db, claims, data=None):
+    """Find or create the user for a verified Google subject and issue a session."""
+    data = data if isinstance(data, dict) else {}
     ident = db.execute(
         select(AuthIdentity).where(AuthIdentity.provider == "google", AuthIdentity.subject == claims["sub"])
     ).scalar_one_or_none()
@@ -272,8 +280,18 @@ def google_login():
         user = db.get(User, ident.user_id)
         if user is None or user.status != "active":
             raise unauthorized("invalid credentials", "invalid_credentials")
+    _grant_admin(user, claims)
     resp = issue_session(db, user, "google")
     db.commit()
+    return resp, status
+
+
+@bp.post("/auth/google")
+def google_login():
+    db = get_db()
+    data = json_body()
+    claims = _verify_google(data.get("id_token"))
+    resp, status = login_with_google(db, claims, data)
     return jsonify(resp), status
 
 
@@ -287,28 +305,23 @@ def _apple_audience(platform):
     return cfg.APPLE_BUNDLE_ID if platform == "ios" else cfg.APPLE_SERVICES_ID
 
 
-@bp.post("/auth/apple/start")
-def apple_start():
-    db = get_db()
-    data = json_body()
-    platform = data.get("platform")
-    purpose = data.get("purpose", "login")
-    if platform not in ("ios", "android"):
-        raise bad_request("platform must be ios or android", {"field": "platform"})
+def start_apple_challenge(db, platform, purpose="login", app_code_challenge=None, user_id=None):
+    """Create a one-time Apple challenge. `web` uses the same form_post callback as Android, then a browser session."""
+    if platform not in ("ios", "android", "web"):
+        raise bad_request("platform must be ios, android or web", {"field": "platform"})
     if purpose not in PURPOSES:
         raise bad_request("invalid purpose", {"field": "purpose"})
-    app_code_challenge = data.get("app_code_challenge")
+    if platform == "web" and purpose != "login":
+        raise bad_request("web Apple sign-in is only for login", {"field": "purpose"})
     if platform == "android" and not (isinstance(app_code_challenge, str) and len(app_code_challenge) == 64):
         raise bad_request("app_code_challenge (SHA-256 hex) is required", {"field": "app_code_challenge"})
-    user_id = None
-    if purpose in ("link", "reauthenticate"):
-        authenticate_request()
-        user_id = g.user.id
+    if purpose in ("link", "reauthenticate") and user_id is None:
+        raise unauthorized()
     audience = _apple_audience(platform)
     if not audience:
         raise ApiError(503, "provider_unavailable", "Sign in with Apple is not configured")
     nonce = random_token(24)
-    state = random_token(24) if platform == "android" else None
+    state = random_token(24) if platform in ("android", "web") else None
     ch = AuthChallenge(
         purpose=purpose,
         user_id=user_id,
@@ -338,6 +351,21 @@ def apple_start():
                 "nonce": sha256_hex(nonce),
             }
         )
+    return resp
+
+
+@bp.post("/auth/apple/start")
+def apple_start():
+    db = get_db()
+    data = json_body()
+    purpose = data.get("purpose", "login")
+    if purpose not in PURPOSES:
+        raise bad_request("invalid purpose", {"field": "purpose"})
+    user_id = None
+    if purpose in ("link", "reauthenticate"):
+        authenticate_request()
+        user_id = g.user.id
+    resp = start_apple_challenge(db, data.get("platform"), purpose, data.get("app_code_challenge"), user_id)
     return jsonify(resp), 201
 
 
@@ -424,6 +452,10 @@ def _apply_apple(db, ch, result, display_name=None, device_language=None):
         _store_apple_credential(db, ident, result)
         resp = issue_session(db, user, "apple")
         db.commit()
+        if ch.client_kind == "web":
+            from ..web.session import redirect_logged_in
+
+            return redirect_logged_in(resp)
         return jsonify(resp), status
 
     # link / reauthenticate: the current LocalVoice user must match the challenge
@@ -492,19 +524,29 @@ def apple_callback():
     if ch is None or ch.consumed_at is not None or ch.expires_at <= now() or ch.result_ciphertext:
         raise ApiError(400, "invalid_challenge", "challenge is invalid or expired")
     if request.form.get("error"):
+        kind = ch.client_kind
         ch.consumed_at = now()
         db.commit()
+        if kind == "web":
+            return redirect(url_for("web.login", error="apple_cancelled"))
         return redirect(_android_return({"error": request.form.get("error"), "state": state}))
     code = request.form.get("code")
     if not code:
         raise bad_request("code is required")
-    result = _verify_apple_tokens(ch, request.form.get("id_token"), code, _cfg().APPLE_REDIRECT_URI)
+    try:
+        result = _verify_apple_tokens(ch, request.form.get("id_token"), code, _cfg().APPLE_REDIRECT_URI)
+    except ApiError:
+        if ch.client_kind == "web":
+            return redirect(url_for("web.login", error="apple"))
+        raise
     try:
         user_json = json.loads(request.form.get("user") or "{}")
         name = user_json.get("name") or {}
         result["display_name"] = " ".join(x for x in (name.get("firstName"), name.get("lastName")) if x) or None
     except (ValueError, AttributeError):
         result["display_name"] = None
+    if ch.client_kind == "web":
+        return _apply_apple(db, ch, result, result.get("display_name"))
     handoff = random_token()
     ch.result_ciphertext = crypto.encrypt(json.dumps(result))
     ch.handoff_code_hash = sha256_hex(handoff)
@@ -614,6 +656,7 @@ def link_google():
         raise conflict("another Google account is already linked", "provider_already_linked")
     if ident is None:
         db.add(AuthIdentity(user_id=g.user.id, provider="google", subject=claims["sub"]))
+    _grant_admin(g.user, claims)
     db.commit()
     return jsonify(_me(db, g.user))
 

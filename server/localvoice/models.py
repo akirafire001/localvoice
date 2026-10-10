@@ -50,6 +50,8 @@ class User(Base):
     recovery_email: Mapped[str | None] = mapped_column(Text)
     recovery_email_verified_at: Mapped[datetime | None] = mapped_column(TS)
     locale: Mapped[str] = mapped_column(String(10), default="ja")
+    # The operator console. Set only when a verified Google sign-in matches the configured admin address.
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # ISO 3166 code (lower case) of the country the user lives in: country-wide manners are told only elsewhere
     home_country: Mapped[str] = mapped_column(String(2), default="jp", server_default="jp")
     notification_level: Mapped[str] = mapped_column(String(20), default="normal")

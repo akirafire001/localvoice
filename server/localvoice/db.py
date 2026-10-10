@@ -59,6 +59,7 @@ def create_schema(app):
 
 UPGRADES = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS home_country varchar(2) NOT NULL DEFAULT 'jp'",  # 2026-10-09
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false",  # 2026-10-10
 ]
 
 

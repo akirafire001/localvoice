@@ -1,0 +1,10 @@
+{% extends "web/base.html" %}
+{% block title %}管理ダッシュボード — LocalVoice{% endblock %}
+{% block content %}
+<section class="panel">
+  <p class="eyebrow">OPERATOR</p>
+  <h1>管理ダッシュボードは開けません</h1>
+  <p class="lead">この画面は、管理者のGoogleアカウントで入ったときだけ表示します。</p>
+  <p><a class="primary link" href="{{ url_for('web.account') }}">利用状況へ戻る</a></p>
+</section>
+{% endblock %}

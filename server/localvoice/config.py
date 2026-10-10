@@ -54,6 +54,10 @@ class Config:
         self.LOGIN_RATE_WINDOW_SEC = _int("LOGIN_RATE_WINDOW_SEC", 300)
         self.ACTION_TOKEN_TTL_SEC = _int("ACTION_TOKEN_TTL_SEC", 3600)
         self.APP_PUBLIC_URL = os.environ.get("APP_PUBLIC_URL", "https://localvoice.example")
+        # Browser console cookies. Leave unset for local HTTP; set on an HTTPS deployment the app itself does not see as secure.
+        self.WEB_COOKIE_SECURE = _bool("WEB_COOKIE_SECURE", False)
+        # Verified Google account that may open the operator dashboard. Not granted by a typed-in address.
+        self.ADMIN_GOOGLE_EMAIL = os.environ.get("ADMIN_GOOGLE_EMAIL", "akirafire001@gmail.com").strip().lower()
 
         # Google sign-in: comma separated OAuth client IDs accepted as audience.
         # Defaults are the LocalVoice project's public client IDs (web/server and iOS); not secrets.
@@ -64,6 +68,10 @@ class Config:
                 "380406027309-ibs30tj1jkoleq1p87s5bv078sa5p5u5.apps.googleusercontent.com",
             ).split(",") if x
         ]
+        # Web client used by the browser Sign in with Google button. Defaults to the server/web client above.
+        self.GOOGLE_WEB_CLIENT_ID = os.environ.get("GOOGLE_WEB_CLIENT_ID", "") or (
+            self.GOOGLE_CLIENT_IDS[0] if self.GOOGLE_CLIENT_IDS else ""
+        )
         # Sign in with Apple
         self.APPLE_TEAM_ID = os.environ.get("APPLE_TEAM_ID", "")
         self.APPLE_KEY_ID = os.environ.get("APPLE_KEY_ID", "")
