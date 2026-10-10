@@ -105,8 +105,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       final l = (await _api.get('/api/v1/languages')).json;
       if (!mounted) return;
       setState(() {
-        _uiLanguages = (l['ui'] as List).cast<Map<String, dynamic>>();
-        _narrationLanguages = (l['narration'] as List).cast<Map<String, dynamic>>();
+        _uiLanguages = (l['ui'] as List?)?.cast<Map<String, dynamic>>() ?? _uiLanguages;
+        _narrationLanguages = (l['narration'] as List?)?.cast<Map<String, dynamic>>() ?? _uiLanguages;
         _maxNarrationLanguages = (l['max_narration_languages'] as num?)?.toInt() ?? 4;
         _prefs = p;
         _interests = (i['interests'] as List).cast<Map<String, dynamic>>();
@@ -412,24 +412,19 @@ class _NarrationLanguages extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             buildDefaultDragHandles: false,
-            onReorder: (from, to) {
+            onReorderItem: (from, to) {
               final next = [...selected];
-              final moved = next.removeAt(from);
-              next.insert(to > from ? to - 1 : to, moved);
+              next.insert(to, next.removeAt(from));
               onChanged(next);
             },
-            children: [
-              for (var i = 0; i < selected.length; i++) _languageRow(context, audio, i, selected[i]),
-            ],
+            children: [for (var i = 0; i < selected.length; i++) _languageRow(context, audio, i, selected[i])],
           ),
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               icon: const Icon(Icons.add),
               label: Text(
-                selected.length >= max
-                    ? tr('言語は$max個まで選べます', 'Up to $max languages')
-                    : tr('言語を追加', 'Add a language'),
+                selected.length >= max ? tr('言語は$max個まで選べます', 'Up to $max languages') : tr('言語を追加', 'Add a language'),
               ),
               onPressed: selected.length >= max || selected.length >= catalog.length ? null : () => _add(context),
             ),

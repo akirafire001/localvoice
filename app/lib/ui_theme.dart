@@ -27,7 +27,11 @@ ThemeData localVoiceTheme() {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     ),
     // Room for the 24px S1 icons used as chip avatars.
-    chipTheme: const ChipThemeData(avatarBoxConstraints: BoxConstraints.tightFor(width: 24, height: 24)),
+    // labelPadding keeps the chip content at least as tall as the 24px avatar (chip.dart asserts it)
+    chipTheme: const ChipThemeData(
+      avatarBoxConstraints: BoxConstraints.tightFor(width: 24, height: 24),
+      labelPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(48, 48),
