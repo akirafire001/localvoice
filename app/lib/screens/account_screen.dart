@@ -216,7 +216,7 @@ class _AccountScreenState extends State<AccountScreen> {
           if (u.recoveryEmailVerified)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
-              child: LvIllustration(LvArtwork.emailVerification, height: 110),
+              child: LvIllustration(LvArtwork.emailVerification, height: 140),
             ),
           ListTile(
             leading: const LvIcon(LvIconKind.account),

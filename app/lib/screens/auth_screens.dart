@@ -39,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 8),
             Text(tr('移動中に、その土地の話を。', 'Stories of the place you are passing.'), textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            const LvIllustration(LvArtwork.loginLandscape, height: 150),
+            const LvIllustration(LvArtwork.loginLandscape, height: 190),
             const SizedBox(height: 20),
             AutofillGroup(
               child: Column(
@@ -115,7 +115,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: ListView(
         padding: EdgeInsets.fromLTRB(24, 24, 24, bottomGap(context)),
         children: [
-          const LvIllustration(LvArtwork.homeDiscovery, height: 110),
+          const LvIllustration(LvArtwork.homeDiscovery, height: 140),
           const SizedBox(height: 16),
           TextField(
             controller: _id,
@@ -200,7 +200,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       body: ListView(
         padding: EdgeInsets.fromLTRB(24, 24, 24, bottomGap(context)),
         children: [
-          const LvIllustration(LvArtwork.passwordReset, height: 140),
+          const LvIllustration(LvArtwork.passwordReset, height: 175),
           const SizedBox(height: 16),
           Text(
             tr('確認済みの回復用メールがある場合、再設定コードを送ります。', 'If you have a verified recovery email, we will send a reset code.'),
@@ -267,7 +267,7 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
     body: ListView(
       padding: EdgeInsets.fromLTRB(24, 24, 24, bottomGap(context)),
       children: [
-        const LvIllustration(LvArtwork.mailPending, height: 140),
+        const LvIllustration(LvArtwork.mailPending, height: 175),
         const SizedBox(height: 16),
         TextField(
           controller: _token,
