@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LocalVoice 鉛筆と淡彩・ブランド調整案</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f7f5ef;color:#203d34;font:16px/1.7 system-ui,"Yu Gothic",sans-serif}main{max-width:1100px;margin:auto;padding:32px 20px 64px}h1{font-size:clamp(24px,4vw,36px);margin:0}p{color:#53645b}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.card{background:#fffdf8;border:1px solid #dfdfd3;border-radius:18px;overflow:hidden}.card img{display:block;width:100%;aspect-ratio:2;object-fit:cover}.body{padding:16px 20px}.body h2{font-size:20px;margin:0 0 8px}.body p{margin:0;font-size:14px}a{color:#075747}.current{max-width:520px;margin:28px 0}summary{cursor:pointer;font-weight:600;margin-bottom:12px}.phone{max-width:390px;margin:28px auto;background:#fbfaf5;border:1px solid #d8ddd4;border-radius:22px;padding:20px}.phone header{font-size:22px;font-weight:700;color:#075747;margin-bottom:20px}.phone img{width:100%;aspect-ratio:2;object-fit:cover;border-radius:16px;display:block}.phone .chips{display:flex;gap:8px;margin:8px 0 16px}.phone .chips span{border:1px solid #aebfb6;border-radius:12px;padding:5px 14px}.phone button{border:0;border-radius:12px;background:#075747;color:white;width:100%;padding:12px;font:inherit}select{font:inherit;max-width:100%;border:1px solid #acbcb3;border-radius:8px;padding:8px;background:white}footer{margin-top:28px;font-size:13px}@media(max-width:680px){.grid{grid-template-columns:1fr}}
+</style>
+<main>
+<h1>鉛筆と淡彩・アプリに合わせた調整案</h1>
+<p>全候補1774×887px（2:1）。鉛筆の線と淡い色を保ち、アプリの深緑 #075747、セージ #739C85、アイボリー #FBFAF5、既存の地図や海辺のモチーフに合わせました。</p>
+<div class="grid">
+<article class="card"><a href="02a-pencil-brand.png" target="_blank"><img src="02a-pencil-brand.png" alt="A 鉛筆と淡彩・街歩き"></a><div class="body"><h2>A｜街歩き</h2><p>2番の街並みと構図を引き継ぎ、色と地図・イヤホンをアプリに寄せた案。</p></div></article>
+<article class="card"><a href="02b-pencil-brand-coast.png" target="_blank"><img src="02b-pencil-brand-coast.png" alt="B 鉛筆と淡彩・既存の海辺"></a><div class="body"><h2>B｜既存の海辺</h2><p>ログイン画面や現在のホーム画像の海辺・家・深緑の柵を、鉛筆と淡彩で描いた案。</p></div></article>
+</div>
+<h2>最初の4候補</h2>
+<div class="grid">
+<article class="card"><a href="01-photo.png" target="_blank"><img src="01-photo.png" alt="自然な写真のバナー"></a><div class="body"><h2>01｜自然な写真</h2><p>日常の光と、紙や木の自然な質感。</p></div></article>
+<article class="card"><a href="02-pencil.png" target="_blank"><img src="02-pencil.png" alt="鉛筆と淡彩のバナー"></a><div class="body"><h2>02｜鉛筆と淡彩</h2><p>描き切らない線と淡い色を残したスケッチ。</p></div></article>
+<article class="card"><a href="03-woodcut.png" target="_blank"><img src="03-woodcut.png" alt="木版画のバナー"></a><div class="body"><h2>03｜木版画</h2><p>少ない色数と、彫りや刷りの質感。</p></div></article>
+<article class="card"><a href="04-paper.png" target="_blank"><img src="04-paper.png" alt="切り絵のバナー"></a><div class="body"><h2>04｜切り絵</h2><p>形を絞り、紙の重なりを見せるコラージュ。</p></div></article>
+</div>
+<details class="current"><summary>現在の画像を見る</summary><article class="card"><img src="current-banner.png" alt="現在の水彩風バナー"></article></details>
+<h2>ホーム画面の表示サイズで比較</h2>
+<label for="variant">表示する候補：</label>
+<select id="variant"><option value="02a-pencil-brand.png">A｜街歩き・ブランド調整</option><option value="02b-pencil-brand-coast.png">B｜海辺・ブランド調整</option><option value="02-pencil.png">02｜最初の鉛筆と淡彩</option><option value="current-banner.png">現在の画像</option><option value="01-photo.png">01｜自然な写真</option><option value="03-woodcut.png">03｜木版画</option><option value="04-paper.png">04｜切り絵</option></select>
+<div class="phone"><header style="display:flex;align-items:center;gap:10px"><img src="../../../../../app/assets/branding/app-icon.png" alt="LocalVoiceアイコン" style="width:38px;height:38px;aspect-ratio:1;border-radius:10px">LocalVoice</header><p>こんにちは、旅行者さん</p><img id="home-preview" src="02a-pencil-brand.png" alt="選択したホーム画像"><p>目的</p><div class="chips"><span style="background:#cfe9df">旅行</span><span>散歩</span><span>出張</span></div><p>移動手段</p><div class="chips"><span style="background:#cfe9df">自動判定</span><span>徒歩</span><span>電車</span></div><button type="button">ガイドを開始</button></div>
+<footer>画面はサイズ比較用の簡易モックです。全候補は組み込みimagegenで生成。<a href="README.md">制作記録</a> / <a href="manifest.json">全生成プロンプト</a></footer>
+</main><script>document.getElementById('variant').addEventListener('change',event=>{document.getElementById('home-preview').src=event.target.value;});</script></html>

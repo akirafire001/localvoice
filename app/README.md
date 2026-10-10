@@ -33,6 +33,8 @@ Google Sign-In is configured for Google Cloud project `localvoice-510815` (web, 
 
 ## S1 visual assets
 
+The home banner uses 22 offline pencil-and-wash WebP images under `assets/s1/home_banners/`: the two selected existing sketches and 20 landmarks from different countries. Original PNGs are preserved with the artwork documentation. One banner is chosen once per app launch and kept through navigation and language changes. See the [gallery, prompts, and behavior](../docs/ui/asset-production/home-banners/README.md).
+
 The selected travel-journal style uses shared transparent PNG icons and illustrations under `assets/s1/`. The generated source sheets, prompts, export script instructions, and rendered screen previews are recorded in [S1 visuals](../docs/ui/asset-production/s1/README.md). Run `python tools/export_s1_assets.py` from the repository root with Pillow and NumPy to reproduce the individual PNGs. The runtime uses `lib/widgets/visuals.dart` and `lib/ui_theme.dart`; no Python packages are needed by the app.
 
 ## Structure
