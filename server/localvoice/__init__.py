@@ -16,6 +16,10 @@ def create_app(config=None):
     init_engine(app)
     register_error_handlers(app)
 
+    from .landing import bp as landing_bp
+
+    app.register_blueprint(landing_bp)
+
     from .auth.routes import bp as auth_bp
 
     from .api.commands import bp as commands_bp
