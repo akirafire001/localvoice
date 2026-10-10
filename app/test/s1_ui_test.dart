@@ -25,7 +25,9 @@ import 'package:localvoice/ui_theme.dart';
 import 'package:localvoice/widgets/common.dart';
 import 'package:localvoice/widgets/visuals.dart';
 
-final capture = Platform.environment['LOCALVOICE_CAPTURE_UI'] == '1';
+final storeCapture = Platform.environment['LOCALVOICE_CAPTURE_STORE_UI'] == '1';
+final capture = Platform.environment['LOCALVOICE_CAPTURE_UI'] == '1' || storeCapture;
+final captureSize = storeCapture ? const Size(432, 768) : const Size(390, 844);
 bool previewFont = false;
 
 class _Tokens implements TokenStore {
@@ -82,7 +84,7 @@ class _Fixture {
     auth = AuthService(api)..state = AuthState.signedIn;
     auth.user = UserInfo({
       'id': 'test-user',
-      'display_name': 'Akira',
+      'display_name': storeCapture ? '旅行者' : 'Akira',
       'login_id': 'sample',
       'login_methods': ['password'],
       'recovery_email': 'sample@example.invalid',
@@ -139,11 +141,13 @@ Future<void> settleImages(WidgetTester tester) async {
 
 Future<void> saveScreen(GlobalKey boundary, String name, WidgetTester tester) async {
   if (!capture) return;
+  if (storeCapture && !{'home', 'preferences'}.contains(name)) return;
   await tester.runAsync(() async {
     final render = boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-    final image = await render.toImage(pixelRatio: 2);
+    final image = await render.toImage(pixelRatio: storeCapture ? 2.5 : 2);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    final folder = Directory('../docs/ui/asset-production/s1/screens')..createSync(recursive: true);
+    final folder = Directory(storeCapture ? '../docs/play-store/screens' : '../docs/ui/asset-production/s1/screens')
+      ..createSync(recursive: true);
     File('${folder.path}/$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
     image.dispose();
   });
@@ -222,7 +226,7 @@ void main() {
   for (final scene in scenes.entries) {
     testWidgets('${scene.key} renders at regular and narrow enlarged English sizes', (tester) async {
       tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(390, 844);
+      tester.view.physicalSize = captureSize;
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetPhysicalSize);
       final fixture = _Fixture();
@@ -253,7 +257,7 @@ void main() {
   });
   testWidgets('nine weights remain adjustable and save the existing API payload', (tester) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
+    tester.view.physicalSize = captureSize;
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     final fixture = _Fixture();

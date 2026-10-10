@@ -16,10 +16,20 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000 \
 | `GOOGLE_SERVER_CLIENT_ID` | project web client ID | Google OAuth client ID put into the ID token audience (must be in the server's `GOOGLE_CLIENT_IDS`) |
 | `MAP_STYLE_URL` | OpenFreeMap liberty | MapLibre style |
 
-Android builds are signed with the shared development key `android/app/dev.keystore` (password `android`), so every machine has the same certificate:
-SHA-1 `49:F2:85:40:66:8F:2D:3C:F3:04:1C:9E:33:18:4D:32:A4:C0:72:52`. Register this SHA-1 for the Android OAuth client. Use a real upload key (and register its SHA-1 too) before publishing to Google Play.
+The Android application ID is `tech.ideaworks.localvoice`, registered in Google Play Console. The Kotlin namespace remains `com.localvoice.localvoice`.
 
-Google Sign-In is configured for Google Cloud project `localvoice-510815` (web, Android and iOS clients; iOS `GIDClientID` and URL scheme are in `ios/Runner/Info.plist`). Only accounts listed as test users on the OAuth consent screen can sign in until the app is published. External setup still needed: Sign in with Apple capability (iOS) and a Services ID + return URL (Android, see server `APPLE_*`).
+Debug builds use the shared development key `android/app/dev.keystore` (password `android`), with SHA-1 `49:F2:85:40:66:8F:2D:3C:F3:04:1C:9E:33:18:4D:32:A4:C0:72:52`.
+Release builds use an upload key configured through the ignored `android/key.properties` file (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`). Keep that file and the keystore private and backed up. Release builds do not fall back to the development key.
+
+```powershell
+C:\work\tools\flutter-localvoice\bin\flutter.bat build appbundle --release --dart-define=API_BASE_URL=https://localvoice.ideaworks.tech
+```
+
+The Play upload artifact is `build/app/outputs/bundle/release/app-release.aab`. Increase the build number for subsequent uploads.
+The Google Play Android OAuth client was created and verified on 2026-10-10: `LocalVoice Android - Google Play`, client ID `380406027309-nsc2asbt61ntqas6gtobnakdvq55t547.apps.googleusercontent.com`, package `tech.ideaworks.localvoice`, and Play app signing SHA-1 `75:58:F6:C9:A1:43:93:44:24:F1:83:DF:AB:72:61:7A:8C:32:82:0E`. The existing web/server client ID remains unchanged, so this registration does not require rebuilding the AAB. Google login on a Play-installed device still needs an end-to-end check after configuration propagates.
+The previous Android OAuth client covers only `com.localvoice.localvoice` with the development certificate. Directly installed debug/release builds of the new package require separate Android OAuth registrations for their respective local signing certificates.
+
+Google Sign-In is configured for Google Cloud project `localvoice-510815` (web, Android and iOS clients; iOS `GIDClientID` and URL scheme are in `ios/Runner/Info.plist`). The OAuth app is in Testing mode. Basic Sign in with Google authentication using only name, email and profile is exempt from the OAuth test-user-list requirement; requesting additional scopes would change that ([Google's audience documentation](https://support.google.com/cloud/answer/15549945)). External setup still needed: Sign in with Apple capability (iOS) and a Services ID + return URL (Android, see server `APPLE_*`).
 
 ## S1 visual assets
 

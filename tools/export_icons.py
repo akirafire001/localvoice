@@ -21,10 +21,10 @@ def main():
 
     outputs = {}
 
-    def export(path, size):
+    def export(path, size, mode="RGB"):
         path.parent.mkdir(parents=True, exist_ok=True)
-        artwork.resize((size, size), Image.Resampling.LANCZOS).save(path)
-        outputs[path] = size
+        artwork.resize((size, size), Image.Resampling.LANCZOS).convert(mode).save(path)
+        outputs[path] = (size, mode)
 
     for name, size in {
         "app-icon-1024.png": 1024,
@@ -34,6 +34,9 @@ def main():
         "apple-touch-icon.png": 180,
     }.items():
         export(BRANDING / name, size)
+
+    # Google Play listing icon: 512px, 32-bit PNG, with an opaque alpha channel.
+    export(BRANDING / "play-store-icon-512.png", 512, "RGBA")
 
     ico_sizes = [(n, n) for n in (16, 32, 48, 64)]
     artwork.resize((64, 64), Image.Resampling.LANCZOS).save(
@@ -59,10 +62,13 @@ def main():
             raise ValueError(f"Unsupported iOS icon size: {entry}")
         export(ios_set / entry["filename"], int(width * scale))
 
-    for path, size in outputs.items():
+    for path, (size, mode) in outputs.items():
         with Image.open(path) as image:
             assert image.size == (size, size), path
-            assert image.mode == "RGB", path
+            assert image.mode == mode, path
+            if mode == "RGBA":
+                assert image.getchannel("A").getextrema() == (255, 255), path
+        with Image.open(path) as image:
             image.verify()
     with Image.open(BRANDING / "favicon.ico") as image:
         assert image.ico.sizes() == set(ico_sizes)
