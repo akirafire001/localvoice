@@ -279,6 +279,11 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     if trigger == "context" and (snap.context_json or {}).get("speaking"):
         # never cut into a story that is still being told; check again shortly
         return _silent(db, trip, snap, "speaking", mode, 15, trigger=trigger, record=record)
+    if trigger == "context" and record:
+        # the next stories were chosen (and voiced) while the last one played; use them when still nearby
+        prepared = _take_prepared(db, trip, user, snap)
+        if prepared is not None:
+            return prepared
 
     lat, lon = snapshot_point(snap)
     tclass = snap.inferred_transport_mode or "walking"
@@ -446,6 +451,24 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     if not record:
         return {"guide": None, "draft": draft, "decision": {"reason": "selected", "fallback": fallback, "next_check_after_sec": 60}}
     return materialize(db, trip, user, snap, draft)
+
+
+def _take_prepared(db, trip, user, snap):
+    from . import next_story  # local import to avoid cycles
+
+    latest = db.execute(
+        select(NotificationHistory.id)
+        .where(NotificationHistory.trip_session_id == trip.id)
+        .order_by(NotificationHistory.shown_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if latest is None:
+        return None
+    taken = next_story.take(db, trip, user, snap, latest, trigger="context")
+    if not taken or not taken["result"]:
+        return None
+    # the caller keeps the rest of the queue ("_keep" is removed before the response is sent)
+    return {**taken["result"], "_keep": taken["remaining"]}
 
 
 def materialize(db, trip, user, snap, draft):
