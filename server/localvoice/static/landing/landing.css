@@ -1410,6 +1410,9 @@ summary>span {
   .nav-link {
     display:none;
   }
+  .nav-link.nav-login {
+    display:inline;
+  }
   .button-small {
     padding:9px 13px;
     font-size:11px;

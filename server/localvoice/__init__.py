@@ -20,6 +20,10 @@ def create_app(config=None):
 
     app.register_blueprint(landing_bp)
 
+    from .web import bp as web_bp
+
+    app.register_blueprint(web_bp)
+
     from .auth.routes import bp as auth_bp
 
     from .api.commands import bp as commands_bp

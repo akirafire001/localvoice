@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#075747">
+  <title>{% block title %}LocalVoice{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='landing/assets/favicon.ico') }}" sizes="any">
+  <link rel="stylesheet" href="{{ url_for('static', filename='web/console.css') }}">
+</head>
+<body>
+<a class="skip" href="#main">本文へ移動</a>
+<header class="bar">
+  <a class="brand" href="{{ url_for('landing.index') }}"><img src="{{ url_for('static', filename='landing/assets/app-icon.png') }}" width="36" height="36" alt=""><span>LocalVoice</span></a>
+  <nav aria-label="コンソール">
+    {% if user %}
+    <a href="{{ url_for('web.account') }}" {% if request.endpoint == 'web.account' %}aria-current="page"{% endif %}>利用状況</a>
+    {% if user.is_admin %}
+    <a href="{{ url_for('web.admin') }}" {% if request.endpoint == 'web.admin' %}aria-current="page"{% endif %}>管理ダッシュボード</a>
+    {% endif %}
+    <form method="post" action="{{ url_for('web.logout') }}"><button type="submit">ログアウト</button></form>
+    {% else %}
+    <a href="{{ url_for('landing.index') }}">トップへ</a>
+    {% endif %}
+  </nav>
+</header>
+<main id="main">
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

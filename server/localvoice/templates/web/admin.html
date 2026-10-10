@@ -1,0 +1,67 @@
+{% extends "web/base.html" %}
+{% block title %}管理ダッシュボード — LocalVoice{% endblock %}
+{% block content %}
+<section class="panel">
+  <p class="eyebrow">OPERATOR</p>
+  <h1>管理ダッシュボード</h1>
+  <p class="lead">生成されたガイドの本数と、それが世界のどこにあるかをまとめています。</p>
+  <div class="cards">
+    <article><p>生成されたガイド</p><strong data-stat="generated">{{ stats.generated }}</strong><span>新しく作られた土地の話</span></article>
+    <article><p>届いたガイド</p><strong data-stat="delivered">{{ stats.delivered }}</strong><span>旅行中に届いた回数</span></article>
+    <article><p>利用者</p><strong data-stat="users">{{ stats.users }}</strong><span>利用中のアカウント</span></article>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>言語ごとの生成数</h2>
+  <p class="note">1本のガイドを複数の言語で持っているときは、言語ごとに1件ずつ数えます。合計の本数は上の「生成されたガイド」です。</p>
+  {% if stats.generated_languages %}
+  <ul class="bars">
+    {% for row in stats.generated_languages %}
+    <li data-generated-language="{{ row.code }}" data-count="{{ row.count }}">
+      <span>{{ row.name }}</span>
+      <span class="track"><span class="fill" style="width: {{ row.percent }}%"></span></span>
+      <span class="count">{{ row.count }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">まだ生成されたガイドはありません。</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>届いたガイドの言語</h2>
+  <p class="note">利用者が受け取ったときの画面の言語です。</p>
+  {% if stats.delivered_languages %}
+  <ul class="bars">
+    {% for row in stats.delivered_languages %}
+    <li data-delivered-language="{{ row.code }}" data-count="{{ row.count }}">
+      <span>{{ row.name }}</span>
+      <span class="track"><span class="fill" style="width: {{ row.percent }}%"></span></span>
+      <span class="count">{{ row.count }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">まだ利用者に届いたガイドはありません。</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>世界の生成量</h2>
+  <p class="note">色が濃いほど、その付近で生成されたガイドが多いことを表します。位置は約0.1度（おおよそ10km）ごとにまとめています。</p>
+  <div id="world-map" data-land="{{ url_for('static', filename='web/land.json') }}"></div>
+  {% if stats.points %}
+  <ol class="places">
+    {% for point in stats.points %}
+    <li data-lat="{{ point.lat }}" data-lon="{{ point.lon }}" data-count="{{ point.count }}">{{ point.label }}<strong>{{ point.count }}本</strong></li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="empty">地図に載せる生成ガイドはまだありません。</p>
+  {% endif %}
+  <script id="map-points" type="application/json">{{ stats.points|tojson }}</script>
+  <script src="{{ url_for('static', filename='web/world.js') }}?v=translucent" defer></script>
+</section>
+{% endblock %}

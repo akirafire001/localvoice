@@ -26,6 +26,14 @@ def test_browser_language(lp_client, header, expected):
     assert f'<html lang="{expected}">'.encode() in response.data
 
 
+def test_login_link_follows_the_page_language(lp_client):
+    japanese = lp_client.get('/', headers={'Accept-Language': 'ja'})
+    assert b'href="/login"' in japanese.data
+    assert 'ログイン'.encode() in japanese.data
+    english = lp_client.get('/?lang=en')
+    assert b'Log in' in english.data
+
+
 def test_explicit_language_wins(lp_client):
     response = lp_client.get('/?lang=fr', headers={'Accept-Language': 'ja-JP'})
     assert response.headers['Content-Language'] == 'fr'

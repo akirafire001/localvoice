@@ -24,7 +24,10 @@ PASSWORD = "correct horse battery staple"
 
 
 class FakeGoogle:
-    """id_token format for tests: 'google:<sub>[:<iat>]'"""
+    """id_token format for tests: 'google:<sub>[:<iat>][:<email>][:unverified]'.
+
+    A segment containing @ is the verified email. The literal segment 'unverified' clears email_verified.
+    """
 
     def verify(self, token):
         if not token.startswith("google:"):
@@ -32,7 +35,20 @@ class FakeGoogle:
         parts = token.split(":")
         import time
 
-        return {"sub": parts[1], "iat": int(parts[2]) if len(parts) > 2 else int(time.time()), "name": "G User"}
+        iat = int(time.time())
+        email = None
+        verified = True
+        for part in parts[2:]:
+            if part == "unverified":
+                verified = False
+            elif "@" in part:
+                email = part
+            elif part.isdigit():
+                iat = int(part)
+        claims = {"sub": parts[1], "iat": iat, "name": "G User", "email_verified": verified}
+        if email:
+            claims["email"] = email
+        return claims
 
 
 class FakeApple:

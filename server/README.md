@@ -59,6 +59,26 @@ which is disclosed alongside the source links in the demo's expandable details.
 Download links and pricing are intentionally not presented while store release is pending.
 For a separate local preview, run `flask --app localvoice run --port 8001`.
 
+## Browser console
+
+The same Flask app serves the signed-in screens. The landing page links to `/login`.
+
+- `/login` — the same three methods as the app: login ID and password, Google, and Apple.
+- `/account` — that user's trips, guides, languages, and recent titles.
+- `/admin` — generated-guide totals, counts by language, and a world map of where they were generated.
+  User-management screens will be added here later.
+
+Google treats `akirafire001@gmail.com` as the operator only when the ID token's email is verified
+(`ADMIN_GOOGLE_EMAIL` overrides it). Linking that Google account to an existing user makes that
+user the operator too. Other addresses, including an unverified copy of the same address, stay
+on their own usage page.
+
+On an existing database, run `flask --app localvoice init-db` once so `users.is_admin` is added.
+Set `WEB_COOKIE_SECURE=1` when the public site is HTTPS but the app process itself sees plain HTTP.
+`GOOGLE_WEB_CLIENT_ID` defaults to the first entry of `GOOGLE_CLIENT_IDS` (the web client).
+Apple on the web reuses `APPLE_SERVICES_ID` and `APPLE_REDIRECT_URI`; the form post still arrives
+at `/api/v1/auth/apple/callback`, and a browser session is issued only for challenges started as `web`.
+
 Assets reuse the adopted branding and S1 artwork: `docs/branding/apple-touch-icon.png`
 (also the compact LP logo), `docs/branding/favicon.ico`, and selected illustrations/icons
 from `app/assets/s1/`. Copies are included under the Flask static directory so deploying

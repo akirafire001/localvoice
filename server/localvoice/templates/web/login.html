@@ -1,0 +1,57 @@
+{% extends "web/base.html" %}
+{% block title %}ログイン — LocalVoice{% endblock %}
+{% block content %}
+<section class="panel login-panel">
+  <p class="eyebrow">YOUR ACCOUNT</p>
+  <h1>ログイン</h1>
+  <p class="lead">アプリと同じ方法で入れます。ログインすると、自分の利用状況を表示します。</p>
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  <form method="post" action="{{ url_for('web.login_password') }}" class="stack">
+    <label for="login_id">ログインID</label>
+    <input id="login_id" name="login_id" autocomplete="username" required maxlength="100">
+    <label for="password">パスワード</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button class="primary" type="submit">IDとパスワードでログイン</button>
+  </form>
+
+  <p class="or" role="separator"><span>または</span></p>
+  <div class="providers">
+    {% if google_client_id %}
+    <div id="g_id_onload" data-client_id="{{ google_client_id }}" data-callback="lvGoogle" data-auto_prompt="false" data-context="signin"></div>
+    <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large" data-text="signin_with" data-shape="rectangular" data-logo_alignment="left" data-width="320"></div>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      async function lvGoogle(response) {
+        const box = document.getElementById("provider-error");
+        try {
+          const result = await fetch("{{ url_for('web.login_google') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json", "Accept": "application/json"},
+            body: JSON.stringify({id_token: response.credential})
+          });
+          const data = await result.json();
+          if (!result.ok) {
+            box.hidden = false;
+            box.textContent = data.message || "Googleでのログインに失敗しました。";
+            return;
+          }
+          location.href = data.redirect;
+        } catch (e) {
+          box.hidden = false;
+          box.textContent = "Googleでのログインに失敗しました。";
+        }
+      }
+    </script>
+    {% else %}
+    <p class="hint">GoogleログインはサーバーのクライアントIDを設定すると使えます。</p>
+    {% endif %}
+    {% if apple_ready %}
+    <a class="apple" href="{{ url_for('web.login_apple') }}">Appleでサインイン</a>
+    {% else %}
+    <p class="hint">Appleログインはサーバー側の設定が済んでから使えます。</p>
+    {% endif %}
+    <p id="provider-error" class="alert" role="alert" hidden></p>
+  </div>
+</section>
+{% endblock %}

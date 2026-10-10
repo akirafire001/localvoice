@@ -20,7 +20,7 @@
 <header class="site-header"><div class="container header-inner">
   <a class="brand" href="{{ url_for('landing.index', lang=language) }}" aria-label="{{ t('top') }}"><img src="{{ url_for('static', filename='landing/assets/app-icon.png') }}" alt="" width="40" height="40"><span>LocalVoice</span></a>
   <nav aria-label="{{ t('navigation') }}">
-    <a class="nav-link" href="#about">{{ t('about') }}</a><a class="nav-link" href="#how-it-works">{{ t('how') }}</a><a class="nav-link" href="#faq">{{ t('faq') }}</a>
+    <a class="nav-link" href="#about">{{ t('about') }}</a><a class="nav-link" href="#how-it-works">{{ t('how') }}</a><a class="nav-link" href="#faq">{{ t('faq') }}</a><a class="nav-link nav-login" href="{{ url_for('web.login') }}">{{ t('login') }}</a>
     <form class="language-picker" action="{{ url_for('landing.index') }}" method="get"><label class="sr-only" for="page-language">{{ t('language') }}</label><select id="page-language" name="lang">{% for code, option in language_options.items() %}<option value="{{ code }}" {{ 'selected' if code == language else '' }}>{{ option.name }}</option>{% endfor %}</select><button type="submit" class="language-apply">{{ t('apply') }}</button></form>
     <a class="button button-small" href="#demo">{{ t('try') }} <span aria-hidden="true">↗</span></a>
   </nav>
