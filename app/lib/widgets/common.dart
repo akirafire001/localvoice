@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../auth/auth_service.dart';
 import '../util/i18n.dart';
+import 'visuals.dart';
 
 String errorText(Object e) {
   if (e is AuthCancelled) return '';
@@ -107,8 +108,10 @@ class _PasswordFieldState extends State<PasswordField> {
     autofillHints: widget.autofill == null ? null : [widget.autofill!],
     decoration: InputDecoration(
       labelText: widget.label ?? tr('パスワード', 'Password'),
+      prefixIcon: const Padding(padding: EdgeInsets.all(12), child: LvIcon(LvIconKind.password)),
       suffixIcon: IconButton(
-        icon: Icon(_hidden ? Icons.visibility : Icons.visibility_off),
+        icon: LvIcon(_hidden ? LvIconKind.visible : LvIconKind.hidden),
+        tooltip: _hidden ? tr('パスワードを表示', 'Show password') : tr('パスワードを隠す', 'Hide password'),
         onPressed: () => setState(() => _hidden = !_hidden),
       ),
     ),

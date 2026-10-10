@@ -21,6 +21,10 @@ SHA-1 `49:F2:85:40:66:8F:2D:3C:F3:04:1C:9E:33:18:4D:32:A4:C0:72:52`. Register th
 
 Google Sign-In is configured for Google Cloud project `localvoice-510815` (web, Android and iOS clients; iOS `GIDClientID` and URL scheme are in `ios/Runner/Info.plist`). Only accounts listed as test users on the OAuth consent screen can sign in until the app is published. External setup still needed: Sign in with Apple capability (iOS) and a Services ID + return URL (Android, see server `APPLE_*`).
 
+## S1 visual assets
+
+The selected travel-journal style uses shared transparent PNG icons and illustrations under `assets/s1/`. The generated source sheets, prompts, export script instructions, and rendered screen previews are recorded in [S1 visuals](../docs/ui/asset-production/s1/README.md). Run `python tools/export_s1_assets.py` from the repository root with Pillow and NumPy to reproduce the individual PNGs. The runtime uses `lib/widgets/visuals.dart` and `lib/ui_theme.dart`; no Python packages are needed by the app.
+
 ## Structure
 
 - `lib/api/` — HTTP client (access token in memory, refresh token in secure storage, single-flight refresh)

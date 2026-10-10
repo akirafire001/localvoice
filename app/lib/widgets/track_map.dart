@@ -6,6 +6,7 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import '../config.dart';
 import '../location/track.dart';
 import '../util/i18n.dart';
+import 'visuals.dart';
 
 class GuideMarker {
   GuideMarker(this.lat, this.lon, this.title);
@@ -183,10 +184,10 @@ class _TrackMapState extends State<TrackMap> {
           top: 8,
           child: Column(
             children: [
-              _MapButton(icon: Icons.my_location, tooltip: tr('現在地へ', 'Recenter'), onTap: recenter),
+              _MapButton(icon: LvIconKind.gps, tooltip: tr('現在地へ', 'Recenter'), onTap: recenter),
               if (!widget.compact) ...[
                 const SizedBox(height: 8),
-                _MapButton(icon: Icons.zoom_out_map, tooltip: tr('全体を表示', 'Show whole track'), onTap: fitAll),
+                _MapButton(icon: LvIconKind.expand, tooltip: tr('全体を表示', 'Show whole track'), onTap: fitAll),
               ],
             ],
           ),
@@ -198,7 +199,7 @@ class _TrackMapState extends State<TrackMap> {
 
 class _MapButton extends StatelessWidget {
   const _MapButton({required this.icon, required this.tooltip, required this.onTap});
-  final IconData icon;
+  final LvIconKind icon;
   final String tooltip;
   final VoidCallback onTap;
 
@@ -207,6 +208,6 @@ class _MapButton extends StatelessWidget {
     color: Theme.of(context).colorScheme.surface,
     shape: const CircleBorder(),
     elevation: 2,
-    child: IconButton(icon: Icon(icon), tooltip: tooltip, onPressed: onTap),
+    child: IconButton(icon: LvIcon(icon), tooltip: tooltip, onPressed: onTap),
   );
 }

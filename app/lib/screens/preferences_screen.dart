@@ -5,6 +5,7 @@ import '../api/api_client.dart';
 import '../audio/audio_controller.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
+import '../widgets/visuals.dart';
 
 const _levels = {
   'quiet': ['控えめ', 'Quiet'],
@@ -122,15 +123,23 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         ],
       }),
     );
-    if (r != null && mounted) setState(() => _interests = (r.json['interests'] as List).cast<Map<String, dynamic>>());
+    if (r != null && mounted) {
+      setState(() => _interests = (r.json['interests'] as List).cast<Map<String, dynamic>>());
+    }
   }
 
-  Widget _choice(String title, Map<String, List<String>> opts, String? cur, void Function(String) on) => Padding(
+  Widget _choice(
+    String title,
+    Map<String, List<String>> opts,
+    String? cur,
+    void Function(String) on, {
+    LvIconKind? icon,
+  }) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleSmall),
+        if (icon != null) LvSectionTitle(title, icon) else Text(title, style: Theme.of(context).textTheme.titleSmall),
         Wrap(
           spacing: 8,
           children: [
@@ -147,7 +156,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     final p = _prefs;
     if (p == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(tr('設定', 'Settings'))),
+        appBar: LvAppBar(title: Text(tr('設定', 'Settings'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -157,7 +166,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     final langVoices = _voices.where((v) => v['language'] == language).toList();
     final audio = context.read<AudioController>();
     return Scaffold(
-      appBar: AppBar(title: Text(tr('設定', 'Settings'))),
+      appBar: LvAppBar(title: Text(tr('設定', 'Settings'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -169,11 +178,14 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             },
             language,
             (v) => _patch({'language': v}),
+            icon: LvIconKind.language,
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Row(
               children: [
+                const LvIcon(LvIconKind.language),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(tr('住んでいる国', 'Country you live in'), style: Theme.of(context).textTheme.titleSmall),
                 ),
@@ -200,20 +212,37 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             _levels,
             p['notification_level'] as String?,
             (v) => _patch({'notification_level': v}),
+            icon: LvIconKind.frequency,
           ),
-          _choice(tr('説明の長さ', 'Detail'), _details, p['detail_mode'] as String?, (v) => _patch({'detail_mode': v})),
+          _choice(
+            tr('説明の長さ', 'Detail'),
+            _details,
+            p['detail_mode'] as String?,
+            (v) => _patch({'detail_mode': v}),
+            icon: LvIconKind.explanation,
+          ),
           _choice(
             tr('意外な話題', 'Surprise topics'),
             _serendipity,
             p['serendipity'] as String?,
             (v) => _patch({'serendipity': v}),
+            icon: LvIconKind.discovery,
           ),
           const Divider(height: 32),
-          Text(tr('興味', 'Interests'), style: Theme.of(context).textTheme.titleMedium),
+          LvSectionTitle(tr('興味', 'Interests'), LvIconKind.nature),
           for (final i in _interests)
             Row(
               children: [
-                SizedBox(width: 110, child: Text(categoryLabel(i['category'] as String?))),
+                SizedBox(
+                  width: 132,
+                  child: Row(
+                    children: [
+                      LvIcon(categoryIcon(i['category'] as String?), size: 24),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(categoryLabel(i['category'] as String?))),
+                    ],
+                  ),
+                ),
                 Expanded(
                   child: Slider(
                     value: ((i['explicit_score'] ?? 0.5) as num).toDouble(),
@@ -226,9 +255,10 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               ],
             ),
           const Divider(height: 32),
-          Text(tr('音声', 'Voice'), style: Theme.of(context).textTheme.titleMedium),
+          LvSectionTitle(tr('音声', 'Voice'), LvIconKind.voice),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
+            secondary: const LvIcon(LvIconKind.guide),
             title: Text(tr('新しい話を自動で読み上げる', 'Read new stories aloud automatically')),
             subtitle: Text(tr('イヤホン利用時などに。初期設定はオフです。', 'Off by default. Useful with earphones.')),
             value: voice['enabled'] == true,
@@ -259,7 +289,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                     value: v['voice_profile_id'] as String,
                     title: Text(v['display_name'] as String? ?? v['voice_profile_id'] as String),
                     secondary: IconButton(
-                      icon: const Icon(Icons.play_circle_outline),
+                      icon: const LvIcon(LvIconKind.play),
                       tooltip: tr('試聴', 'Sample'),
                       onPressed: _ttsAvailable
                           ? () async {
@@ -276,6 +306,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           ),
           Row(
             children: [
+              const LvIcon(LvIconKind.speed),
+              const SizedBox(width: 8),
               Text(tr('速さ', 'Speed')),
               Expanded(
                 child: Slider(
@@ -294,6 +326,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
+            secondary: const LvIcon(LvIconKind.offline),
             title: Text(tr('サーバー音声が使えないとき端末で読み上げる', 'Use device speech when server audio is unavailable')),
             value: voice['allow_device_tts_fallback'] == true,
             onChanged: (v) => _patch({

@@ -5,6 +5,7 @@ import '../auth/auth_service.dart';
 import '../guide/guide_session.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
+import '../widgets/visuals.dart';
 import 'account_screen.dart';
 import 'guide_screen.dart';
 import 'history_screen.dart';
@@ -56,7 +57,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     if (!mounted) return;
     setState(() => _busy = false);
-    if (ok == true) Navigator.push(context, MaterialPageRoute(builder: (_) => const GuideScreen()));
+    if (ok == true) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const GuideScreen()));
+    }
   }
 
   @override
@@ -64,16 +67,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final s = context.watch<GuideSession>();
     final user = context.watch<AuthService>().user;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('LocalVoice'),
+      appBar: LvAppBar(
+        title: const LvBrandTitle(),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const LvIcon(LvIconKind.settings),
             tooltip: tr('設定', 'Settings'),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PreferencesScreen())),
           ),
           IconButton(
-            icon: const Icon(Icons.person),
+            icon: const LvIcon(LvIconKind.account),
             tooltip: tr('アカウント', 'Account'),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountScreen())),
           ),
@@ -90,20 +93,24 @@ class _HomeScreenState extends State<HomeScreen> {
           if (s.active)
             Card(
               child: ListTile(
-                leading: const Icon(Icons.record_voice_over),
+                leading: const LvIcon(LvIconKind.guide, size: 32),
                 title: Text(tr('ガイド中の旅行があります', 'A trip is in progress')),
                 subtitle: Text(labelOf(purposeLabels, s.trip?['purpose'] as String?)),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const LvIcon(LvIconKind.forward),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GuideScreen())),
               ),
             )
           else ...[
+            const LvIllustration(LvArtwork.homeDiscovery, height: 145),
+            const SizedBox(height: 16),
             Text(tr('目的', 'Purpose'), style: Theme.of(context).textTheme.titleSmall),
             Wrap(
               spacing: 8,
               children: [
                 for (final k in purposeLabels.keys)
                   ChoiceChip(
+                    avatar: LvIcon(purposeIcon(k), size: 20),
+                    showCheckmark: false,
                     label: Text(labelOf(purposeLabels, k)),
                     selected: _purpose == k,
                     onSelected: (_) => setState(() => _purpose = k),
@@ -117,6 +124,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 for (final k in transportLabels.keys)
                   ChoiceChip(
+                    avatar: LvIcon(transportIcon(k), size: 20),
+                    showCheckmark: false,
                     label: Text(labelOf(transportLabels, k)),
                     selected: _transport == k,
                     onSelected: (_) => setState(() => _transport = k),
@@ -125,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              icon: const Icon(Icons.play_arrow),
+              icon: const LvIcon(LvIconKind.play, color: Colors.white),
               onPressed: _busy ? null : _start,
               label: Text(tr('ガイドを開始', 'Start guide')),
             ),
@@ -137,12 +146,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           const Divider(height: 40),
           ListTile(
-            leading: const Icon(Icons.history),
+            leading: const LvIcon(LvIconKind.history, size: 28),
             title: Text(tr('これまでの旅行', 'Past trips')),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TripListScreen())),
           ),
           ListTile(
-            leading: const Icon(Icons.map),
+            leading: const LvIcon(LvIconKind.map, size: 28),
             title: Text(tr('地図で振り返る', 'Review on the map')),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen())),
           ),

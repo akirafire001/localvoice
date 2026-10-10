@@ -8,6 +8,7 @@ import '../location/track.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
 import '../widgets/track_map.dart';
+import '../widgets/visuals.dart';
 import 'home_screen.dart';
 import 'map_screen.dart';
 
@@ -70,10 +71,11 @@ class _GuideScreenState extends State<GuideScreen> {
     final pos = s.lastPosition;
     final g = s.current;
     return Scaffold(
-      appBar: AppBar(
+      appBar: LvAppBar(
         title: Text(tr('ガイド中', 'Guiding')),
         actions: [
           PopupMenuButton<String>(
+            icon: const LvIcon(LvIconKind.other),
             onSelected: (v) async {
               if (v == 'transport') await _pickTransport(s);
               if (v == 'people' && context.mounted) {
@@ -88,9 +90,36 @@ class _GuideScreenState extends State<GuideScreen> {
               }
             },
             itemBuilder: (_) => [
-              PopupMenuItem(value: 'transport', child: Text(tr('移動手段を変更', 'Change transport'))),
-              PopupMenuItem(value: 'map', child: Text(tr('地図を開く', 'Open map'))),
-              PopupMenuItem(value: 'people', child: Text(tr('同行者', 'Companions'))),
+              PopupMenuItem(
+                value: 'transport',
+                child: Row(
+                  children: [
+                    LvIcon(transportIcon(s.trip?['manual_transport_mode'] as String?)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(tr('移動手段を変更', 'Change transport'))),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'map',
+                child: Row(
+                  children: [
+                    const LvIcon(LvIconKind.map),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(tr('地図を開く', 'Open map'))),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'people',
+                child: Row(
+                  children: [
+                    const LvIcon(LvIconKind.companions),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(tr('同行者', 'Companions'))),
+                  ],
+                ),
+              ),
             ],
           ),
           TextButton(onPressed: () => _finish(s), child: Text(tr('終了', 'Finish'))),
@@ -119,19 +148,23 @@ class _GuideScreenState extends State<GuideScreen> {
           _StatusBar(session: s),
           Expanded(
             child: g == null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        tr(
-                          '近くに話題があればお知らせします。画面を閉じてもガイドは続きます。',
-                          'We will tell you when there is a story nearby. Guiding continues with the screen off.',
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+                ? LvEmptyState(
+                    artwork: s.offline
+                        ? LvArtwork.offlineLocalSave
+                        : s.gps == GpsState.denied || s.gps == GpsState.serviceOff
+                        ? LvArtwork.locationPermission
+                        : LvArtwork.waitingForStory,
+                    message: s.offline
+                        ? tr(
+                            '通信が戻るまで移動を端末に記録します。',
+                            'Your movement is saved on this device until the connection returns.',
+                          )
+                        : tr(
+                            '近くに話題があればお知らせします。画面を閉じてもガイドは続きます。',
+                            'We will tell you when there is a story nearby. Guiding continues with the screen off.',
+                          ),
                   )
-                : _GuideCard(guide: g, session: s, audio: audio),
+                : GuideStoryCard(guide: g, session: s, audio: audio),
           ),
         ],
       ),
@@ -148,15 +181,18 @@ class _GuideScreenState extends State<GuideScreen> {
           children: [
             for (final k in transportLabels.keys)
               ListTile(
+                leading: LvIcon(transportIcon(k)),
                 title: Text(labelOf(transportLabels, k)),
-                trailing: k == cur ? const Icon(Icons.check) : null,
+                trailing: k == cur ? const LvIcon(LvIconKind.check) : null,
                 onTap: () => Navigator.pop(c, k),
               ),
           ],
         ),
       ),
     );
-    if (v != null && v != cur && mounted) await guarded(context, () => s.updateTrip({'manual_transport_mode': v}));
+    if (v != null && v != cur && mounted) {
+      await guarded(context, () => s.updateTrip({'manual_transport_mode': v}));
+    }
   }
 }
 
@@ -167,18 +203,18 @@ class _StatusBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = session;
     String text;
-    IconData icon;
+    LvIconKind icon;
     switch (s.gps) {
       case GpsState.denied:
         text = tr('位置情報が許可されていません。設定で許可してください。', 'Location permission is off. Allow it in Settings.');
-        icon = Icons.location_disabled;
+        icon = LvIconKind.gpsDenied;
       case GpsState.serviceOff:
         text = tr('端末の位置情報がオフです。', 'Device location is turned off.');
-        icon = Icons.location_off;
+        icon = LvIconKind.gpsOff;
       case GpsState.off:
       case GpsState.starting:
         text = tr('位置情報を待っています…', 'Waiting for location…');
-        icon = Icons.location_searching;
+        icon = LvIconKind.gpsSearching;
       case GpsState.on:
         final acc = s.lastPosition?.accuracy;
         text = acc == null
@@ -186,11 +222,11 @@ class _StatusBar extends StatelessWidget {
             : acc > 100
             ? tr('位置の精度が低いため、案内を控えています（±${acc.round()}m）', 'Low accuracy (±${acc.round()} m); holding guides')
             : '${_modeLabel(s.lastMotion?.mode)} · ±${acc.round()}m';
-        icon = Icons.gps_fixed;
+        icon = LvIconKind.gps;
     }
     if (s.offline) {
       text = tr('オフライン：位置は端末に保存し、通信回復後に送ります', 'Offline: points are saved and sent later');
-      icon = Icons.cloud_off;
+      icon = LvIconKind.offline;
     }
     return Container(
       width: double.infinity,
@@ -198,7 +234,7 @@ class _StatusBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 16),
+          LvIcon(icon, size: 20),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
         ],
@@ -216,8 +252,8 @@ class _StatusBar extends StatelessWidget {
   };
 }
 
-class _GuideCard extends StatelessWidget {
-  const _GuideCard({required this.guide, required this.session, required this.audio});
+class GuideStoryCard extends StatelessWidget {
+  const GuideStoryCard({super.key, required this.guide, required this.session, required this.audio});
   final Map<String, dynamic> guide;
   final GuideSession session;
   final AudioController audio;
@@ -233,12 +269,17 @@ class _GuideCard extends StatelessWidget {
       // Keep the rating buttons clear of the system navigation bar.
       padding: EdgeInsets.fromLTRB(16, 16, 16, 32 + MediaQuery.paddingOf(context).bottom),
       children: [
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Chip(label: Text(categoryLabel(g['category'] as String?)), visualDensity: VisualDensity.compact),
-            const SizedBox(width: 8),
+            Chip(
+              avatar: LvIcon(categoryIcon(g['category'] as String?), size: 20),
+              label: Text(categoryLabel(g['category'] as String?)),
+              visualDensity: VisualDensity.compact,
+            ),
             if (g['origin'] == 'generated') const GeneratedBadge(),
-            const Spacer(),
             if (loc?['relative_direction'] != null)
               Text(_dir(loc!['relative_direction'] as String), style: theme.textTheme.bodySmall),
           ],
@@ -258,10 +299,13 @@ class _GuideCard extends StatelessWidget {
             style: theme.textTheme.bodySmall,
           ),
         const SizedBox(height: 12),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             IconButton.filledTonal(
-              icon: Icon(playingThis ? Icons.stop : Icons.volume_up),
+              icon: LvIcon(playingThis ? LvIconKind.stop : LvIconKind.guide),
               tooltip: playingThis ? tr('停止', 'Stop') : tr('読み上げ', 'Play'),
               onPressed: () => playingThis ? audio.stop() : session.playCurrent(),
             ),
@@ -270,24 +314,27 @@ class _GuideCard extends StatelessWidget {
                 padding: EdgeInsets.only(left: 8),
                 child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
               ),
-            const Spacer(),
-            TextButton(
+            TextButton.icon(
+              icon: const LvIcon(LvIconKind.detail, size: 20),
               onPressed: () async {
                 await guarded(context, () => session.feedback(g, 'more_detail'));
                 g['_showDetail'] = true;
               },
-              child: Text(tr('詳しく', 'More')),
+              label: Text(tr('詳しく', 'More')),
             ),
-            TextButton(
+            TextButton.icon(
+              icon: const LvIcon(LvIconKind.next, size: 20),
               onPressed: () async {
                 final r = await guarded(context, () => session.feedback(g, 'skip_story'));
                 // No untold story nearby: the server queues the surrounding area for generation
                 if (r != null && r['guide'] == null && context.mounted) {
-                  showInfo(context, tr('近くの話はもうありません。周りの話を準備しています',
-                      'No more stories nearby. Preparing stories around you'));
+                  showInfo(
+                    context,
+                    tr('近くの話はもうありません。周りの話を準備しています', 'No more stories nearby. Preparing stories around you'),
+                  );
                 }
               },
-              child: Text(tr('次の話', 'Next')),
+              label: Text(tr('次の話', 'Next')),
             ),
           ],
         ),
@@ -295,10 +342,12 @@ class _GuideCard extends StatelessWidget {
           spacing: 8,
           children: [
             ActionChip(
+              avatar: const LvIcon(LvIconKind.related, size: 20),
               label: Text(tr('関連する話を', 'More like this')),
               onPressed: () => _act(context, 'more_related', tr('関連する話を増やします', 'More related stories')),
             ),
             ActionChip(
+              avatar: const LvIcon(LvIconKind.enough, size: 20),
               label: Text(tr('この話題はもう十分', 'Enough of this topic')),
               onPressed: () => _act(context, 'enough_topic', tr('しばらくこの話題を控えます', 'This topic will pause for a while')),
             ),
@@ -317,6 +366,8 @@ class _GuideCard extends StatelessWidget {
               ['wrong_info', '情報が違う', 'Wrong info'],
             ])
               ChoiceChip(
+                avatar: LvIcon(ratingIcon(r[0]), size: 20),
+                showCheckmark: false,
                 label: Text(tr(r[1], r[2])),
                 selected: rating == r[0],
                 onSelected: (_) => _act(
@@ -356,6 +407,7 @@ class _Sources extends StatelessWidget {
     if (src.isEmpty && conf == null) return const SizedBox.shrink();
     return ExpansionTile(
       tilePadding: EdgeInsets.zero,
+      leading: const LvIcon(LvIconKind.sources, size: 22),
       title: Text(tr('出典・信頼度', 'Sources & confidence'), style: Theme.of(context).textTheme.bodySmall),
       children: [
         if (conf != null)
@@ -448,9 +500,9 @@ class _CommandBarState extends State<_CommandBar> {
                 ),
               ),
             ),
-            IconButton(icon: const Icon(Icons.send), tooltip: tr('送信', 'Send'), onPressed: _busy ? null : _send),
+            IconButton(icon: const LvIcon(LvIconKind.send), tooltip: tr('送信', 'Send'), onPressed: _busy ? null : _send),
             IconButton(
-              icon: Icon(s.isQuiet ? Icons.notifications_off : Icons.notifications_paused_outlined),
+              icon: LvIcon(s.isQuiet ? LvIconKind.quiet : LvIconKind.bell),
               tooltip: tr('30分静かに', 'Quiet for 30 min'),
               onPressed: s.isQuiet ? null : () => guarded(context, () => s.setQuiet(30)),
             ),
@@ -488,10 +540,12 @@ class _CompanionsState extends State<_Companions> {
           for (final p in s.participants)
             ListTile(
               contentPadding: EdgeInsets.zero,
+              leading: const LvIcon(LvIconKind.companions),
               title: Text(p['display_name'] as String),
               subtitle: Text(((p['interests'] as List?) ?? []).map((c) => categoryLabel(c as String)).join('・')),
               trailing: IconButton(
-                icon: const Icon(Icons.close),
+                icon: const LvIcon(LvIconKind.close),
+                tooltip: tr('同行者を外す', 'Remove companion'),
                 onPressed: () => guarded(context, () => s.removeParticipant(p['participant_id'] as String)),
               ),
             ),
@@ -506,6 +560,8 @@ class _CompanionsState extends State<_Companions> {
             children: [
               for (final c in categoryLabels.keys)
                 FilterChip(
+                  avatar: LvIcon(categoryIcon(c), size: 20),
+                  showCheckmark: false,
                   label: Text(categoryLabel(c)),
                   selected: _interests.contains(c),
                   onSelected: (v) => setState(() => v ? _interests.add(c) : _interests.remove(c)),

@@ -7,6 +7,7 @@ import '../api/api_client.dart';
 import '../auth/auth_service.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
+import '../widgets/visuals.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -46,7 +47,7 @@ class _AccountScreenState extends State<AccountScreen> {
             ListTile(title: Text(tr('本人確認の方法', 'Confirm it is you'), style: Theme.of(context).textTheme.titleMedium)),
             if (methods.contains('password'))
               ListTile(
-                leading: const Icon(Icons.password),
+                leading: const LvIcon(LvIconKind.password),
                 title: Text(tr('パスワード', 'Password')),
                 onTap: () => Navigator.pop(c, 'password'),
               ),
@@ -156,7 +157,9 @@ class _AccountScreenState extends State<AccountScreen> {
       await auth.setRecoveryEmail(c.text.trim());
       return true;
     });
-    if (done == true && mounted) showInfo(context, tr('確認メールを送りました', 'Verification email sent'));
+    if (done == true && mounted) {
+      showInfo(context, tr('確認メールを送りました', 'Verification email sent'));
+    }
   }
 
   Future<void> _delete() async {
@@ -206,13 +209,19 @@ class _AccountScreenState extends State<AccountScreen> {
     final m = u.loginMethods;
     final onlyOne = m.length <= 1;
     return Scaffold(
-      appBar: AppBar(title: Text(tr('アカウント', 'Account'))),
+      appBar: LvAppBar(title: Text(tr('アカウント', 'Account'))),
       body: ListView(
         children: [
+          if (u.recoveryEmailVerified)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: LvIllustration(LvArtwork.emailVerification, height: 110),
+            ),
           ListTile(
+            leading: const LvIcon(LvIconKind.account),
             title: Text(tr('表示名', 'Display name')),
             subtitle: Text(u.displayName ?? '-'),
-            trailing: const Icon(Icons.edit),
+            trailing: const LvIcon(LvIconKind.edit),
             onTap: () async {
               final c = TextEditingController(text: u.displayName ?? '');
               final ok = await showDialog<bool>(
@@ -222,13 +231,15 @@ class _AccountScreenState extends State<AccountScreen> {
                   actions: [FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('OK'))],
                 ),
               );
-              if (ok == true && context.mounted) await guarded(context, () => auth.updateDisplayName(c.text.trim()));
+              if (ok == true && context.mounted) {
+                await guarded(context, () => auth.updateDisplayName(c.text.trim()));
+              }
             },
           ),
           const Divider(),
           ListTile(title: Text(tr('ログイン方法', 'Sign-in methods'), style: Theme.of(context).textTheme.titleSmall)),
           ListTile(
-            leading: const Icon(Icons.password),
+            leading: const LvIcon(LvIconKind.password),
             title: Text(u.loginId == null ? tr('ID・パスワード（未設定）', 'ID & password (not set)') : 'ID: ${u.loginId}'),
             trailing: TextButton(
               onPressed: () => _setPassword(u),
@@ -268,7 +279,7 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.email),
+            leading: const LvIcon(LvIconKind.email),
             title: Text(tr('回復用メール', 'Recovery email')),
             subtitle: Text(
               u.recoveryEmail == null
@@ -279,7 +290,7 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.logout),
+            leading: const LvIcon(LvIconKind.logout),
             title: Text(tr('ログアウト', 'Sign out')),
             onTap: () async {
               final nav = Navigator.of(context);
@@ -288,7 +299,7 @@ class _AccountScreenState extends State<AccountScreen> {
             },
           ),
           ListTile(
-            leading: Icon(Icons.delete_forever, color: Theme.of(context).colorScheme.error),
+            leading: const LvIcon(LvIconKind.delete),
             title: Text(tr('アカウントを削除', 'Delete account'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
             onTap: _delete,
           ),

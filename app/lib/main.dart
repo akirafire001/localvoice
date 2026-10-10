@@ -9,6 +9,7 @@ import 'guide/notifier.dart';
 import 'screens/auth_screens.dart';
 import 'screens/home_screen.dart';
 import 'util/i18n.dart';
+import 'ui_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -87,7 +88,7 @@ class _LocalVoiceAppState extends State<LocalVoiceApp> with WidgetsBindingObserv
         builder: (context, auth, _, _) => MaterialApp(
           title: 'LocalVoice',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(colorSchemeSeed: const Color(0xFF00796B), useMaterial3: true),
+          theme: localVoiceTheme(),
           home: switch (auth.state) {
             AuthState.unknown => const Scaffold(body: Center(child: CircularProgressIndicator())),
             AuthState.signedOut => const LoginScreen(),

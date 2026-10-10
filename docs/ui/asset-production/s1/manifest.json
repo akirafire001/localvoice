@@ -1,0 +1,488 @@
+{
+  "date": "2026-10-10",
+  "selection": "S1 icons and illustrations",
+  "method": "built-in image_gen",
+  "coreCount": 42,
+  "extraIconCount": 24,
+  "illustrationCount": 10,
+  "jobs": [
+    {
+      "file": "core-icons.png",
+      "kind": "icons",
+      "cols": 6,
+      "rows": 7,
+      "items": [
+        {
+          "id": "01",
+          "key": "home",
+          "label": "ホーム",
+          "motif": "simple house"
+        },
+        {
+          "id": "02",
+          "key": "guide",
+          "label": "音声ガイド",
+          "motif": "speaker with two sound arcs"
+        },
+        {
+          "id": "03",
+          "key": "map",
+          "label": "地図",
+          "motif": "three-panel folded map"
+        },
+        {
+          "id": "04",
+          "key": "history",
+          "label": "旅行履歴",
+          "motif": "clock with backward arrow"
+        },
+        {
+          "id": "05",
+          "key": "settings",
+          "label": "設定",
+          "motif": "six-tooth gear"
+        },
+        {
+          "id": "06",
+          "key": "account",
+          "label": "アカウント",
+          "motif": "person bust"
+        },
+        {
+          "id": "07",
+          "key": "play",
+          "label": "再生・開始",
+          "motif": "right-pointing filled triangle"
+        },
+        {
+          "id": "08",
+          "key": "stop",
+          "label": "読み上げ停止",
+          "motif": "solid square"
+        },
+        {
+          "id": "09",
+          "key": "next",
+          "label": "次の話",
+          "motif": "triangle with one right stop bar"
+        },
+        {
+          "id": "10",
+          "key": "detail",
+          "label": "詳しく",
+          "motif": "open book"
+        },
+        {
+          "id": "11",
+          "key": "related",
+          "label": "関連する話",
+          "motif": "two overlapping speech bubbles"
+        },
+        {
+          "id": "12",
+          "key": "enough",
+          "label": "この話題はもう十分",
+          "motif": "speech bubble with a horizontal minus"
+        },
+        {
+          "id": "13",
+          "key": "history-topic",
+          "label": "歴史",
+          "motif": "old stone column with small clock"
+        },
+        {
+          "id": "14",
+          "key": "architecture",
+          "label": "建築",
+          "motif": "simple architectural arch and roof"
+        },
+        {
+          "id": "15",
+          "key": "nature",
+          "label": "自然",
+          "motif": "one tree and leaf"
+        },
+        {
+          "id": "16",
+          "key": "food",
+          "label": "食",
+          "motif": "bowl with chopsticks"
+        },
+        {
+          "id": "17",
+          "key": "culture",
+          "label": "文化",
+          "motif": "one rounded festival lantern"
+        },
+        {
+          "id": "18",
+          "key": "everyday-life",
+          "label": "暮らし",
+          "motif": "two small neighborhood houses"
+        },
+        {
+          "id": "19",
+          "key": "industry",
+          "label": "産業",
+          "motif": "simple factory roof and chimney"
+        },
+        {
+          "id": "20",
+          "key": "seasonal",
+          "label": "季節",
+          "motif": "single flower and small sun"
+        },
+        {
+          "id": "21",
+          "key": "practical",
+          "label": "実用",
+          "motif": "shield with checkmark"
+        },
+        {
+          "id": "22",
+          "key": "quiet",
+          "label": "30分静かに",
+          "motif": "bell with diagonal slash"
+        },
+        {
+          "id": "23",
+          "key": "companions",
+          "label": "同行者",
+          "motif": "two person busts"
+        },
+        {
+          "id": "24",
+          "key": "send",
+          "label": "一時指示の送信",
+          "motif": "paper plane"
+        },
+        {
+          "id": "25",
+          "key": "auto-transport",
+          "label": "移動手段の自動判定",
+          "motif": "small radar circle and sweep"
+        },
+        {
+          "id": "26",
+          "key": "walk",
+          "label": "散歩・徒歩",
+          "motif": "walking person side view"
+        },
+        {
+          "id": "27",
+          "key": "bicycle",
+          "label": "自転車",
+          "motif": "simple bicycle"
+        },
+        {
+          "id": "28",
+          "key": "car",
+          "label": "車",
+          "motif": "small car front view"
+        },
+        {
+          "id": "29",
+          "key": "train",
+          "label": "電車",
+          "motif": "ordinary train front view"
+        },
+        {
+          "id": "30",
+          "key": "shinkansen",
+          "label": "新幹線",
+          "motif": "streamlined bullet-train nose in profile"
+        },
+        {
+          "id": "31",
+          "key": "ship",
+          "label": "船",
+          "motif": "ferry and two simple water strokes"
+        },
+        {
+          "id": "32",
+          "key": "gps",
+          "label": "現在地・測位",
+          "motif": "location crosshair with center dot"
+        },
+        {
+          "id": "33",
+          "key": "offline",
+          "label": "オフライン",
+          "motif": "cloud with diagonal slash"
+        },
+        {
+          "id": "34",
+          "key": "travel",
+          "label": "旅行",
+          "motif": "suitcase"
+        },
+        {
+          "id": "35",
+          "key": "business",
+          "label": "出張",
+          "motif": "briefcase"
+        },
+        {
+          "id": "36",
+          "key": "commute",
+          "label": "通勤・通学",
+          "motif": "train above a small briefcase"
+        },
+        {
+          "id": "37",
+          "key": "interesting",
+          "label": "面白い",
+          "motif": "simple thumbs up"
+        },
+        {
+          "id": "38",
+          "key": "knew-it",
+          "label": "知ってた",
+          "motif": "small brain with checkmark"
+        },
+        {
+          "id": "39",
+          "key": "not-interested",
+          "label": "興味なし",
+          "motif": "simple thumbs down"
+        },
+        {
+          "id": "40",
+          "key": "wrong-info",
+          "label": "情報が違う",
+          "motif": "flag with an exclamation mark"
+        },
+        {
+          "id": "41",
+          "key": "password",
+          "label": "パスワード・本人確認",
+          "motif": "padlock"
+        },
+        {
+          "id": "42",
+          "key": "other",
+          "label": "その他の目的・移動手段",
+          "motif": "three centered dots"
+        }
+      ],
+      "refs": [
+        "C:\\work\\git\\localvoice\\docs\\ui\\asset-concepts\\2026-10-10\\S1-icons.png"
+      ],
+      "prompt": "Use case: precise-object-edit. Recreate the 42 icons in the supplied S1 reference as a usable clean transparent sprite atlas, preserving each recognizable design, palette and relative order. REMOVE ALL reference grid lines and numeric labels; keep only the icons. Precisely match the selected S1 travel-journal style in the reference: deep forest green uniform rounded outlines, restrained pale sage, ivory, sand and pale blue fills, calm mature travel editorial design. Illustration vignettes can have a delicate pale watercolor wash contained INSIDE each subject, but no paper canvas backdrop. NO 3D, no clay, no photorealism, no glossy shadows. Keep ivory object interiors opaque. Everything between objects is truly transparent. PRODUCTION SPRITE ATLAS on genuinely transparent alpha background. EXACTLY 6 EQUAL-WIDTH COLUMNS by 7 EQUAL-HEIGHT ROWS. No outside margin: the full canvas is divided into 42 identical invisible slots. Center ONE subject in EACH slot, give every subject at least 18 percent transparent padding to the slot edges; no subject crosses a slot boundary. No drawn grid, no tile backgrounds, no labels, no numbers, no watermark, no captions. Read left to right, top to bottom. Exact motif order: simple house; speaker with two sound arcs; three-panel folded map; clock with backward arrow; six-tooth gear; person bust; right-pointing filled triangle; solid square; triangle with one right stop bar; open book; two overlapping speech bubbles; speech bubble with a horizontal minus; old stone column with small clock; simple architectural arch and roof; one tree and leaf; bowl with chopsticks; one rounded festival lantern; two small neighborhood houses; simple factory roof and chimney; single flower and small sun; shield with checkmark; bell with diagonal slash; two person busts; paper plane; small radar circle and sweep; walking person side view; simple bicycle; small car front view; ordinary train front view; streamlined bullet-train nose in profile; ferry and two simple water strokes; location crosshair with center dot; cloud with diagonal slash; suitcase; briefcase; train above a small briefcase; simple thumbs up; small brain with checkmark; simple thumbs down; flag with an exclamation mark; padlock; three centered dots. Conventional operational glyphs have bold simple strokes, no scene decoration. Keep the icons optically equally sized."
+    },
+    {
+      "file": "extra-icons.png",
+      "kind": "icons",
+      "cols": 6,
+      "rows": 4,
+      "items": [
+        {
+          "key": "language",
+          "motif": "globe with two simple latitude lines",
+          "id": "01"
+        },
+        {
+          "key": "voice",
+          "motif": "headphones",
+          "id": "02"
+        },
+        {
+          "key": "speed",
+          "motif": "simple speed gauge with one needle",
+          "id": "03"
+        },
+        {
+          "key": "frequency",
+          "motif": "single speech bubble with two short lines",
+          "id": "04"
+        },
+        {
+          "key": "explanation",
+          "motif": "document with three short lines",
+          "id": "05"
+        },
+        {
+          "key": "discovery",
+          "motif": "two four-point sparkles",
+          "id": "06"
+        },
+        {
+          "key": "gps-searching",
+          "motif": "dashed crosshair and a dot",
+          "id": "07"
+        },
+        {
+          "key": "gps-off",
+          "motif": "location pin with a diagonal slash",
+          "id": "08"
+        },
+        {
+          "key": "gps-denied",
+          "motif": "location pin with small padlock",
+          "id": "09"
+        },
+        {
+          "key": "pause",
+          "motif": "two thick vertical bars",
+          "id": "10"
+        },
+        {
+          "key": "bell",
+          "motif": "simple ringing bell",
+          "id": "11"
+        },
+        {
+          "key": "check",
+          "motif": "one clean checkmark",
+          "id": "12"
+        },
+        {
+          "key": "close",
+          "motif": "two crossing diagonal strokes",
+          "id": "13"
+        },
+        {
+          "key": "back",
+          "motif": "single left chevron",
+          "id": "14"
+        },
+        {
+          "key": "forward",
+          "motif": "single right chevron",
+          "id": "15"
+        },
+        {
+          "key": "expand",
+          "motif": "four outward corner brackets",
+          "id": "16"
+        },
+        {
+          "key": "visible",
+          "motif": "open eye with central pupil",
+          "id": "17"
+        },
+        {
+          "key": "hidden",
+          "motif": "eye with diagonal slash",
+          "id": "18"
+        },
+        {
+          "key": "email",
+          "motif": "closed envelope",
+          "id": "19"
+        },
+        {
+          "key": "edit",
+          "motif": "simple pencil diagonal",
+          "id": "20"
+        },
+        {
+          "key": "logout",
+          "motif": "doorway and right-pointing outward arrow",
+          "id": "21"
+        },
+        {
+          "key": "delete",
+          "motif": "simple wastebin outlined in muted brick red, no smile",
+          "id": "22"
+        },
+        {
+          "key": "info",
+          "motif": "circle with letter i as conventional information symbol",
+          "id": "23"
+        },
+        {
+          "key": "sources",
+          "motif": "two linked document sheets",
+          "id": "24"
+        }
+      ],
+      "refs": [
+        "C:\\work\\git\\localvoice\\docs\\ui\\asset-concepts\\2026-10-10\\S1-icons.png"
+      ],
+      "prompt": "Use case: logo-brand. Generate 24 additional UI icons for LocalVoice that match the S1 reference icons exactly in palette and outline style. Precisely match the selected S1 travel-journal style in the reference: deep forest green uniform rounded outlines, restrained pale sage, ivory, sand and pale blue fills, calm mature travel editorial design. Illustration vignettes can have a delicate pale watercolor wash contained INSIDE each subject, but no paper canvas backdrop. NO 3D, no clay, no photorealism, no glossy shadows. Keep ivory object interiors opaque. Everything between objects is truly transparent. PRODUCTION SPRITE ATLAS on genuinely transparent alpha background. EXACTLY 6 EQUAL-WIDTH COLUMNS by 4 EQUAL-HEIGHT ROWS. No outside margin: the full canvas is divided into 24 identical invisible slots. Center ONE subject in EACH slot, give every subject at least 18 percent transparent padding to the slot edges; no subject crosses a slot boundary. No drawn grid, no tile backgrounds, no labels, no numbers, no watermark, no captions. Read left to right, top to bottom. Exact motif order: globe with two simple latitude lines; headphones; simple speed gauge with one needle; single speech bubble with two short lines; document with three short lines; two four-point sparkles; dashed crosshair and a dot; location pin with a diagonal slash; location pin with small padlock; two thick vertical bars; simple ringing bell; one clean checkmark; two crossing diagonal strokes; single left chevron; single right chevron; four outward corner brackets; open eye with central pupil; eye with diagonal slash; closed envelope; simple pencil diagonal; doorway and right-pointing outward arrow; simple wastebin outlined in muted brick red, no smile; circle with letter i as conventional information symbol; two linked document sheets. Each is a clear small 24px operational icon, no ornamental leaves, no emoji faces. White/light shape interiors may be opaque, empty space is transparent."
+    },
+    {
+      "file": "core-illustrations.png",
+      "kind": "illustrations",
+      "cols": 3,
+      "rows": 2,
+      "items": [
+        {
+          "id": "I01",
+          "key": "login-landscape",
+          "label": "ログインの導入風景",
+          "placement": "ログイン画面の見出し付近",
+          "subject": "a small wide coastal town vignette: hillside houses, a short riverside alley, one little ferry, quiet green hills. Generic place, not a specific tourist landmark. No device or brand logo"
+        },
+        {
+          "id": "I02",
+          "key": "home-discovery",
+          "label": "ホーム・ガイド開始",
+          "placement": "ホームの目的・移動手段の選択や開始ボタン付近",
+          "subject": "a folded map next to a simple pair of earphones, with one small town house and one tree rising softly behind it. Welcoming discovery scene, no map route arrows"
+        },
+        {
+          "id": "I03",
+          "key": "waiting-for-story",
+          "label": "近くの話題を待つ",
+          "placement": "ガイド中に話題がまだない状態",
+          "subject": "a quiet tree and a little park bench, beside a very simple small listening ear/sound cue. Peaceful attentive pause. No loading spinner or progress bar"
+        },
+        {
+          "id": "I04",
+          "key": "empty-history",
+          "label": "まだ旅行の記録がない",
+          "placement": "旅行履歴・旅行詳細の空状態",
+          "subject": "a closed travel notebook, a pencil and a small suitcase beside one leaf. Blank unmarked cover, relaxed invitation to start a first journey"
+        },
+        {
+          "id": "I05",
+          "key": "offline-local-save",
+          "label": "通信がなくても端末に記録",
+          "placement": "ガイド中のオフライン状態の補助",
+          "subject": "a simple neutral smartphone standing beside a tiny cloud with a short diagonal slash; two footprint dots remain inside the phone and a small shield/check conveys local saving. No arrows to the cloud, no fake offline navigation, no interface text"
+        },
+        {
+          "id": "I06",
+          "key": "email-verification",
+          "label": "メール確認・本人確認",
+          "placement": "メール確認画面の補助",
+          "subject": "a small ivory envelope and a green shield with a check, supported by one subtle leaf. Clear reassuring account verification illustration, no Google or Apple logo"
+        }
+      ],
+      "refs": [
+        "C:\\work\\git\\localvoice\\docs\\ui\\asset-concepts\\2026-10-10\\S1-illustrations.png"
+      ],
+      "prompt": "Use case: precise-object-edit. Convert the supplied S1 six-vignette reference into a production transparent sprite atlas of the same six illustrations. Preserve the selected S1 artwork: the harbor town, map and earphones, listening bench/tree, travel notebook/suitcase, offline local-saving phone, verified mail/shield. REMOVE ALL six I01-I06 labels and the ivory paper background. Keep the artwork and interior ivory material colors opaque. Precisely match the selected S1 travel-journal style in the reference: deep forest green uniform rounded outlines, restrained pale sage, ivory, sand and pale blue fills, calm mature travel editorial design. Illustration vignettes can have a delicate pale watercolor wash contained INSIDE each subject, but no paper canvas backdrop. NO 3D, no clay, no photorealism, no glossy shadows. Keep ivory object interiors opaque. Everything between objects is truly transparent. PRODUCTION SPRITE ATLAS on genuinely transparent alpha background. EXACTLY 3 EQUAL-WIDTH COLUMNS by 2 EQUAL-HEIGHT ROWS. No outside margin: the full canvas is divided into 6 identical invisible slots. Center ONE subject in EACH slot, give every subject at least 18 percent transparent padding to the slot edges; no subject crosses a slot boundary. No drawn grid, no tile backgrounds, no labels, no numbers, no watermark, no captions. Read left to right, top to bottom. Only these six subjects in exact order: a small wide coastal town vignette: hillside houses, a short riverside alley, one little ferry, quiet green hills. Generic place, not a specific tourist landmark. No device or brand logo; a folded map next to a simple pair of earphones, with one small town house and one tree rising softly behind it. Welcoming discovery scene, no map route arrows; a quiet tree and a little park bench, beside a very simple small listening ear/sound cue. Peaceful attentive pause. No loading spinner or progress bar; a closed travel notebook, a pencil and a small suitcase beside one leaf. Blank unmarked cover, relaxed invitation to start a first journey; a simple neutral smartphone standing beside a tiny cloud with a short diagonal slash; two footprint dots remain inside the phone and a small shield/check conveys local saving. No arrows to the cloud, no fake offline navigation, no interface text; a small ivory envelope and a green shield with a check, supported by one subtle leaf. Clear reassuring account verification illustration, no Google or Apple logo. Each illustration should stay compact, with generous truly transparent surrounding space for independent cropping."
+    },
+    {
+      "file": "extra-illustrations.png",
+      "kind": "illustrations",
+      "cols": 2,
+      "rows": 2,
+      "items": [
+        {
+          "key": "mail-pending",
+          "subject": "an open ivory envelope with a short unmarked letter and a small clock. Email verification is pending. No checkmark, shield check or success symbolism."
+        },
+        {
+          "key": "location-permission",
+          "subject": "a folded paper map and an ivory smartphone with a simple small location pin and a closed padlock next to it. Location permission is required. No success checkmark."
+        },
+        {
+          "key": "password-reset",
+          "subject": "a closed ivory envelope beside a forest-green old-fashioned key and one small sage leaf. A calm password recovery illustration, no success checkmark."
+        },
+        {
+          "key": "empty-map",
+          "subject": "a folded unmarked paper map with a few pale abstract roads and one small notebook beside it. No location pins, tracking line, arrows, footprints or success checkmark. No recorded track yet."
+        }
+      ],
+      "refs": [
+        "C:\\work\\git\\localvoice\\docs\\ui\\asset-concepts\\2026-10-10\\S1-illustrations.png"
+      ],
+      "prompt": "Use case: illustration-story. Create four additional empty-state illustrations for LocalVoice, matching the selected S1 watercolor/ink travel-journal artwork. Precisely match the selected S1 travel-journal style in the reference: deep forest green uniform rounded outlines, restrained pale sage, ivory, sand and pale blue fills, calm mature travel editorial design. Illustration vignettes can have a delicate pale watercolor wash contained INSIDE each subject, but no paper canvas backdrop. NO 3D, no clay, no photorealism, no glossy shadows. Keep ivory object interiors opaque. Everything between objects is truly transparent. PRODUCTION SPRITE ATLAS on genuinely transparent alpha background. EXACTLY 2 EQUAL-WIDTH COLUMNS by 2 EQUAL-HEIGHT ROWS. No outside margin: the full canvas is divided into 4 identical invisible slots. Center ONE subject in EACH slot, give every subject at least 18 percent transparent padding to the slot edges; no subject crosses a slot boundary. No drawn grid, no tile backgrounds, no labels, no numbers, no watermark, no captions. Read left to right, top to bottom. The four subjects in exact order: an open ivory envelope with a short unmarked letter and a small clock. Email verification is pending. No checkmark, shield check or success symbolism.; a folded paper map and an ivory smartphone with a simple small location pin and a closed padlock next to it. Location permission is required. No success checkmark.; a closed ivory envelope beside a forest-green old-fashioned key and one small sage leaf. A calm password recovery illustration, no success checkmark.; a folded unmarked paper map with a few pale abstract roads and one small notebook beside it. No location pins, tracking line, arrows, footprints or success checkmark. No recorded track yet.. No letters, UI, app screenshot, branding or labels. Generous transparent padding, restrained linework and sage watercolor inside objects."
+    }
+  ]
+}

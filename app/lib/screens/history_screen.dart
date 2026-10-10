@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
+import '../widgets/visuals.dart';
 import 'home_screen.dart';
 import 'map_screen.dart';
 
@@ -39,18 +40,19 @@ class _TripListScreenState extends State<TripListScreen> {
   Widget build(BuildContext context) {
     final trips = _trips;
     return Scaffold(
-      appBar: AppBar(title: Text(tr('これまでの旅行', 'Past trips'))),
+      appBar: LvAppBar(title: Text(tr('これまでの旅行', 'Past trips'))),
       body: trips == null
           ? const Center(child: CircularProgressIndicator())
           : trips.isEmpty
-          ? Center(child: Text(tr('まだ旅行がありません', 'No trips yet')))
+          ? LvEmptyState(artwork: LvArtwork.emptyHistory, message: tr('まだ旅行がありません', 'No trips yet'))
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 children: [
                   for (final t in trips)
                     ListTile(
-                      leading: Icon(t['ended_at'] == null ? Icons.play_circle : Icons.check_circle_outline),
+                      leading: LvIcon(purposeIcon(t['purpose'] as String?), size: 30),
+                      trailing: LvIcon(t['ended_at'] == null ? LvIconKind.guide : LvIconKind.check, size: 20),
                       title: Text(
                         '${labelOf(purposeLabels, t['purpose'] as String?)}  ${fmtTime(t['started_at'] as String?)}',
                       ),
@@ -112,11 +114,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     final items = _items;
     final s = _summary;
     return Scaffold(
-      appBar: AppBar(
+      appBar: LvAppBar(
         title: Text(tr('旅行の記録', 'Trip record')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.map),
+            icon: const LvIcon(LvIconKind.map),
             tooltip: tr('地図で見る', 'View on map'),
             onPressed: () =>
                 Navigator.push(context, MaterialPageRoute(builder: (_) => MapScreen(initialTripId: widget.tripId))),
@@ -148,18 +150,22 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                     ),
                   ),
                 if (items.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(tr('この旅行ではまだガイドがありません', 'No guides in this trip')),
+                  LvEmptyState(
+                    artwork: LvArtwork.emptyHistory,
+                    compact: true,
+                    message: tr('この旅行ではまだガイドがありません', 'No guides in this trip'),
                   ),
                 for (final g in items)
                   Card(
                     child: ExpansionTile(
+                      leading: LvIcon(categoryIcon(g['category'] as String?), size: 28),
                       title: Text(g['title'] as String? ?? ''),
-                      subtitle: Row(
+                      subtitle: Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
                           Text('${categoryLabel(g['category'] as String?)} · ${fmtTime(g['shown_at'] as String?)}'),
-                          if (g['origin'] == 'generated') ...[const SizedBox(width: 6), const GeneratedBadge()],
+                          if (g['origin'] == 'generated') const GeneratedBadge(),
                         ],
                       ),
                       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -180,6 +186,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                               ['wrong_info', '情報が違う', 'Wrong info'],
                             ])
                               ChoiceChip(
+                                avatar: LvIcon(ratingIcon(r[0]), size: 20),
+                                showCheckmark: false,
                                 label: Text(tr(r[1], r[2])),
                                 selected: g['rating'] == r[0],
                                 onSelected: (_) => _rate(g, r[0]),

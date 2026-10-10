@@ -1,0 +1,838 @@
+[
+  {
+    "file": "app/assets/s1/icons/home.png",
+    "source": "core-icons.png",
+    "slot": 0,
+    "bounds": [
+      47,
+      56,
+      199,
+      177
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/guide.png",
+    "source": "core-icons.png",
+    "slot": 1,
+    "bounds": [
+      50,
+      64,
+      179,
+      176
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/map.png",
+    "source": "core-icons.png",
+    "slot": 2,
+    "bounds": [
+      35,
+      62,
+      172,
+      179
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/history.png",
+    "source": "core-icons.png",
+    "slot": 3,
+    "bounds": [
+      44,
+      59,
+      168,
+      179
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/settings.png",
+    "source": "core-icons.png",
+    "slot": 4,
+    "bounds": [
+      39,
+      60,
+      158,
+      182
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/account.png",
+    "source": "core-icons.png",
+    "slot": 5,
+    "bounds": [
+      37,
+      57,
+      152,
+      178
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/play.png",
+    "source": "core-icons.png",
+    "slot": 6,
+    "bounds": [
+      80,
+      50,
+      165,
+      150
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/stop.png",
+    "source": "core-icons.png",
+    "slot": 7,
+    "bounds": [
+      68,
+      52,
+      164,
+      149
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/next.png",
+    "source": "core-icons.png",
+    "slot": 8,
+    "bounds": [
+      56,
+      50,
+      152,
+      148
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/detail.png",
+    "source": "core-icons.png",
+    "slot": 9,
+    "bounds": [
+      30,
+      44,
+      180,
+      159
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/related.png",
+    "source": "core-icons.png",
+    "slot": 10,
+    "bounds": [
+      25,
+      37,
+      179,
+      164
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/enough.png",
+    "source": "core-icons.png",
+    "slot": 11,
+    "bounds": [
+      29,
+      36,
+      158,
+      160
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/history-topic.png",
+    "source": "core-icons.png",
+    "slot": 12,
+    "bounds": [
+      61,
+      38,
+      196,
+      175
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/architecture.png",
+    "source": "core-icons.png",
+    "slot": 13,
+    "bounds": [
+      32,
+      45,
+      200,
+      170
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/nature.png",
+    "source": "core-icons.png",
+    "slot": 14,
+    "bounds": [
+      35,
+      35,
+      190,
+      178
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/food.png",
+    "source": "core-icons.png",
+    "slot": 15,
+    "bounds": [
+      33,
+      38,
+      176,
+      178
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/culture.png",
+    "source": "core-icons.png",
+    "slot": 16,
+    "bounds": [
+      43,
+      22,
+      150,
+      183
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/everyday-life.png",
+    "source": "core-icons.png",
+    "slot": 17,
+    "bounds": [
+      5,
+      51,
+      178,
+      163
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/industry.png",
+    "source": "core-icons.png",
+    "slot": 18,
+    "bounds": [
+      55,
+      23,
+      189,
+      173
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/seasonal.png",
+    "source": "core-icons.png",
+    "slot": 19,
+    "bounds": [
+      36,
+      18,
+      195,
+      172
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/practical.png",
+    "source": "core-icons.png",
+    "slot": 20,
+    "bounds": [
+      41,
+      33,
+      166,
+      171
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/quiet.png",
+    "source": "core-icons.png",
+    "slot": 21,
+    "bounds": [
+      42,
+      30,
+      168,
+      172
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/companions.png",
+    "source": "core-icons.png",
+    "slot": 22,
+    "bounds": [
+      23,
+      45,
+      179,
+      162
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/send.png",
+    "source": "core-icons.png",
+    "slot": 23,
+    "bounds": [
+      22,
+      45,
+      168,
+      162
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/auto-transport.png",
+    "source": "core-icons.png",
+    "slot": 24,
+    "bounds": [
+      51,
+      40,
+      193,
+      181
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/walk.png",
+    "source": "core-icons.png",
+    "slot": 25,
+    "bounds": [
+      56,
+      32,
+      157,
+      181
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/bicycle.png",
+    "source": "core-icons.png",
+    "slot": 26,
+    "bounds": [
+      14,
+      58,
+      193,
+      172
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/car.png",
+    "source": "core-icons.png",
+    "slot": 27,
+    "bounds": [
+      26,
+      54,
+      183,
+      171
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/train.png",
+    "source": "core-icons.png",
+    "slot": 28,
+    "bounds": [
+      31,
+      33,
+      162,
+      177
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/shinkansen.png",
+    "source": "core-icons.png",
+    "slot": 29,
+    "bounds": [
+      5,
+      65,
+      178,
+      165
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/ship.png",
+    "source": "core-icons.png",
+    "slot": 30,
+    "bounds": [
+      30,
+      28,
+      209,
+      160
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/gps.png",
+    "source": "core-icons.png",
+    "slot": 31,
+    "bounds": [
+      43,
+      24,
+      183,
+      160
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/offline.png",
+    "source": "core-icons.png",
+    "slot": 32,
+    "bounds": [
+      16,
+      40,
+      195,
+      147
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/travel.png",
+    "source": "core-icons.png",
+    "slot": 33,
+    "bounds": [
+      56,
+      22,
+      152,
+      158
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/business.png",
+    "source": "core-icons.png",
+    "slot": 34,
+    "bounds": [
+      28,
+      31,
+      165,
+      149
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/commute.png",
+    "source": "core-icons.png",
+    "slot": 35,
+    "bounds": [
+      17,
+      31,
+      177,
+      158
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/interesting.png",
+    "source": "core-icons.png",
+    "slot": 36,
+    "bounds": [
+      60,
+      22,
+      178,
+      136
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/knew-it.png",
+    "source": "core-icons.png",
+    "slot": 37,
+    "bounds": [
+      43,
+      23,
+      193,
+      136
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/not-interested.png",
+    "source": "core-icons.png",
+    "slot": 38,
+    "bounds": [
+      49,
+      22,
+      161,
+      138
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/wrong-info.png",
+    "source": "core-icons.png",
+    "slot": 39,
+    "bounds": [
+      51,
+      21,
+      173,
+      140
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/password.png",
+    "source": "core-icons.png",
+    "slot": 40,
+    "bounds": [
+      51,
+      21,
+      146,
+      138
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/other.png",
+    "source": "core-icons.png",
+    "slot": 41,
+    "bounds": [
+      32,
+      65,
+      158,
+      100
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/language.png",
+    "source": "extra-icons.png",
+    "slot": 0,
+    "bounds": [
+      92,
+      86,
+      264,
+      259
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/voice.png",
+    "source": "extra-icons.png",
+    "slot": 1,
+    "bounds": [
+      54,
+      90,
+      248,
+      258
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/speed.png",
+    "source": "extra-icons.png",
+    "slot": 2,
+    "bounds": [
+      58,
+      86,
+      232,
+      262
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/frequency.png",
+    "source": "extra-icons.png",
+    "slot": 3,
+    "bounds": [
+      26,
+      97,
+      200,
+      256
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/explanation.png",
+    "source": "extra-icons.png",
+    "slot": 4,
+    "bounds": [
+      26,
+      85,
+      171,
+      258
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/discovery.png",
+    "source": "extra-icons.png",
+    "slot": 5,
+    "bounds": [
+      17,
+      95,
+      173,
+      255
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/gps-searching.png",
+    "source": "extra-icons.png",
+    "slot": 6,
+    "bounds": [
+      88,
+      64,
+      261,
+      234
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/gps-off.png",
+    "source": "extra-icons.png",
+    "slot": 7,
+    "bounds": [
+      80,
+      67,
+      224,
+      228
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/gps-denied.png",
+    "source": "extra-icons.png",
+    "slot": 8,
+    "bounds": [
+      69,
+      63,
+      210,
+      236
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/pause.png",
+    "source": "extra-icons.png",
+    "slot": 9,
+    "bounds": [
+      54,
+      74,
+      176,
+      223
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/bell.png",
+    "source": "extra-icons.png",
+    "slot": 10,
+    "bounds": [
+      12,
+      68,
+      188,
+      229
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/check.png",
+    "source": "extra-icons.png",
+    "slot": 11,
+    "bounds": [
+      13,
+      68,
+      171,
+      229
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/close.png",
+    "source": "extra-icons.png",
+    "slot": 12,
+    "bounds": [
+      93,
+      59,
+      246,
+      199
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/back.png",
+    "source": "extra-icons.png",
+    "slot": 13,
+    "bounds": [
+      96,
+      58,
+      180,
+      199
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/forward.png",
+    "source": "extra-icons.png",
+    "slot": 14,
+    "bounds": [
+      99,
+      57,
+      183,
+      198
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/expand.png",
+    "source": "extra-icons.png",
+    "slot": 15,
+    "bounds": [
+      41,
+      54,
+      190,
+      200
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/visible.png",
+    "source": "extra-icons.png",
+    "slot": 16,
+    "bounds": [
+      8,
+      69,
+      193,
+      193
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/hidden.png",
+    "source": "extra-icons.png",
+    "slot": 17,
+    "bounds": [
+      1,
+      53,
+      184,
+      199
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/email.png",
+    "source": "extra-icons.png",
+    "slot": 18,
+    "bounds": [
+      85,
+      33,
+      261,
+      165
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/edit.png",
+    "source": "extra-icons.png",
+    "slot": 19,
+    "bounds": [
+      61,
+      12,
+      220,
+      177
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/logout.png",
+    "source": "extra-icons.png",
+    "slot": 20,
+    "bounds": [
+      61,
+      12,
+      235,
+      185
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/delete.png",
+    "source": "extra-icons.png",
+    "slot": 21,
+    "bounds": [
+      46,
+      13,
+      182,
+      176
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/info.png",
+    "source": "extra-icons.png",
+    "slot": 22,
+    "bounds": [
+      17,
+      17,
+      180,
+      182
+    ]
+  },
+  {
+    "file": "app/assets/s1/icons/sources.png",
+    "source": "extra-icons.png",
+    "slot": 23,
+    "bounds": [
+      15,
+      12,
+      179,
+      180
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/login-landscape.png",
+    "source": "core-illustrations.png",
+    "slot": 0,
+    "bounds": [
+      58,
+      144,
+      543,
+      513
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/home-discovery.png",
+    "source": "core-illustrations.png",
+    "slot": 1,
+    "bounds": [
+      41,
+      109,
+      464,
+      523
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/waiting-for-story.png",
+    "source": "core-illustrations.png",
+    "slot": 2,
+    "bounds": [
+      8,
+      71,
+      457,
+      512
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/empty-history.png",
+    "source": "core-illustrations.png",
+    "slot": 3,
+    "bounds": [
+      64,
+      66,
+      509,
+      406
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/offline-local-save.png",
+    "source": "core-illustrations.png",
+    "slot": 4,
+    "bounds": [
+      41,
+      84,
+      446,
+      393
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/email-verification.png",
+    "source": "core-illustrations.png",
+    "slot": 5,
+    "bounds": [
+      20,
+      93,
+      457,
+      382
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/mail-pending.png",
+    "source": "extra-illustrations.png",
+    "slot": 0,
+    "bounds": [
+      98,
+      112,
+      725,
+      471
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/location-permission.png",
+    "source": "extra-illustrations.png",
+    "slot": 1,
+    "bounds": [
+      17,
+      101,
+      694,
+      471
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/password-reset.png",
+    "source": "extra-illustrations.png",
+    "slot": 2,
+    "bounds": [
+      82,
+      96,
+      694,
+      398
+    ]
+  },
+  {
+    "file": "app/assets/s1/illustrations/empty-map.png",
+    "source": "extra-illustrations.png",
+    "slot": 3,
+    "bounds": [
+      22,
+      52,
+      704,
+      421
+    ]
+  }
+]
