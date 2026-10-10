@@ -35,3 +35,6 @@ app/.dart_tool/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# AI subscription generation work files (tools/subgen)
+.subgen/

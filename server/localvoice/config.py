@@ -154,6 +154,15 @@ class Config:
         self.RESEARCH_MIN_NEW_FACTS = _int("RESEARCH_MIN_NEW_FACTS", 2)
         self.RESEARCH_MAX_PASSES = _int("RESEARCH_MAX_PASSES", 4)
 
+        # Stories written by the owner's AI subscriptions (services/external_gen.py, tools/subgen). Off without a token.
+        self.EXTERNAL_GEN_TOKEN = os.environ.get("EXTERNAL_GEN_TOKEN", "")
+        # A cell gets external tasks until it holds this many stories; tourist spots first, then rings around them
+        self.EXTERNAL_GEN_TARGET_PER_CELL = _int("EXTERNAL_GEN_TARGET_PER_CELL", 30)
+        self.EXTERNAL_GEN_MAX_RING = _int("EXTERNAL_GEN_MAX_RING", 3)
+        self.EXTERNAL_GEN_LEASE_MIN = _int("EXTERNAL_GEN_LEASE_MIN", 180)
+        # Facts whose page does not exist (404/410, unknown host) are dropped
+        self.EXTERNAL_GEN_VERIFY_URLS = _bool("EXTERNAL_GEN_VERIFY_URLS", not self.TESTING)
+
         # Voice (voice-design §6-7)
         self.TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "none")  # none | silent (dev) | google
         self.GOOGLE_TTS_API_KEY = os.environ.get("GOOGLE_TTS_API_KEY", "")
