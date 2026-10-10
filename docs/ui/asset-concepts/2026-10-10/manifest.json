@@ -1,0 +1,371 @@
+{
+  "date": "2026-10-10",
+  "status": "comparison sheets; S1 selected and integrated; S2/S3 preview only",
+  "selectedSet": "S1",
+  "source_revision": "3290f2b5a3b516da20d9b3c7d039b6a9d119854b",
+  "method": "built-in image_gen",
+  "references": [
+    "docs/ui/01-login.png",
+    "docs/ui/05-home.png",
+    "docs/ui/10-preferences.png"
+  ],
+  "styles": [
+    {
+      "id": "S1",
+      "name": "旅の手帖",
+      "slug": "travel-journal",
+      "description": "深緑の線、淡いセージ・砂色・水色。落ち着いた旅の手帖の雰囲気。",
+      "style": "Refined travel-journal editorial illustration. Deep forest green #075747 uniform fine-but-legible rounded outline strokes, pale sage, muted sand and pale water-blue accents on warm ivory #FBFAF5. Icons must be clean precise geometric outlines with a small amount of soft flat fill, NOT scratchy hand scribbles. Illustrations can use delicate ink contours and a restrained pale watercolor wash with lots of whitespace. Calm, thoughtful, mature; inspired by the supplied screen concept art."
+    },
+    {
+      "id": "S2",
+      "name": "やさしいフラット",
+      "slug": "friendly-flat",
+      "description": "丸い輪郭と控えめな色面。小さな操作アイコンも見分けやすい方向。",
+      "style": "Friendly contemporary flat illustration system. Bold rounded geometric silhouettes with disciplined moderate line width, deep forest green #075747 primary, sage #AACBB9, warm amber #E4B56E and muted sky-blue #91BCCB accents, warm ivory background #FBFAF5. Two or three solid colors per icon, slightly softer corners and fuller shapes than standard outline icons. No gradients, no shadows, no cartoon faces in controls. Warm, inviting and highly legible; consistent with LocalVoice's green identity."
+    },
+    {
+      "id": "S3",
+      "name": "小さな立体",
+      "slug": "soft-dimensional",
+      "description": "深緑・ミント・アイボリーの小さな立体。挿絵に存在感を持たせる方向。",
+      "style": "Restrained premium soft-dimensional illustration system. Very simple rounded matte clay/paper objects, shallow 2.5D relief depth, gentle top-left studio lighting and small soft shadows; NOT shiny glossy plastic, NOT photorealism, NOT complex isometric environments. Deep forest green #075747, soft mint, ivory and one muted amber/blue accent on warm ivory #FBFAF5. Controls must keep absolutely conventional recognizable front-facing silhouettes and generous simple negative space. Mature playful touch, coherent objects and consistent view angle."
+    }
+  ],
+  "icons": [
+    {
+      "id": "01",
+      "key": "home",
+      "label": "ホーム",
+      "motif": "simple house"
+    },
+    {
+      "id": "02",
+      "key": "guide",
+      "label": "音声ガイド",
+      "motif": "speaker with two sound arcs"
+    },
+    {
+      "id": "03",
+      "key": "map",
+      "label": "地図",
+      "motif": "three-panel folded map"
+    },
+    {
+      "id": "04",
+      "key": "history",
+      "label": "旅行履歴",
+      "motif": "clock with backward arrow"
+    },
+    {
+      "id": "05",
+      "key": "settings",
+      "label": "設定",
+      "motif": "six-tooth gear"
+    },
+    {
+      "id": "06",
+      "key": "account",
+      "label": "アカウント",
+      "motif": "person bust"
+    },
+    {
+      "id": "07",
+      "key": "play",
+      "label": "再生・開始",
+      "motif": "right-pointing filled triangle"
+    },
+    {
+      "id": "08",
+      "key": "stop",
+      "label": "読み上げ停止",
+      "motif": "solid square"
+    },
+    {
+      "id": "09",
+      "key": "next",
+      "label": "次の話",
+      "motif": "triangle with one right stop bar"
+    },
+    {
+      "id": "10",
+      "key": "detail",
+      "label": "詳しく",
+      "motif": "open book"
+    },
+    {
+      "id": "11",
+      "key": "related",
+      "label": "関連する話",
+      "motif": "two overlapping speech bubbles"
+    },
+    {
+      "id": "12",
+      "key": "enough",
+      "label": "この話題はもう十分",
+      "motif": "speech bubble with a horizontal minus"
+    },
+    {
+      "id": "13",
+      "key": "history-topic",
+      "label": "歴史",
+      "motif": "old stone column with small clock"
+    },
+    {
+      "id": "14",
+      "key": "architecture",
+      "label": "建築",
+      "motif": "simple architectural arch and roof"
+    },
+    {
+      "id": "15",
+      "key": "nature",
+      "label": "自然",
+      "motif": "one tree and leaf"
+    },
+    {
+      "id": "16",
+      "key": "food",
+      "label": "食",
+      "motif": "bowl with chopsticks"
+    },
+    {
+      "id": "17",
+      "key": "culture",
+      "label": "文化",
+      "motif": "one rounded festival lantern"
+    },
+    {
+      "id": "18",
+      "key": "everyday-life",
+      "label": "暮らし",
+      "motif": "two small neighborhood houses"
+    },
+    {
+      "id": "19",
+      "key": "industry",
+      "label": "産業",
+      "motif": "simple factory roof and chimney"
+    },
+    {
+      "id": "20",
+      "key": "seasonal",
+      "label": "季節",
+      "motif": "single flower and small sun"
+    },
+    {
+      "id": "21",
+      "key": "practical",
+      "label": "実用",
+      "motif": "shield with checkmark"
+    },
+    {
+      "id": "22",
+      "key": "quiet",
+      "label": "30分静かに",
+      "motif": "bell with diagonal slash"
+    },
+    {
+      "id": "23",
+      "key": "companions",
+      "label": "同行者",
+      "motif": "two person busts"
+    },
+    {
+      "id": "24",
+      "key": "send",
+      "label": "一時指示の送信",
+      "motif": "paper plane"
+    },
+    {
+      "id": "25",
+      "key": "auto-transport",
+      "label": "移動手段の自動判定",
+      "motif": "small radar circle and sweep"
+    },
+    {
+      "id": "26",
+      "key": "walk",
+      "label": "散歩・徒歩",
+      "motif": "walking person side view"
+    },
+    {
+      "id": "27",
+      "key": "bicycle",
+      "label": "自転車",
+      "motif": "simple bicycle"
+    },
+    {
+      "id": "28",
+      "key": "car",
+      "label": "車",
+      "motif": "small car front view"
+    },
+    {
+      "id": "29",
+      "key": "train",
+      "label": "電車",
+      "motif": "ordinary train front view"
+    },
+    {
+      "id": "30",
+      "key": "shinkansen",
+      "label": "新幹線",
+      "motif": "streamlined bullet-train nose in profile"
+    },
+    {
+      "id": "31",
+      "key": "ship",
+      "label": "船",
+      "motif": "ferry and two simple water strokes"
+    },
+    {
+      "id": "32",
+      "key": "gps",
+      "label": "現在地・測位",
+      "motif": "location crosshair with center dot"
+    },
+    {
+      "id": "33",
+      "key": "offline",
+      "label": "オフライン",
+      "motif": "cloud with diagonal slash"
+    },
+    {
+      "id": "34",
+      "key": "travel",
+      "label": "旅行",
+      "motif": "suitcase"
+    },
+    {
+      "id": "35",
+      "key": "business",
+      "label": "出張",
+      "motif": "briefcase"
+    },
+    {
+      "id": "36",
+      "key": "commute",
+      "label": "通勤・通学",
+      "motif": "train above a small briefcase"
+    },
+    {
+      "id": "37",
+      "key": "interesting",
+      "label": "面白い",
+      "motif": "simple thumbs up"
+    },
+    {
+      "id": "38",
+      "key": "knew-it",
+      "label": "知ってた",
+      "motif": "small brain with checkmark"
+    },
+    {
+      "id": "39",
+      "key": "not-interested",
+      "label": "興味なし",
+      "motif": "simple thumbs down"
+    },
+    {
+      "id": "40",
+      "key": "wrong-info",
+      "label": "情報が違う",
+      "motif": "flag with an exclamation mark"
+    },
+    {
+      "id": "41",
+      "key": "password",
+      "label": "パスワード・本人確認",
+      "motif": "padlock"
+    },
+    {
+      "id": "42",
+      "key": "other",
+      "label": "その他の目的・移動手段",
+      "motif": "three centered dots"
+    }
+  ],
+  "illustrations": [
+    {
+      "id": "I01",
+      "key": "login-landscape",
+      "label": "ログインの導入風景",
+      "placement": "ログイン画面の見出し付近",
+      "subject": "a small wide coastal town vignette: hillside houses, a short riverside alley, one little ferry, quiet green hills. Generic place, not a specific tourist landmark. No device or brand logo"
+    },
+    {
+      "id": "I02",
+      "key": "home-discovery",
+      "label": "ホーム・ガイド開始",
+      "placement": "ホームの目的・移動手段の選択や開始ボタン付近",
+      "subject": "a folded map next to a simple pair of earphones, with one small town house and one tree rising softly behind it. Welcoming discovery scene, no map route arrows"
+    },
+    {
+      "id": "I03",
+      "key": "waiting-for-story",
+      "label": "近くの話題を待つ",
+      "placement": "ガイド中に話題がまだない状態",
+      "subject": "a quiet tree and a little park bench, beside a very simple small listening ear/sound cue. Peaceful attentive pause. No loading spinner or progress bar"
+    },
+    {
+      "id": "I04",
+      "key": "empty-history",
+      "label": "まだ旅行の記録がない",
+      "placement": "旅行履歴・旅行詳細の空状態",
+      "subject": "a closed travel notebook, a pencil and a small suitcase beside one leaf. Blank unmarked cover, relaxed invitation to start a first journey"
+    },
+    {
+      "id": "I05",
+      "key": "offline-local-save",
+      "label": "通信がなくても端末に記録",
+      "placement": "ガイド中のオフライン状態の補助",
+      "subject": "a simple neutral smartphone standing beside a tiny cloud with a short diagonal slash; two footprint dots remain inside the phone and a small shield/check conveys local saving. No arrows to the cloud, no fake offline navigation, no interface text"
+    },
+    {
+      "id": "I06",
+      "key": "email-verification",
+      "label": "メール確認・本人確認",
+      "placement": "メール確認画面の補助",
+      "subject": "a small ivory envelope and a green shield with a check, supported by one subtle leaf. Clear reassuring account verification illustration, no Google or Apple logo"
+    }
+  ],
+  "jobs": [
+    {
+      "set": "S1",
+      "type": "icons",
+      "file": "S1-icons.png",
+      "prompt": "Generate an original LocalVoice in-app asset concept sheet for visual selection, NOT production-ready sliced assets, NOT a full app screen. The three supplied screenshots are design references ONLY: use their calm green/ivory palette and spacious feel, do not copy their text, logos or phone layout. LocalVoice is a location-aware audio story guide for travel, walks, business trips and commuting. No compass navigation, no camera, no AI robot, no microphone-recording symbolism, no third-party logos, no watermark. Refined travel-journal editorial illustration. Deep forest green #075747 uniform fine-but-legible rounded outline strokes, pale sage, muted sand and pale water-blue accents on warm ivory #FBFAF5. Icons must be clean precise geometric outlines with a small amount of soft flat fill, NOT scratchy hand scribbles. Illustrations can use delicate ink contours and a restrained pale watercolor wash with lots of whitespace. Calm, thoughtful, mature; inspired by the supplied screen concept art. Asset type: numbered UI icon contact sheet. Portrait canvas, EXACTLY SIX COLUMNS by SEVEN ROWS, 42 evenly spaced cells, generous margins, tidy subtle grid dividers, all icon centers aligned, same apparent icon size and same style. Every cell contains ONE distinct icon plus only its tiny two-digit ID below it in neutral gray sans-serif. No other text, header or descriptive words. Read left to right, top to bottom. The motifs and IDs in exact order are: 01 simple house; 02 speaker with two sound arcs; 03 three-panel folded map; 04 clock with backward arrow; 05 six-tooth gear; 06 person bust; 07 right-pointing filled triangle; 08 solid square; 09 triangle with one right stop bar; 10 open book; 11 two overlapping speech bubbles; 12 speech bubble with a horizontal minus; 13 old stone column with small clock; 14 simple architectural arch and roof; 15 one tree and leaf; 16 bowl with chopsticks; 17 one rounded festival lantern; 18 two small neighborhood houses; 19 simple factory roof and chimney; 20 single flower and small sun; 21 shield with checkmark; 22 bell with diagonal slash; 23 two person busts; 24 paper plane; 25 small radar circle and sweep; 26 walking person side view; 27 simple bicycle; 28 small car front view; 29 ordinary train front view; 30 streamlined bullet-train nose in profile; 31 ferry and two simple water strokes; 32 location crosshair with center dot; 33 cloud with diagonal slash; 34 suitcase; 35 briefcase; 36 train above a small briefcase; 37 simple thumbs up; 38 small brain with checkmark; 39 simple thumbs down; 40 flag with an exclamation mark; 41 padlock; 42 three centered dots. Use clear conventional control shapes; no ornaments inside play/stop/next icons. Keep cultural/category icons differentiated. Each icon should stand alone on the ivory page with no enclosing tile unless integral to its motif. No perspective view for operational controls."
+    },
+    {
+      "set": "S1",
+      "type": "illustrations",
+      "file": "S1-illustrations.png",
+      "prompt": "Generate an original LocalVoice in-app asset concept sheet for visual selection, NOT production-ready sliced assets, NOT a full app screen. The three supplied screenshots are design references ONLY: use their calm green/ivory palette and spacious feel, do not copy their text, logos or phone layout. LocalVoice is a location-aware audio story guide for travel, walks, business trips and commuting. No compass navigation, no camera, no AI robot, no microphone-recording symbolism, no third-party logos, no watermark. Refined travel-journal editorial illustration. Deep forest green #075747 uniform fine-but-legible rounded outline strokes, pale sage, muted sand and pale water-blue accents on warm ivory #FBFAF5. Icons must be clean precise geometric outlines with a small amount of soft flat fill, NOT scratchy hand scribbles. Illustrations can use delicate ink contours and a restrained pale watercolor wash with lots of whitespace. Calm, thoughtful, mature; inspired by the supplied screen concept art. Asset type: six small empty-state and hero illustrations, assembled as a landscape contact sheet. EXACTLY THREE COLUMNS and TWO ROWS. Six distinct spacious vignettes, consistent scale and lighting, each fully contained in its own region with wide ivory gutters, no touching or merging. Only a tiny ID centered below each vignette, no other text. Top row left to right: I01: a small wide coastal town vignette: hillside houses, a short riverside alley, one little ferry, quiet green hills. Generic place, not a specific tourist landmark. No device or brand logo; I02: a folded map next to a simple pair of earphones, with one small town house and one tree rising softly behind it. Welcoming discovery scene, no map route arrows; I03: a quiet tree and a little park bench, beside a very simple small listening ear/sound cue. Peaceful attentive pause. No loading spinner or progress bar. Bottom row left to right: I04: a closed travel notebook, a pencil and a small suitcase beside one leaf. Blank unmarked cover, relaxed invitation to start a first journey; I05: a simple neutral smartphone standing beside a tiny cloud with a short diagonal slash; two footprint dots remain inside the phone and a small shield/check conveys local saving. No arrows to the cloud, no fake offline navigation, no interface text; I06: a small ivory envelope and a green shield with a check, supported by one subtle leaf. Clear reassuring account verification illustration, no Google or Apple logo. Draw welcoming editorial artwork, no full UI or screen labels; keep generous whitespace. I05 phone is only a simple object in its vignette."
+    },
+    {
+      "set": "S2",
+      "type": "icons",
+      "file": "S2-icons.png",
+      "prompt": "Generate an original LocalVoice in-app asset concept sheet for visual selection, NOT production-ready sliced assets, NOT a full app screen. The three supplied screenshots are design references ONLY: use their calm green/ivory palette and spacious feel, do not copy their text, logos or phone layout. LocalVoice is a location-aware audio story guide for travel, walks, business trips and commuting. No compass navigation, no camera, no AI robot, no microphone-recording symbolism, no third-party logos, no watermark. Friendly contemporary flat illustration system. Bold rounded geometric silhouettes with disciplined moderate line width, deep forest green #075747 primary, sage #AACBB9, warm amber #E4B56E and muted sky-blue #91BCCB accents, warm ivory background #FBFAF5. Two or three solid colors per icon, slightly softer corners and fuller shapes than standard outline icons. No gradients, no shadows, no cartoon faces in controls. Warm, inviting and highly legible; consistent with LocalVoice's green identity. Asset type: numbered UI icon contact sheet. Portrait canvas, EXACTLY SIX COLUMNS by SEVEN ROWS, 42 evenly spaced cells, generous margins, tidy subtle grid dividers, all icon centers aligned, same apparent icon size and same style. Every cell contains ONE distinct icon plus only its tiny two-digit ID below it in neutral gray sans-serif. No other text, header or descriptive words. Read left to right, top to bottom. The motifs and IDs in exact order are: 01 simple house; 02 speaker with two sound arcs; 03 three-panel folded map; 04 clock with backward arrow; 05 six-tooth gear; 06 person bust; 07 right-pointing filled triangle; 08 solid square; 09 triangle with one right stop bar; 10 open book; 11 two overlapping speech bubbles; 12 speech bubble with a horizontal minus; 13 old stone column with small clock; 14 simple architectural arch and roof; 15 one tree and leaf; 16 bowl with chopsticks; 17 one rounded festival lantern; 18 two small neighborhood houses; 19 simple factory roof and chimney; 20 single flower and small sun; 21 shield with checkmark; 22 bell with diagonal slash; 23 two person busts; 24 paper plane; 25 small radar circle and sweep; 26 walking person side view; 27 simple bicycle; 28 small car front view; 29 ordinary train front view; 30 streamlined bullet-train nose in profile; 31 ferry and two simple water strokes; 32 location crosshair with center dot; 33 cloud with diagonal slash; 34 suitcase; 35 briefcase; 36 train above a small briefcase; 37 simple thumbs up; 38 small brain with checkmark; 39 simple thumbs down; 40 flag with an exclamation mark; 41 padlock; 42 three centered dots. Use clear conventional control shapes; no ornaments inside play/stop/next icons. Keep cultural/category icons differentiated. Each icon should stand alone on the ivory page with no enclosing tile unless integral to its motif. No perspective view for operational controls."
+    },
+    {
+      "set": "S2",
+      "type": "illustrations",
+      "file": "S2-illustrations.png",
+      "prompt": "Generate an original LocalVoice in-app asset concept sheet for visual selection, NOT production-ready sliced assets, NOT a full app screen. The three supplied screenshots are design references ONLY: use their calm green/ivory palette and spacious feel, do not copy their text, logos or phone layout. LocalVoice is a location-aware audio story guide for travel, walks, business trips and commuting. No compass navigation, no camera, no AI robot, no microphone-recording symbolism, no third-party logos, no watermark. Friendly contemporary flat illustration system. Bold rounded geometric silhouettes with disciplined moderate line width, deep forest green #075747 primary, sage #AACBB9, warm amber #E4B56E and muted sky-blue #91BCCB accents, warm ivory background #FBFAF5. Two or three solid colors per icon, slightly softer corners and fuller shapes than standard outline icons. No gradients, no shadows, no cartoon faces in controls. Warm, inviting and highly legible; consistent with LocalVoice's green identity. Asset type: six small empty-state and hero illustrations, assembled as a landscape contact sheet. EXACTLY THREE COLUMNS and TWO ROWS. Six distinct spacious vignettes, consistent scale and lighting, each fully contained in its own region with wide ivory gutters, no touching or merging. Only a tiny ID centered below each vignette, no other text. Top row left to right: I01: a small wide coastal town vignette: hillside houses, a short riverside alley, one little ferry, quiet green hills. Generic place, not a specific tourist landmark. No device or brand logo; I02: a folded map next to a simple pair of earphones, with one small town house and one tree rising softly behind it. Welcoming discovery scene, no map route arrows; I03: a quiet tree and a little park bench, beside a very simple small listening ear/sound cue. Peaceful attentive pause. No loading spinner or progress bar. Bottom row left to right: I04: a closed travel notebook, a pencil and a small suitcase beside one leaf. Blank unmarked cover, relaxed invitation to start a first journey; I05: a simple neutral smartphone standing beside a tiny cloud with a short diagonal slash; two footprint dots remain inside the phone and a small shield/check conveys local saving. No arrows to the cloud, no fake offline navigation, no interface text; I06: a small ivory envelope and a green shield with a check, supported by one subtle leaf. Clear reassuring account verification illustration, no Google or Apple logo. Draw welcoming editorial artwork, no full UI or screen labels; keep generous whitespace. I05 phone is only a simple object in its vignette."
+    },
+    {
+      "set": "S3",
+      "type": "icons",
+      "file": "S3-icons.png",
+      "prompt": "Generate an original LocalVoice in-app asset concept sheet for visual selection, NOT production-ready sliced assets, NOT a full app screen. The three supplied screenshots are design references ONLY: use their calm green/ivory palette and spacious feel, do not copy their text, logos or phone layout. LocalVoice is a location-aware audio story guide for travel, walks, business trips and commuting. No compass navigation, no camera, no AI robot, no microphone-recording symbolism, no third-party logos, no watermark. Restrained premium soft-dimensional illustration system. Very simple rounded matte clay/paper objects, shallow 2.5D relief depth, gentle top-left studio lighting and small soft shadows; NOT shiny glossy plastic, NOT photorealism, NOT complex isometric environments. Deep forest green #075747, soft mint, ivory and one muted amber/blue accent on warm ivory #FBFAF5. Controls must keep absolutely conventional recognizable front-facing silhouettes and generous simple negative space. Mature playful touch, coherent objects and consistent view angle. Asset type: numbered UI icon contact sheet. Portrait canvas, EXACTLY SIX COLUMNS by SEVEN ROWS, 42 evenly spaced cells, generous margins, tidy subtle grid dividers, all icon centers aligned, same apparent icon size and same style. Every cell contains ONE distinct icon plus only its tiny two-digit ID below it in neutral gray sans-serif. No other text, header or descriptive words. Read left to right, top to bottom. The motifs and IDs in exact order are: 01 simple house; 02 speaker with two sound arcs; 03 three-panel folded map; 04 clock with backward arrow; 05 six-tooth gear; 06 person bust; 07 right-pointing filled triangle; 08 solid square; 09 triangle with one right stop bar; 10 open book; 11 two overlapping speech bubbles; 12 speech bubble with a horizontal minus; 13 old stone column with small clock; 14 simple architectural arch and roof; 15 one tree and leaf; 16 bowl with chopsticks; 17 one rounded festival lantern; 18 two small neighborhood houses; 19 simple factory roof and chimney; 20 single flower and small sun; 21 shield with checkmark; 22 bell with diagonal slash; 23 two person busts; 24 paper plane; 25 small radar circle and sweep; 26 walking person side view; 27 simple bicycle; 28 small car front view; 29 ordinary train front view; 30 streamlined bullet-train nose in profile; 31 ferry and two simple water strokes; 32 location crosshair with center dot; 33 cloud with diagonal slash; 34 suitcase; 35 briefcase; 36 train above a small briefcase; 37 simple thumbs up; 38 small brain with checkmark; 39 simple thumbs down; 40 flag with an exclamation mark; 41 padlock; 42 three centered dots. Use clear conventional control shapes; no ornaments inside play/stop/next icons. Keep cultural/category icons differentiated. Each icon should stand alone on the ivory page with no enclosing tile unless integral to its motif. No perspective view for operational controls."
+    },
+    {
+      "set": "S3",
+      "type": "illustrations",
+      "file": "S3-illustrations.png",
+      "prompt": "Generate an original LocalVoice in-app asset concept sheet for visual selection, NOT production-ready sliced assets, NOT a full app screen. The three supplied screenshots are design references ONLY: use their calm green/ivory palette and spacious feel, do not copy their text, logos or phone layout. LocalVoice is a location-aware audio story guide for travel, walks, business trips and commuting. No compass navigation, no camera, no AI robot, no microphone-recording symbolism, no third-party logos, no watermark. Restrained premium soft-dimensional illustration system. Very simple rounded matte clay/paper objects, shallow 2.5D relief depth, gentle top-left studio lighting and small soft shadows; NOT shiny glossy plastic, NOT photorealism, NOT complex isometric environments. Deep forest green #075747, soft mint, ivory and one muted amber/blue accent on warm ivory #FBFAF5. Controls must keep absolutely conventional recognizable front-facing silhouettes and generous simple negative space. Mature playful touch, coherent objects and consistent view angle. Asset type: six small empty-state and hero illustrations, assembled as a landscape contact sheet. EXACTLY THREE COLUMNS and TWO ROWS. Six distinct spacious vignettes, consistent scale and lighting, each fully contained in its own region with wide ivory gutters, no touching or merging. Only a tiny ID centered below each vignette, no other text. Top row left to right: I01: a small wide coastal town vignette: hillside houses, a short riverside alley, one little ferry, quiet green hills. Generic place, not a specific tourist landmark. No device or brand logo; I02: a folded map next to a simple pair of earphones, with one small town house and one tree rising softly behind it. Welcoming discovery scene, no map route arrows; I03: a quiet tree and a little park bench, beside a very simple small listening ear/sound cue. Peaceful attentive pause. No loading spinner or progress bar. Bottom row left to right: I04: a closed travel notebook, a pencil and a small suitcase beside one leaf. Blank unmarked cover, relaxed invitation to start a first journey; I05: a simple neutral smartphone standing beside a tiny cloud with a short diagonal slash; two footprint dots remain inside the phone and a small shield/check conveys local saving. No arrows to the cloud, no fake offline navigation, no interface text; I06: a small ivory envelope and a green shield with a check, supported by one subtle leaf. Clear reassuring account verification illustration, no Google or Apple logo. Draw welcoming editorial artwork, no full UI or screen labels; keep generous whitespace. I05 phone is only a simple object in its vignette."
+    }
+  ]
+}

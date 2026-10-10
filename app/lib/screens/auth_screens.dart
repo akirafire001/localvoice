@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../auth/auth_service.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
+import '../widgets/visuals.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -33,18 +34,24 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.all(24),
           children: [
             const SizedBox(height: 32),
-            Text('LocalVoice', style: Theme.of(context).textTheme.headlineLarge, textAlign: TextAlign.center),
+            const Center(child: LvBrandTitle(large: true)),
             const SizedBox(height: 8),
             Text(tr('移動中に、その土地の話を。', 'Stories of the place you are passing.'), textAlign: TextAlign.center),
-            const SizedBox(height: 32),
+            const SizedBox(height: 12),
+            const LvIllustration(LvArtwork.loginLandscape, height: 150),
+            const SizedBox(height: 20),
             AutofillGroup(
               child: Column(
                 children: [
                   TextField(
                     controller: _id,
                     autofillHints: const [AutofillHints.username],
-                    decoration: InputDecoration(labelText: tr('ログインID', 'Login ID')),
+                    decoration: InputDecoration(
+                      labelText: tr('ログインID', 'Login ID'),
+                      prefixIcon: const Padding(padding: EdgeInsets.all(12), child: LvIcon(LvIconKind.account)),
+                    ),
                   ),
+                  const SizedBox(height: 12),
                   PasswordField(controller: _pw, autofill: AutofillHints.password),
                 ],
               ),
@@ -103,15 +110,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(tr('新規登録', 'Create account'))),
+      appBar: LvAppBar(title: Text(tr('新規登録', 'Create account'))),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          const LvIllustration(LvArtwork.homeDiscovery, height: 110),
+          const SizedBox(height: 16),
           TextField(
             controller: _id,
             autofillHints: const [AutofillHints.newUsername],
             decoration: InputDecoration(
               labelText: tr('ログインID', 'Login ID'),
+              prefixIcon: const Padding(padding: EdgeInsets.all(12), child: LvIcon(LvIconKind.account)),
               helperText: tr('英数字と . _ - の3〜32文字', '3–32 letters, digits, . _ -'),
             ),
           ),
@@ -125,13 +135,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           TextField(
             controller: _name,
-            decoration: InputDecoration(labelText: tr('表示名（任意）', 'Display name (optional)')),
+            decoration: InputDecoration(
+              labelText: tr('表示名（任意）', 'Display name (optional)'),
+              prefixIcon: const Padding(padding: EdgeInsets.all(12), child: LvIcon(LvIconKind.account)),
+            ),
           ),
           TextField(
             controller: _mail,
             keyboardType: TextInputType.emailAddress,
             decoration: InputDecoration(
               labelText: tr('回復用メール（任意）', 'Recovery email (optional)'),
+              prefixIcon: const Padding(padding: EdgeInsets.all(12), child: LvIcon(LvIconKind.email)),
               helperText: tr('パスワードを忘れたときの再設定に使います', 'Used to reset a forgotten password'),
             ),
           ),
@@ -153,7 +167,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     });
                     if (!context.mounted) return;
                     setState(() => _busy = false);
-                    if (ok == true) Navigator.of(context).popUntil((r) => r.isFirst);
+                    if (ok == true) {
+                      Navigator.of(context).popUntil((r) => r.isFirst);
+                    }
                   },
             child: Text(tr('登録する', 'Create account')),
           ),
@@ -179,16 +195,21 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
   Widget build(BuildContext context) {
     final auth = context.read<AuthService>();
     return Scaffold(
-      appBar: AppBar(title: Text(tr('パスワード再設定', 'Reset password'))),
+      appBar: LvAppBar(title: Text(tr('パスワード再設定', 'Reset password'))),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          const LvIllustration(LvArtwork.passwordReset, height: 140),
+          const SizedBox(height: 16),
           Text(
             tr('確認済みの回復用メールがある場合、再設定コードを送ります。', 'If you have a verified recovery email, we will send a reset code.'),
           ),
           TextField(
             controller: _id,
-            decoration: InputDecoration(labelText: tr('ログインID', 'Login ID')),
+            decoration: InputDecoration(
+              labelText: tr('ログインID', 'Login ID'),
+              prefixIcon: const Padding(padding: EdgeInsets.all(12), child: LvIcon(LvIconKind.account)),
+            ),
           ),
           const SizedBox(height: 8),
           OutlinedButton(
@@ -204,7 +225,10 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
             const Divider(height: 32),
             TextField(
               controller: _token,
-              decoration: InputDecoration(labelText: tr('メールのコード', 'Code from the email')),
+              decoration: InputDecoration(
+                labelText: tr('メールのコード', 'Code from the email'),
+                prefixIcon: const Padding(padding: EdgeInsets.all(12), child: LvIcon(LvIconKind.email)),
+              ),
             ),
             PasswordField(controller: _pw, label: tr('新しいパスワード', 'New password'), autofill: AutofillHints.newPassword),
             const SizedBox(height: 16),
@@ -238,13 +262,18 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
   final _token = TextEditingController();
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(tr('メール確認', 'Verify email'))),
+    appBar: LvAppBar(title: Text(tr('メール確認', 'Verify email'))),
     body: ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        const LvIllustration(LvArtwork.mailPending, height: 140),
+        const SizedBox(height: 16),
         TextField(
           controller: _token,
-          decoration: InputDecoration(labelText: tr('メールのコード', 'Code from the email')),
+          decoration: InputDecoration(
+            labelText: tr('メールのコード', 'Code from the email'),
+            prefixIcon: const Padding(padding: EdgeInsets.all(12), child: LvIcon(LvIconKind.email)),
+          ),
         ),
         const SizedBox(height: 16),
         FilledButton(

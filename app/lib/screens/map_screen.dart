@@ -7,6 +7,7 @@ import '../location/track.dart';
 import '../util/i18n.dart';
 import '../widgets/common.dart';
 import '../widgets/track_map.dart';
+import '../widgets/visuals.dart';
 import 'history_screen.dart';
 import 'home_screen.dart';
 
@@ -104,7 +105,7 @@ class _MapScreenState extends State<MapScreen> {
     final pos = s.lastPosition;
     final showCurrent = s.active && s.tripId == _tripId && pos != null;
     return Scaffold(
-      appBar: AppBar(
+      appBar: LvAppBar(
         title: Text(tr('地図', 'Map')),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -144,9 +145,13 @@ class _MapScreenState extends State<MapScreen> {
           if (!_loading && _points.isEmpty)
             Center(
               child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(tr('表示できる移動記録がありません', 'No track to show')),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: LvEmptyState(
+                    artwork: LvArtwork.emptyMap,
+                    compact: true,
+                    message: tr('表示できる移動記録がありません', 'No track to show'),
+                  ),
                 ),
               ),
             ),
