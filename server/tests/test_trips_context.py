@@ -276,7 +276,7 @@ def test_pacing_is_explained_and_speaking_is_not_interrupted(app, client):
     t = register(client)
     add_item(app, "A", LAT + 0.001, LON)
     add_item(app, "B", LAT - 0.001, LON)
-    trip = _trip(client, t)
+    trip = _trip(client, t, notification_level="normal")
     first = _send(client, t, trip, ctx(LAT, LON))
     d = first["decision"]
     assert first["guide"] is not None
@@ -344,3 +344,9 @@ def test_continue_respects_quiet_mode(app, client):
     r = client.post(f"/api/v1/guides/{first['history_id']}/feedback", headers=auth(t),
                     json={"action": "continue"}).get_json()
     assert r["guide"] is None and r["decision"]["reason"] == "quiet_mode"
+
+
+def test_new_users_default_to_continuous(client):
+    t = register(client)
+    p = client.get("/api/v1/users/me/preferences", headers=auth(t)).get_json()
+    assert p["notification_level"] == "continuous"

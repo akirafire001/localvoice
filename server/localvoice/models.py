@@ -54,7 +54,7 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # ISO 3166 code (lower case) of the country the user lives in: country-wide manners are told only elsewhere
     home_country: Mapped[str] = mapped_column(String(2), default="jp", server_default="jp")
-    notification_level: Mapped[str] = mapped_column(String(20), default="normal")
+    notification_level: Mapped[str] = mapped_column(String(20), default="continuous")  # prefs.DEFAULT_NOTIFICATION_LEVEL
     detail_mode: Mapped[str] = mapped_column(String(20), default="auto")
     serendipity_level: Mapped[str] = mapped_column(String(20), default="normal")
     voice_settings_json: Mapped[dict] = mapped_column(JSONB, default=dict)
