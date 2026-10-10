@@ -22,7 +22,7 @@ from ..models import (
 from ..util import now, parse_datetime, parse_uuid
 from . import commands, geo
 from .languages import narration_languages
-from .prefs import CATEGORIES, NOTIFICATION_LEVELS, trip_settings
+from .prefs import CATEGORIES, DEFAULT_NOTIFICATION_LEVEL, NOTIFICATION_LEVELS, trip_settings
 from .ranking import (
     active_boosts,
     fetch_candidates,
@@ -247,7 +247,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     t = now()
     settings = trip_settings(trip, user)
     mode = trip.selection_mode
-    level = dict(NOTIFICATION_LEVELS.get(settings["notification_level"], NOTIFICATION_LEVELS["normal"]))
+    level = dict(NOTIFICATION_LEVELS.get(settings["notification_level"], NOTIFICATION_LEVELS[DEFAULT_NOTIFICATION_LEVEL]))
     # "continue": continuous mode asking for the next story as one ends. It skips the cooldown like a tap on
     # "next", but quiet mode still holds and it counts as an automatic guide.
     manual = trigger not in ("context", "continue")
@@ -551,7 +551,7 @@ def _log_llm_usage(db, trip_id, sel, provider):
 
 def cooldown_sec(trip, user):
     level = trip_settings(trip, user)["notification_level"]
-    return NOTIFICATION_LEVELS.get(level, NOTIFICATION_LEVELS["normal"])["cooldown_sec"]
+    return NOTIFICATION_LEVELS.get(level, NOTIFICATION_LEVELS[DEFAULT_NOTIFICATION_LEVEL])["cooldown_sec"]
 
 
 def describe_pacing(result, trip, user):
@@ -559,7 +559,7 @@ def describe_pacing(result, trip, user):
     decision = result.setdefault("decision", {})
     level = trip_settings(trip, user)["notification_level"]
     if level not in NOTIFICATION_LEVELS:
-        level = "normal"
+        level = DEFAULT_NOTIFICATION_LEVEL
     decision["notification_level"] = level
     decision["cooldown_sec"] = NOTIFICATION_LEVELS[level]["cooldown_sec"]
     return result

@@ -31,6 +31,7 @@ void main() {
   });
 
   test('cooldown shows the time left and the pace in seconds', () {
+    s.notificationLevel = 'normal';
     s.decision = {'reason': 'selected', 'cooldown_sec': 360, 'notification_level': 'normal'};
     s.nextCheckAt = now.add(const Duration(seconds: 135));
     final a = activityOf(s, audio, now)!;
@@ -56,7 +57,10 @@ void main() {
     expect(activityOf(s, audio, now)!.busy, isTrue);
   });
 
-  test('continuous mode follows the server and explains itself', () {
+  test('continuous is the default and explains itself', () {
+    expect(s.continuous, isTrue);
+    s.applyPrefs({'notification_level': 'normal'});
+    expect(s.continuous, isFalse);
     s.applyPrefs({'notification_level': 'continuous'});
     expect(s.continuous, isTrue);
     s.continuing = true;

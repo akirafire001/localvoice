@@ -13,6 +13,8 @@ CATEGORIES = [
     "practical",      # 実用・安全
 ]
 
+# New users and anything unknown get the next story right after one ends (土居輝, 2026-10-10).
+DEFAULT_NOTIFICATION_LEVEL = "continuous"
 # Effectively no hourly cap for now; free users get a real cap back when paid plans exist.
 HOURLY_LIMIT = 1000
 NOTIFICATION_LEVELS = {
@@ -36,7 +38,7 @@ MAX_SAME_CATEGORY_IN_ROW = 3
 
 def trip_settings(trip, user):
     s = dict(trip.settings_json or {})
-    s.setdefault("notification_level", user.notification_level or "normal")
+    s.setdefault("notification_level", user.notification_level or DEFAULT_NOTIFICATION_LEVEL)
     s.setdefault("detail_mode", user.detail_mode or "auto")
     s.setdefault("serendipity", user.serendipity_level or "normal")
     return s

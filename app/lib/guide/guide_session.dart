@@ -79,7 +79,7 @@ class GuideSession extends ChangeNotifier {
   bool appInForeground = true;
 
   /// "How often to talk" (server NOTIFICATION_LEVELS key). "continuous" asks for the next story as one ends.
-  String notificationLevel = 'normal';
+  String notificationLevel = 'continuous';
   bool get continuous => notificationLevel == 'continuous';
 
   /// The server's latest answer on why nothing is being told (reason, cooldown_sec, searching, ...) and when
