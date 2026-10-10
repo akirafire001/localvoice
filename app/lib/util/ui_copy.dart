@@ -1,4 +1,9 @@
 // Screen copy beyond Japanese and English. The key pairs the two source strings.
+const zh = 'zh';
+const ko = 'ko';
+const es = 'es';
+const fr = 'fr';
+
 const uiCopy = <String, Map<String, String>>{
   '（未確認）|| (unverified)': {zh: '（未验证）', ko: ' (미확인)', es: ' (sin verificar)', fr: ' (non vérifié)'},
   '15文字以上。単語を並べた長めのフレーズがおすすめです。||15+ characters. A long phrase of words works well.': {zh: '至少15个字符。把几个词连成一句比较好记。', ko: '15자 이상. 단어를 이어 붙인 긴 문구를 권합니다.', es: '15 caracteres o más. Una frase larga de palabras funciona bien.', fr: '15 caractères ou plus. Une longue phrase de mots est plus sûre.'},
