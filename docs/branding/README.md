@@ -9,6 +9,7 @@
 | ファイル | 用途 |
 | --- | --- |
 | [app-icon-1024.png](app-icon-1024.png) | 共通の1024pxアプリアイコン |
+| [play-store-icon-512.png](play-store-icon-512.png) | Google Playのストア掲載用。512px、32bit PNG、完全不透明 |
 | [favicon.ico](favicon.ico) | 16 / 32 / 48 / 64pxを格納したfavicon |
 | [favicon-16.png](favicon-16.png), [favicon-32.png](favicon-32.png), [favicon-48.png](favicon-48.png) | PNG形式のfavicon |
 | [apple-touch-icon.png](apple-touch-icon.png) | 180pxのWebクリップ用アイコン |

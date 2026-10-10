@@ -1,7 +1,15 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val uploadKeyProperties = Properties()
+val uploadKeyPropertiesFile = rootProject.file("key.properties")
+if (uploadKeyPropertiesFile.exists()) {
+    uploadKeyPropertiesFile.inputStream().use { uploadKeyProperties.load(it) }
 }
 
 android {
@@ -17,8 +25,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.localvoice.localvoice"
+        // Registered package in Google Play Console.
+        applicationId = "tech.ideaworks.localvoice"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -40,12 +48,18 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        create("release") {
+            storeFile = uploadKeyProperties.getProperty("storeFile")?.let { file(it) }
+            storePassword = uploadKeyProperties.getProperty("storePassword")
+            keyAlias = uploadKeyProperties.getProperty("keyAlias")
+            keyPassword = uploadKeyProperties.getProperty("keyPassword")
+        }
     }
 
     buildTypes {
         release {
-            // TODO: use a real upload key before publishing; register its SHA-1 in Google Cloud too.
-            signingConfig = signingConfigs.getByName("debug")
+            // Never upload a development-key-signed build to Google Play.
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

@@ -202,7 +202,8 @@ def test_hourly_limit_and_notification_level(app, client):
 def test_preferences_and_interests(client):
     t = register(client)
     p = client.get("/api/v1/users/me/preferences", headers=auth(t)).get_json()
-    assert p["voice"]["enabled"] is False
+    assert p["voice"]["enabled"] is True
+    assert p["voice"]["allow_device_tts_fallback"] is True
     r = client.patch(
         "/api/v1/users/me/preferences",
         headers=auth(t),
