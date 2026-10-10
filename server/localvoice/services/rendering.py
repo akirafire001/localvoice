@@ -3,6 +3,17 @@ from .languages import LANGUAGES
 
 
 def item_texts(item, language, detail_mode="auto"):
+    if language not in ("ja", "en"):
+        from .translation import localized_story
+
+        story = localized_story(item, language)
+        if story and (story.get("short") or story.get("body")):
+            title = story.get("title") or item.title_en or item.title
+            short = story.get("short") or story.get("body") or ""
+            body = story.get("body") or short
+            text = body if detail_mode == "detailed" else short
+            return title, text, body
+        language = "en" if (item.short_en or item.body_en or item.title_en) else "ja"
     if language == "en":
         title = item.title_en or item.title
         short, body = item.short_en, item.body_en

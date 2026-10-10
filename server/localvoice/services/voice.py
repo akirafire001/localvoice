@@ -14,7 +14,7 @@ from datetime import timedelta
 
 import requests
 from flask import current_app
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from ..models import ApiUsageLog, AudioAsset, KnowledgeItem
@@ -268,6 +268,55 @@ def delete_user_audio_files(db, user_id):
         n += 1
     db.flush()
     return n
+
+
+def warm_narrations(db, *, item, speech, voices, trip_id, user_id, detail_mode):
+    """Synthesize one prepared story's shared audio and private intro for each narration language.
+
+    `voices` maps a language to the traveller's voice_profile_id. Returns the speech snapshot with any
+    translated bodies filled in, so a later playback request hits this cache instead of generating again.
+    """
+    from .translation import ensure_story, spoken_text
+
+    provider = get_provider()
+    narrations = []
+    private_count = None
+    for n in speech.get("narrations") or []:
+        lang = n.get("language")
+        vid = voices.get(lang)
+        body, intro = n.get("body"), n.get("intro")
+        if body is None and lang:
+            story = ensure_story(db, item, lang, trip_id=trip_id)
+            if story is not None:
+                body = spoken_text(story, detail_mode)
+        narrations.append({**n, "body": body})
+        if provider is None or not vid or vid not in VOICE_PROFILES or VOICE_PROFILES[vid]["language"] != lang:
+            continue
+        if body:
+            asset, prov = get_or_create_asset(
+                db, text=body, language=lang, voice_profile_id=vid, scope="shared",
+                content_version=item.content_version, knowledge_item_id=item.id,
+                user_id=user_id, trip_id=trip_id, valid_until=item.valid_until,
+            )
+            if asset is not None and asset.status in ("pending", "invalidated"):
+                synthesize_asset(db, asset, prov)
+        if not intro:
+            continue
+        if private_count is None:
+            private_count = db.execute(
+                select(func.count()).select_from(AudioAsset).where(AudioAsset.trip_session_id == trip_id)
+            ).scalar_one()
+        if private_count >= PRIVATE_ASSETS_PER_TRIP:
+            continue
+        asset, prov = get_or_create_asset(
+            db, text=intro, language=lang, voice_profile_id=vid, scope="private",
+            content_version=item.content_version, knowledge_item_id=item.id,
+            user_id=user_id, trip_id=trip_id, valid_until=item.valid_until,
+        )
+        private_count += 1
+        if asset is not None and asset.status in ("pending", "invalidated"):
+            synthesize_asset(db, asset, prov)
+    return {**speech, "narrations": narrations}
 
 
 def sample_asset(db, voice_profile_id):

@@ -147,7 +147,7 @@ def add_participant(trip_id):
     name = require_str(data, "display_name", max_len=100)
     locale = data.get("locale")
     if locale is not None and locale not in LANGUAGES:
-        raise bad_request("locale must be ja or en", {"field": "locale"})
+        raise bad_request(f"locale must be one of {sorted(LANGUAGES)}", {"field": "locale"})
     home = require_str(data, "home_region", max_len=200, required=False)
     interests = data.get("interests") or []
     if not isinstance(interests, list) or any(c not in commands.CATEGORY_WORDS for c in interests):

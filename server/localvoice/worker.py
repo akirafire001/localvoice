@@ -12,7 +12,7 @@ from sqlalchemy import delete, select
 from .auth import crypto
 from .auth.providers import ProviderTokenInvalid, ProviderUnavailable, apple
 from .models import AuthChallenge, ContextSnapshot, LoginAttempt, OAuthRevocationJob, TripSession
-from .services import knowledge_gen, memory
+from .services import knowledge_gen, memory, next_story
 from .util import now
 
 log = logging.getLogger(__name__)
@@ -60,8 +60,9 @@ def process_revocations(app):
 def refresh_summaries(app):
     db = _db(app)
     try:
+        # Ended trips are included: finish marks the summary dirty and returns without the LLM.
         trips = db.execute(
-            select(TripSession).where(TripSession.ended_at.is_(None), TripSession.state_json["summary_dirty"].as_boolean().is_(True)).limit(10)
+            select(TripSession).where(TripSession.state_json["summary_dirty"].as_boolean().is_(True)).limit(10)
         ).scalars().all()
         for trip in trips:
             memory.update_summary(db, trip)
@@ -113,6 +114,7 @@ def run_forever(app, idle_sleep=2.0):
             worked += process_audio(app) or 0
             process_revocations(app)
             refresh_summaries(app)
+            next_story.prepare_upcoming(app)
             if time.time() - last_cleanup > 3600:
                 cleanup(app)
                 last_cleanup = time.time()

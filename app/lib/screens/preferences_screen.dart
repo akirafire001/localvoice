@@ -85,6 +85,10 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   List<Map<String, dynamic>> _uiLanguages = const [
     {'code': 'ja', 'name': '日本語'},
     {'code': 'en', 'name': 'English'},
+    {'code': 'zh', 'name': '中文'},
+    {'code': 'ko', 'name': '한국어'},
+    {'code': 'es', 'name': 'Español'},
+    {'code': 'fr', 'name': 'Français'},
   ];
   List<Map<String, dynamic>> _narrationLanguages = const [];
   int _maxNarrationLanguages = 4;
@@ -122,7 +126,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     if (r == null || !mounted) return;
     setState(() => _prefs = r.json);
     audio.applyPrefs(r.json);
-    lang.set(r.json['language'] as String? ?? 'ja');
+    lang.set(r.json['language'] as String? ?? uiLanguageForDevice());
   }
 
   Future<void> _setInterest(String cat, double? score) async {
@@ -172,7 +176,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       );
     }
     final voice = (p['voice'] as Map).cast<String, dynamic>();
-    final language = p['language'] as String? ?? 'ja';
+    final language = p['language'] as String? ?? uiLanguageForDevice();
     final narration = ((p['narration_languages'] ?? [language]) as List).cast<String>();
     return Scaffold(
       appBar: LvAppBar(title: Text(tr('設定', 'Settings'))),
@@ -424,7 +428,14 @@ class _NarrationLanguages extends StatelessWidget {
             child: TextButton.icon(
               icon: const Icon(Icons.add),
               label: Text(
-                selected.length >= max ? tr('言語は$max個まで選べます', 'Up to $max languages') : tr('言語を追加', 'Add a language'),
+                selected.length >= max
+                    ? tr('言語は$max個まで選べます', 'Up to $max languages', {
+                        'zh': '最多可选 $max 种语言',
+                        'ko': '언어는 최대 $max개까지입니다',
+                        'es': 'Hasta $max idiomas',
+                        'fr': 'Jusqu’à $max langues',
+                      })
+                    : tr('言語を追加', 'Add a language'),
               ),
               onPressed: selected.length >= max || selected.length >= catalog.length ? null : () => _add(context),
             ),

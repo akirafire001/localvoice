@@ -13,6 +13,7 @@ import 'ui_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  lang.set(uiLanguageForDevice());
   final api = ApiClient();
   final auth = AuthService(api);
   final audio = AudioController(api);
@@ -62,6 +63,7 @@ class _LocalVoiceAppState extends State<LocalVoiceApp> with WidgetsBindingObserv
     if (uid == _attachedUser) return;
     _attachedUser = uid;
     if (uid == null) {
+      lang.set(uiLanguageForDevice());
       await widget.session.detach();
       return;
     }
@@ -69,7 +71,7 @@ class _LocalVoiceAppState extends State<LocalVoiceApp> with WidgetsBindingObserv
     try {
       final prefs = (await widget.api.get('/api/v1/users/me/preferences')).json;
       widget.audio.applyPrefs(prefs);
-      lang.set(prefs['language'] as String? ?? 'ja');
+      lang.set(prefs['language'] as String? ?? uiLanguageForDevice());
     } catch (_) {}
     if (widget.session.active) await widget.session.startGps();
   }

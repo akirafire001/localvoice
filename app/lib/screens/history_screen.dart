@@ -139,7 +139,12 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            tr('ガイド ${s['guides']}件', '${s['guides']} guides'),
+                            tr('ガイド ${s['guides']}件', '${s['guides']} guides', {
+                              'zh': '${s['guides']} 条讲解',
+                              'ko': '가이드 ${s['guides']}개',
+                              'es': '${s['guides']} guías',
+                              'fr': '${s['guides']} récits',
+                            }),
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           if ((s['memory_summary'] as String?)?.isNotEmpty == true) ...[

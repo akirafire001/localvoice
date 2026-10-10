@@ -86,7 +86,12 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.fromLTRB(20, 20, 20, bottomGap(context)),
         children: [
           Text(
-            tr('こんにちは、${user?.displayName ?? ''}さん', 'Hello, ${user?.displayName ?? ''}'),
+            tr('こんにちは、${user?.displayName ?? ''}さん', 'Hello, ${user?.displayName ?? ''}', {
+              'zh': '你好，${user?.displayName ?? ''}',
+              'ko': '안녕하세요, ${user?.displayName ?? ''}님',
+              'es': 'Hola, ${user?.displayName ?? ''}',
+              'fr': 'Bonjour ${user?.displayName ?? ''}',
+            }),
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 20),

@@ -167,8 +167,21 @@ def test_finish_and_late_points(app, client):
     add_item(app, "A", LAT, LON)
     trip = _trip(client, t)
     _send(client, t, trip, ctx(LAT, LON))
+
+    class Summarizing:
+        def summarize(self, trip_row, hist):
+            raise AssertionError("finish must not wait on the summary model")
+
+    app.extensions["lv_llm"] = Summarizing()
     r = client.post(f"/api/v1/trips/{trip}/finish", headers=auth(t)).get_json()
     assert r["ended_at"] and r["summary"]["guides"] == 1
+    assert "これまでに話した話題" in r["summary"]["memory_summary"]
+    from uuid import UUID
+
+    from localvoice.models import TripSession
+
+    with session_scope(app) as db:
+        assert db.get(TripSession, UUID(trip)).state_json["summary_dirty"] is True
     res = _send(client, t, trip, ctx(LAT, LON, observed_at=iso_now(-30)))
     assert res["decision"]["reason"] == "trip_finished"
     assert len(client.get(f"/api/v1/trips/{trip}/track", headers=auth(t)).get_json()["points"]) == 2

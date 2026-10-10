@@ -21,6 +21,7 @@ from ..models import (
     PasswordCredential,
     User,
 )
+from ..services.languages import apply_device_language
 from ..util import json_body, now, parse_uuid, random_token, require_str, sha256_hex
 from . import crypto
 from .passwords import (
@@ -154,6 +155,7 @@ def register():
     if db.execute(select(PasswordCredential).where(PasswordCredential.login_id_normalized == norm)).first():
         raise conflict("login_id is already taken", "login_id_taken")
     user = User(display_name=display_name or login_id, locale=data.get("locale") or "ja")
+    apply_device_language(user, data)
     db.add(user)
     db.flush()
     db.add(
@@ -250,7 +252,8 @@ def _verify_google(token):
 @bp.post("/auth/google")
 def google_login():
     db = get_db()
-    claims = _verify_google(json_body().get("id_token"))
+    data = json_body()
+    claims = _verify_google(data.get("id_token"))
     ident = db.execute(
         select(AuthIdentity).where(AuthIdentity.provider == "google", AuthIdentity.subject == claims["sub"])
     ).scalar_one_or_none()
@@ -258,6 +261,7 @@ def google_login():
     if ident is None:
         # Never merge by email (auth-design §4): a new Google subject is a new user.
         user = User(display_name=(claims.get("name") or "")[:100] or None, locale="ja")
+        apply_device_language(user, data)
         db.add(user)
         db.flush()
         db.add(AuthIdentity(user_id=user.id, provider="google", subject=claims["sub"]))
@@ -393,7 +397,7 @@ def _queue_revocation(db, client_id, ciphertext, key_id):
     )
 
 
-def _apply_apple(db, ch, result, display_name=None):
+def _apply_apple(db, ch, result, display_name=None, device_language=None):
     ch.consumed_at = now()
     ident = db.execute(
         select(AuthIdentity).where(AuthIdentity.provider == "apple", AuthIdentity.subject == result["sub"])
@@ -402,6 +406,7 @@ def _apply_apple(db, ch, result, display_name=None):
         status = 200
         if ident is None:
             user = User(display_name=(display_name or "")[:100] or None, locale="ja")
+            apply_device_language(user, {"device_language": device_language})
             db.add(user)
             db.flush()
             ident = AuthIdentity(user_id=user.id, provider="apple", subject=result["sub"])
@@ -466,7 +471,7 @@ def _apple_native(data, purpose):
     code = require_str(data, "authorization_code")
     id_token = require_str(data, "id_token")
     result = _verify_apple_tokens(ch, id_token, code)
-    return _apply_apple(db, ch, result, data.get("display_name"))
+    return _apply_apple(db, ch, result, data.get("display_name"), data.get("device_language"))
 
 
 @bp.post("/auth/apple")
@@ -530,7 +535,7 @@ def apple_complete():
     _check_verifier(ch, data.get("code_verifier"))
     result = json.loads(crypto.decrypt(ch.result_ciphertext))
     ch.result_ciphertext = None
-    return _apply_apple(db, ch, result, result.get("display_name"))
+    return _apply_apple(db, ch, result, result.get("display_name"), data.get("device_language"))
 
 
 # ---------------------------------------------------------------- reauthenticate

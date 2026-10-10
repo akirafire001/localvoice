@@ -23,6 +23,7 @@ class GuideScreen extends StatefulWidget {
 class _GuideScreenState extends State<GuideScreen> {
   List<TrackPoint> _track = [];
   int _trackLoadedFor = -1;
+  bool _finishing = false;
 
   Future<void> _loadTrack(GuideSession s) async {
     if (s.store == null || s.tripId == null) return;
@@ -54,6 +55,7 @@ class _GuideScreenState extends State<GuideScreen> {
       ),
     );
     if (ok != true || !mounted) return;
+    setState(() => _finishing = true);
     await guarded(context, s.finishTrip);
     if (!mounted) return;
     // Back to home; the finished trip stays viewable from the history screen.
@@ -122,50 +124,77 @@ class _GuideScreenState extends State<GuideScreen> {
               ),
             ],
           ),
-          TextButton(onPressed: () => _finish(s), child: Text(tr('終了', 'Finish'))),
+          TextButton(
+            onPressed: _finishing ? null : () => _finish(s),
+            child: Text(tr('終了', 'Finish')),
+          ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          SizedBox(
-            height: MediaQuery.of(context).size.height / 3,
-            child: TrackMap(
-              compact: true,
-              points: _track,
-              current: pos == null ? null : TrackPoint(pos.timestamp, pos.latitude, pos.longitude, pos.accuracy),
-              currentAccuracyM: pos?.accuracy,
-              guides: [
-                for (final x in s.guides)
-                  if (x['location']?['lat'] != null)
-                    GuideMarker(
-                      (x['location']['lat'] as num).toDouble(),
-                      (x['location']['lon'] as num).toDouble(),
-                      x['title'] as String,
-                    ),
-              ],
+          Column(
+            children: [
+              SizedBox(
+                height: MediaQuery.of(context).size.height / 3,
+                child: TrackMap(
+                  compact: true,
+                  points: _track,
+                  current: pos == null ? null : TrackPoint(pos.timestamp, pos.latitude, pos.longitude, pos.accuracy),
+                  currentAccuracyM: pos?.accuracy,
+                  guides: [
+                    for (final x in s.guides)
+                      if (x['location']?['lat'] != null)
+                        GuideMarker(
+                          (x['location']['lat'] as num).toDouble(),
+                          (x['location']['lon'] as num).toDouble(),
+                          x['title'] as String,
+                        ),
+                  ],
+                ),
+              ),
+              _StatusBar(session: s),
+              Expanded(
+                child: g == null
+                    ? LvEmptyState(
+                        artwork: s.offline
+                            ? LvArtwork.offlineLocalSave
+                            : s.gps == GpsState.denied || s.gps == GpsState.serviceOff
+                            ? LvArtwork.locationPermission
+                            : LvArtwork.waitingForStory,
+                        message: s.offline
+                            ? tr(
+                                '通信が戻るまで移動を端末に記録します。',
+                                'Your movement is saved on this device until the connection returns.',
+                              )
+                            : tr(
+                                '近くに話題があればお知らせします。画面を閉じてもガイドは続きます。',
+                                'We will tell you when there is a story nearby. Guiding continues with the screen off.',
+                              ),
+                      )
+                    : GuideStoryCard(guide: g, session: s, audio: audio),
+              ),
+            ],
+          ),
+          if (_finishing) ...[
+            const Positioned.fill(
+              child: ModalBarrier(dismissible: false, color: Color(0x66000000)),
             ),
-          ),
-          _StatusBar(session: s),
-          Expanded(
-            child: g == null
-                ? LvEmptyState(
-                    artwork: s.offline
-                        ? LvArtwork.offlineLocalSave
-                        : s.gps == GpsState.denied || s.gps == GpsState.serviceOff
-                        ? LvArtwork.locationPermission
-                        : LvArtwork.waitingForStory,
-                    message: s.offline
-                        ? tr(
-                            '通信が戻るまで移動を端末に記録します。',
-                            'Your movement is saved on this device until the connection returns.',
-                          )
-                        : tr(
-                            '近くに話題があればお知らせします。画面を閉じてもガイドは続きます。',
-                            'We will tell you when there is a story nearby. Guiding continues with the screen off.',
-                          ),
-                  )
-                : GuideStoryCard(guide: g, session: s, audio: audio),
-          ),
+            Center(
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                      const SizedBox(width: 16),
+                      Text(tr('終了しています…', 'Finishing…')),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -220,7 +249,12 @@ class _StatusBar extends StatelessWidget {
         text = acc == null
             ? tr('位置情報を待っています…', 'Waiting for location…')
             : acc > 100
-            ? tr('位置の精度が低いため、案内を控えています（±${acc.round()}m）', 'Low accuracy (±${acc.round()} m); holding guides')
+            ? tr('位置の精度が低いため、案内を控えています（±${acc.round()}m）', 'Low accuracy (±${acc.round()} m); holding guides', {
+                'zh': '定位不够精确（±${acc.round()} 米），先暂停讲解',
+                'ko': '위치 오차가 커서 안내를 잠시 멈춥니다(±${acc.round()} m)',
+                'es': 'Precisión baja (±${acc.round()} m); las guías esperan',
+                'fr': 'Précision faible (±${acc.round()} m) ; les récits patientent',
+              })
             : '${_modeLabel(s.lastMotion?.mode)} · ±${acc.round()}m';
         icon = LvIconKind.gps;
     }
@@ -264,6 +298,7 @@ class GuideStoryCard extends StatelessWidget {
     final theme = Theme.of(context);
     final rating = g['rating'] as String?;
     final playingThis = audio.currentHistoryId == g['history_id'] && audio.state != SpeechState.idle;
+    final busy = session.feedbackBusy;
     final loc = g['location'] as Map?;
     return ListView(
       padding: EdgeInsets.fromLTRB(16, 16, 16, bottomGap(context)),
@@ -298,6 +333,16 @@ class GuideStoryCard extends StatelessWidget {
             style: theme.textTheme.bodySmall,
           ),
         const SizedBox(height: 12),
+        if (busy) ...[
+          Row(
+            children: [
+              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              const SizedBox(width: 8),
+              Expanded(child: Text(_busyLabel(session.feedbackAction), style: theme.textTheme.bodySmall)),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         Wrap(
           spacing: 8,
           runSpacing: 4,
@@ -315,24 +360,28 @@ class GuideStoryCard extends StatelessWidget {
               ),
             TextButton.icon(
               icon: const LvIcon(LvIconKind.detail, size: 24),
-              onPressed: () async {
-                await guarded(context, () => session.feedback(g, 'more_detail'));
-                g['_showDetail'] = true;
-              },
+              onPressed: busy
+                  ? null
+                  : () async {
+                      await guarded(context, () => session.feedback(g, 'more_detail'));
+                      g['_showDetail'] = true;
+                    },
               label: Text(tr('詳しく', 'More')),
             ),
             TextButton.icon(
               icon: const LvIcon(LvIconKind.next, size: 24),
-              onPressed: () async {
-                final r = await guarded(context, () => session.feedback(g, 'skip_story'));
-                // No untold story nearby: the server queues the surrounding area for generation
-                if (r != null && r['guide'] == null && context.mounted) {
-                  showInfo(
-                    context,
-                    tr('近くの話はもうありません。周りの話を準備しています', 'No more stories nearby. Preparing stories around you'),
-                  );
-                }
-              },
+              onPressed: busy
+                  ? null
+                  : () async {
+                      final r = await guarded(context, () => session.feedback(g, 'skip_story'));
+                      // No untold story nearby: the server queues the surrounding area for generation
+                      if (r != null && r['guide'] == null && context.mounted) {
+                        showInfo(
+                          context,
+                          tr('近くの話はもうありません。周りの話を準備しています', 'No more stories nearby. Preparing stories around you'),
+                        );
+                      }
+                    },
               label: Text(tr('次の話', 'Next')),
             ),
           ],
@@ -343,12 +392,14 @@ class GuideStoryCard extends StatelessWidget {
             ActionChip(
               avatar: const LvIcon(LvIconKind.related, size: 24),
               label: Text(tr('関連する話を', 'More like this')),
-              onPressed: () => _act(context, 'more_related', tr('関連する話を増やします', 'More related stories')),
+              onPressed: busy ? null : () => _act(context, 'more_related', tr('関連する話を増やします', 'More related stories')),
             ),
             ActionChip(
               avatar: const LvIcon(LvIconKind.enough, size: 24),
               label: Text(tr('この話題はもう十分', 'Enough of this topic')),
-              onPressed: () => _act(context, 'enough_topic', tr('しばらくこの話題を控えます', 'This topic will pause for a while')),
+              onPressed: busy
+                  ? null
+                  : () => _act(context, 'enough_topic', tr('しばらくこの話題を控えます', 'This topic will pause for a while')),
             ),
           ],
         ),
@@ -369,17 +420,27 @@ class GuideStoryCard extends StatelessWidget {
                 showCheckmark: false,
                 label: Text(tr(r[1], r[2])),
                 selected: rating == r[0],
-                onSelected: (_) => _act(
-                  context,
-                  r[0],
-                  r[0] == 'wrong_info' ? tr('報告しました。確認まで表示を止めます。', 'Reported; hidden until reviewed.') : null,
-                ),
+                onSelected: busy
+                    ? null
+                    : (_) => _act(
+                        context,
+                        r[0],
+                        r[0] == 'wrong_info'
+                            ? tr('報告しました。確認まで表示を止めます。', 'Reported; hidden until reviewed.')
+                            : null,
+                      ),
               ),
           ],
         ),
       ],
     );
   }
+
+  static String _busyLabel(String? action) => switch (action) {
+    'skip_story' => tr('次の話を選んでいます…', 'Choosing the next story…'),
+    'more_detail' => tr('詳しい内容を読み込んでいます…', 'Loading more detail…'),
+    _ => tr('反映しています…', 'Saving…'),
+  };
 
   Future<void> _act(BuildContext context, String action, String? done) async {
     final r = await guarded(context, () => session.feedback(guide, action));
@@ -454,10 +515,20 @@ class _CommandBarState extends State<_CommandBar> {
       showInfo(
         context,
         r['needs_confirmation'] == true
-            ? tr('「$labels」として短時間だけ反映しました。違う場合は×で解除してください。', 'Applied "$labels" briefly. Tap × if that is wrong.')
+            ? tr('「$labels」として短時間だけ反映しました。違う場合は×で解除してください。', 'Applied "$labels" briefly. Tap × if that is wrong.', {
+                'zh': '已暂时设为「$labels」。如果不是这个意思，请点 × 取消。',
+                'ko': '「$labels」(으)로 잠시 반영했습니다. 다르면 ×로 해제하세요.',
+                'es': 'Se aplicó «$labels» un momento. Pulse × si no es eso.',
+                'fr': '« $labels » est appliqué brièvement. Touchez × si ce n’est pas ça.',
+              })
             : r['resumed'] == true && labels.isEmpty
             ? tr('ガイドを再開します', 'Guiding resumed')
-            : tr('「$labels」にしました', 'Set: $labels'),
+            : tr('「$labels」にしました', 'Set: $labels', {
+                'zh': '已设为「$labels」',
+                'ko': '「$labels」(으)로 설정했습니다',
+                'es': 'Listo: $labels',
+                'fr': 'Réglé : $labels',
+              }),
       );
     } on ApiException catch (e) {
       if (!mounted) return;

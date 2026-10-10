@@ -11,7 +11,7 @@ from ..auth.sessions import require_auth
 from ..db import get_db
 from ..errors import ApiError, bad_request, not_found
 from ..models import ApiUsageLog, ContextSnapshot, GuideDecision, NotificationHistory, TripSession
-from ..services import engine, memory
+from ..services import engine, memory, next_story
 from ..services.prefs import (
     DETAIL_MODES,
     LANGUAGES,
@@ -70,7 +70,7 @@ def _apply_settings(trip, data):
         trip.manual_transport_mode = None if m == "auto" else m
     if "language" in data:
         if data["language"] not in LANGUAGES:
-            raise bad_request("language must be ja or en")
+            raise bad_request(f"language must be one of {sorted(LANGUAGES)}")
         trip.language = data["language"]
     trip.settings_json = settings
 
@@ -143,7 +143,12 @@ def finish_trip(trip_id):
     trip = get_owned_trip(db, trip_id, lock=True)
     if trip.ended_at is None:
         trip.ended_at = now()
-        memory.update_summary(db, trip, final=True)
+        # A rule summary is enough to leave the screen. The worker replaces it with the LLM
+        # summary; waiting for that model here held the phone on this request for many seconds.
+        memory.update_summary(db, trip, final=True, use_llm=False)
+        state = dict(trip.state_json or {})
+        state["summary_dirty"] = True
+        trip.state_json = state
     db.commit()
     return jsonify({**trip_payload(trip), "summary": trip_summary(db, trip)})
 
@@ -214,9 +219,15 @@ def post_context(trip_id):
         db.commit()
         return jsonify({"guide": None, "decision": {"reason": "stale_event", "next_check_after_sec": 60}})
     result = engine.evaluate(db, trip, g.user, snap)
+    prepare_more = False
     if result["guide"] is not None:
         memory.maybe_update(db, trip)
+        prepare_more = next_story.schedule(db, trip, result["guide"]["history_id"], snap)
+    elif next_story.note_position(db, trip, snap):
+        prepare_more = True
     db.commit()
+    if prepare_more:
+        next_story.kick(current_app._get_current_object(), trip.id)
     return jsonify(result)
 
 

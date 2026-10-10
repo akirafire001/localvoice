@@ -48,7 +48,7 @@ def _speech(client, t, g, language, voice):
 def test_language_catalog_and_preferences(client):
     t = register(client)
     cat = client.get("/api/v1/languages", headers=auth(t)).get_json()
-    assert [lang["code"] for lang in cat["ui"]] == ["ja", "en"]
+    assert [lang["code"] for lang in cat["ui"]] == ["ja", "en", "zh", "ko", "es", "fr"]
     assert {"ja", "en", "ko", "zh"} <= {lang["code"] for lang in cat["narration"]}
     # every narration language has a voice
     voices = client.get("/api/v1/voices", headers=auth(t)).get_json()["voices"]
@@ -64,7 +64,34 @@ def test_language_catalog_and_preferences(client):
     assert p["narration_languages"] == ["en", "ja"] and p["voice"]["voices"] == {"ko": "ko-default"}
     for bad in ([], ["ja", "ja"], ["xx"], ["ja", "en", "ko", "zh", "fr"], "ja"):
         assert _prefs(client, t, narration_languages=bad).status_code == 400
-    assert _prefs(client, t, language="ko").status_code == 400  # the app's screens are ja/en only
+    assert _prefs(client, t, language="ko").status_code == 200
+    assert _prefs(client, t, language="de").status_code == 400
+
+
+def test_new_account_languages_follow_the_device(client):
+    def prefs(login_id, tag):
+        tokens = register(client, login_id, device_language=tag)
+        return client.get("/api/v1/users/me/preferences", headers=auth(tokens)).get_json()
+
+    ja = prefs("device-ja", "ja-JP")
+    assert ja["language"] == "ja" and ja["narration_languages"] == ["ja"]
+    zh = prefs("device-zh", "zh-Hans-CN")
+    assert zh["language"] == "zh" and zh["narration_languages"] == ["zh"]
+    de = prefs("device-de", "de_DE")
+    assert de["language"] == "en" and de["narration_languages"] == ["en"]
+    # a later sign-in must not replace a language the user already saved
+    tokens = client.post(
+        "/api/v1/auth/google", json={"id_token": "google:device-lang", "device_language": "fr-FR"}
+    ).get_json()
+    created = client.get("/api/v1/users/me/preferences", headers=auth(tokens)).get_json()
+    assert created["language"] == "fr" and created["narration_languages"] == ["fr"]
+    assert _prefs(client, tokens, language="ja", narration_languages=["ja"]).status_code == 200
+    again = client.post(
+        "/api/v1/auth/google", json={"id_token": "google:device-lang", "device_language": "ko-KR"}
+    )
+    assert again.status_code == 200
+    kept = client.get("/api/v1/users/me/preferences", headers=auth(again.get_json())).get_json()
+    assert kept["language"] == "ja" and kept["narration_languages"] == ["ja"]
 
 
 def test_story_is_told_in_each_language_in_order(app, client):

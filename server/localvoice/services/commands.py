@@ -51,19 +51,37 @@ STATE_WORDS = {
 RESUME_WORDS = ["再開", "話して", "しゃべって", "戻して", "resume", "talk again", "unmute"]
 
 LABELS = {
-    "focus_category": ("{cat}を多めに", "More {cat}"),
-    "suppress_category": ("{cat}は控えめに", "Less {cat}"),
-    "quiet": ("静かに", "Quiet"),
-    "hungry": ("食事を探し中", "Looking for food"),
-    "toilet": ("トイレを探し中", "Looking for a restroom"),
-    "tired": ("休憩モード", "Taking it easy"),
-    "bored": ("話題多め", "More stories"),
-    "no_time": ("手短に", "Keep it short"),
+    "focus_category": {
+        "ja": "{cat}を多めに", "en": "More {cat}", "zh": "多讲一些{cat}", "ko": "{cat} 위주로",
+        "es": "Más {cat}", "fr": "{cat} en priorité",
+    },
+    "suppress_category": {
+        "ja": "{cat}は控えめに", "en": "Less {cat}", "zh": "少讲一些{cat}", "ko": "{cat} 줄이기",
+        "es": "Menos {cat}", "fr": "Moins : {cat}",
+    },
+    "quiet": {"ja": "静かに", "en": "Quiet", "zh": "安静模式", "ko": "조용히", "es": "En silencio", "fr": "Silence"},
+    "hungry": {
+        "ja": "食事を探し中", "en": "Looking for food", "zh": "正在找吃的", "ko": "식사 찾는 중",
+        "es": "Buscando dónde comer", "fr": "Recherche de repas",
+    },
+    "toilet": {
+        "ja": "トイレを探し中", "en": "Looking for a restroom", "zh": "正在找洗手间", "ko": "화장실 찾는 중",
+        "es": "Buscando un aseo", "fr": "Recherche de toilettes",
+    },
+    "tired": {"ja": "休憩モード", "en": "Taking it easy", "zh": "轻松模式", "ko": "쉬어 가기", "es": "A un ritmo suave", "fr": "Au calme"},
+    "bored": {"ja": "話題多め", "en": "More stories", "zh": "多讲一些", "ko": "이야기를 더", "es": "Más historias", "fr": "Plus d’histoires"},
+    "no_time": {"ja": "手短に", "en": "Keep it short", "zh": "简短一些", "ko": "짧게", "es": "En breve", "fr": "En bref"},
 }
 CATEGORY_NAMES = {
-    "history": ("歴史", "history"), "architecture": ("建築", "architecture"), "nature": ("自然", "nature"),
-    "food": ("食", "food"), "culture": ("文化", "culture"), "everyday_life": ("暮らし", "everyday life"),
-    "industry": ("産業", "industry"), "seasonal": ("季節", "seasonal topics"), "practical": ("実用情報", "practical info"),
+    "history": {"ja": "歴史", "en": "history", "zh": "历史", "ko": "역사", "es": "historia", "fr": "histoire"},
+    "architecture": {"ja": "建築", "en": "architecture", "zh": "建筑", "ko": "건축", "es": "arquitectura", "fr": "architecture"},
+    "nature": {"ja": "自然", "en": "nature", "zh": "自然", "ko": "자연", "es": "naturaleza", "fr": "nature"},
+    "food": {"ja": "食", "en": "food", "zh": "美食", "ko": "음식", "es": "comida", "fr": "cuisine"},
+    "culture": {"ja": "文化", "en": "culture", "zh": "文化", "ko": "문화", "es": "cultura", "fr": "culture"},
+    "everyday_life": {"ja": "暮らし", "en": "everyday life", "zh": "日常生活", "ko": "일상", "es": "vida cotidiana", "fr": "vie quotidienne"},
+    "industry": {"ja": "産業", "en": "industry", "zh": "产业", "ko": "산업", "es": "industria", "fr": "industrie"},
+    "seasonal": {"ja": "季節", "en": "seasonal topics", "zh": "时令", "ko": "계절", "es": "temporada", "fr": "saison"},
+    "practical": {"ja": "実用情報", "en": "practical info", "zh": "实用信息", "ko": "실용 정보", "es": "información práctica", "fr": "infos pratiques"},
 }
 
 
@@ -77,10 +95,15 @@ class ParsedCommand:
     parser: str = "rule"
 
 
+def _in_language(entry, lang):
+    return entry.get(lang) or entry.get("en")
+
+
 def label_for(kind, target, lang):
-    ja, en = LABELS[kind]
-    cat = CATEGORY_NAMES.get(target, (target or "", target or ""))
-    return (en if lang == "en" else ja).format(cat=cat[1] if lang == "en" else cat[0])
+    template = _in_language(LABELS[kind], lang)
+    names = CATEGORY_NAMES.get(target)
+    cat = _in_language(names, lang) if names else (target or "")
+    return template.format(cat=cat)
 
 
 def _minutes(text):

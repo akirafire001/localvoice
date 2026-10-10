@@ -15,8 +15,8 @@ LANGUAGES = {
     "es": {"name": "Español", "name_ja": "スペイン語", "name_en": "Spanish", "tts_locale": "es-ES", "dense": False},
     "fr": {"name": "Français", "name_ja": "フランス語", "name_en": "French", "tts_locale": "fr-FR", "dense": False},
 }
-# The app's screens are translated into these only; the UI language stays a single choice among them.
-UI_LANGUAGES = ("ja", "en")
+# The app's screens are translated into these; the UI language stays a single choice among them.
+UI_LANGUAGES = ("ja", "en", "zh", "ko", "es", "fr")
 # Languages stories are written in when they are generated (KnowledgeItem *_ja / *_en columns).
 NATIVE_LANGUAGES = ("ja", "en")
 # How many languages one story may be told in, one after another.
@@ -27,8 +27,26 @@ def is_dense(language):
     return LANGUAGES.get(language, {}).get("dense", False)
 
 
+def from_device_language(tag):
+    """OS language tag → (app language, narration language). Anything this app does not speak becomes English."""
+    primary = tag.strip().lower().replace("_", "-").split("-")[0]
+    ui = primary if primary in UI_LANGUAGES else "en"
+    narration = primary if primary in LANGUAGES else "en"
+    return ui, narration
+
+
+def apply_device_language(user, data):
+    """Initial languages for a new account. Ignored when the client sent no OS language."""
+    tag = data.get("device_language") if isinstance(data, dict) else None
+    if not isinstance(tag, str) or not tag.strip():
+        return
+    ui, narration = from_device_language(tag)
+    user.locale = ui
+    user.voice_settings_json = {**(user.voice_settings_json or {}), "narration_languages": [narration]}
+
+
 def default_narration_languages(user):
-    return [user.locale if user.locale in LANGUAGES else "ja"]
+    return [user.locale if user.locale in LANGUAGES else "en"]
 
 
 def narration_languages(user):
