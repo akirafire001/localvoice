@@ -38,3 +38,7 @@ desktop.ini
 
 # AI subscription generation work files (tools/subgen)
 .subgen/
+
+# Play listing captures and local install packages
+docs/store/
+*.apk
