@@ -106,7 +106,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           else ...[
-            const LvIllustration(LvArtwork.homeDiscovery, height: 180),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: AspectRatio(
+                aspectRatio: 2,
+                child: Image.asset(
+                  LvArtwork.homeDiscoveryBanner.asset,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                  excludeFromSemantics: true,
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
             Text(tr('目的', 'Purpose'), style: Theme.of(context).textTheme.titleSmall),
             Wrap(

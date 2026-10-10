@@ -77,6 +77,7 @@ enum LvIconKind {
 enum LvArtwork {
   loginLandscape('login-landscape'),
   homeDiscovery('home-discovery'),
+  homeDiscoveryBanner('home-discovery-banner'),
   waitingForStory('waiting-for-story'),
   emptyHistory('empty-history'),
   offlineLocalSave('offline-local-save'),
