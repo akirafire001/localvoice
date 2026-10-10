@@ -211,6 +211,7 @@ class _AccountScreenState extends State<AccountScreen> {
     return Scaffold(
       appBar: LvAppBar(title: Text(tr('アカウント', 'Account'))),
       body: ListView(
+        padding: EdgeInsets.only(bottom: bottomGap(context)),
         children: [
           if (u.recoveryEmailVerified)
             const Padding(

@@ -30,8 +30,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthService>();
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(24, 24, 24, bottomGap(context)),
           children: [
             const SizedBox(height: 32),
             const Center(child: LvBrandTitle(large: true)),
@@ -112,7 +113,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       appBar: LvAppBar(title: Text(tr('新規登録', 'Create account'))),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(24, 24, 24, bottomGap(context)),
         children: [
           const LvIllustration(LvArtwork.homeDiscovery, height: 110),
           const SizedBox(height: 16),
@@ -197,7 +198,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     return Scaffold(
       appBar: LvAppBar(title: Text(tr('パスワード再設定', 'Reset password'))),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(24, 24, 24, bottomGap(context)),
         children: [
           const LvIllustration(LvArtwork.passwordReset, height: 140),
           const SizedBox(height: 16),
@@ -264,7 +265,7 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: LvAppBar(title: Text(tr('メール確認', 'Verify email'))),
     body: ListView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, bottomGap(context)),
       children: [
         const LvIllustration(LvArtwork.mailPending, height: 140),
         const SizedBox(height: 16),

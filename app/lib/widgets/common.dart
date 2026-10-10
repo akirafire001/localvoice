@@ -5,6 +5,10 @@ import '../auth/auth_service.dart';
 import '../util/i18n.dart';
 import 'visuals.dart';
 
+/// Bottom padding for a screen's scrolling body, so the last controls stay clear of the
+/// system navigation bar (Android gesture/button bar, iOS home indicator) with some margin.
+double bottomGap(BuildContext context) => MediaQuery.paddingOf(context).bottom + 32;
+
 String errorText(Object e) {
   if (e is AuthCancelled) return '';
   if (e is ApiException) {
