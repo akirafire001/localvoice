@@ -1,4 +1,5 @@
 """Turn a KnowledgeItem (+ optional LLM narration) into the guide payload (api-design /context)."""
+from .languages import LANGUAGES
 
 
 def item_texts(item, language, detail_mode="auto"):
@@ -37,7 +38,27 @@ def location_payload(cand):
     }
 
 
-def guide_payload(history, item, location, *, voice_profile_id, selection_mode):
+def narrations_payload(history, snap, voice_for):
+    narrations = snap.get("narrations")
+    if not narrations:  # guides recorded before narration languages: the screen language only
+        narrations = [{"language": history.language, "intro": snap.get("intro"), "body": snap.get("body")}]
+    out = []
+    for n in narrations:
+        body, intro = n.get("body"), n.get("intro")
+        out.append({
+            "language": n["language"],
+            # for device TTS when server audio fails; null until the story has been translated
+            "text": (f"{intro} {body}" if intro else body) if body else None,
+            "intro": intro,
+            "voice_profile_id": voice_for(n["language"]),
+            "tts_locale": LANGUAGES.get(n["language"], {}).get("tts_locale"),
+        })
+    return out
+
+
+def guide_payload(history, item, location, *, voice_for, selection_mode):
+    """voice_for(language) → the user's voice_profile_id for that language."""
+    voice_profile_id = voice_for(history.language)
     snap = history.speech_snapshot_json or {}
     return {
         "history_id": str(history.id),
@@ -57,6 +78,8 @@ def guide_payload(history, item, location, *, voice_profile_id, selection_mode):
             "content_version": snap.get("content_version"),
             "voice_profile_id": voice_profile_id,
             "audio": None,
+            # the story is told in each of these, one after another
+            "narrations": narrations_payload(history, snap, voice_for),
         },
         "location": location,
         "origin": item.origin,

@@ -55,10 +55,23 @@ class _Fixture {
             'notification_level': 'normal',
             'detail_mode': 'auto',
             'serendipity': 'normal',
+            'narration_languages': ['en', 'ja'],
             'voice': {'enabled': false, 'allow_device_tts_fallback': false, 'playback_rate': 1.0, 'voices': {}},
           },
           '/api/v1/users/me/interests' => {'interests': interests},
           '/api/v1/voices' => {'voices': [], 'tts_available': false},
+          '/api/v1/languages' => {
+            'ui': [
+              {'code': 'ja', 'name': '日本語', 'name_ja': '日本語', 'name_en': 'Japanese'},
+              {'code': 'en', 'name': 'English', 'name_ja': '英語', 'name_en': 'English'},
+            ],
+            'narration': [
+              {'code': 'ja', 'name': '日本語', 'name_ja': '日本語', 'name_en': 'Japanese'},
+              {'code': 'en', 'name': 'English', 'name_ja': '英語', 'name_en': 'English'},
+              {'code': 'ko', 'name': '한국어', 'name_ja': '韓国語', 'name_en': 'Korean'},
+            ],
+            'max_narration_languages': 4,
+          },
           '/api/v1/trips' => {'trips': []},
           _ => <String, dynamic>{},
         });
@@ -248,7 +261,9 @@ void main() {
     final boundary = GlobalKey();
     await tester.pumpWidget(fixture.app(const PreferencesScreen(), boundary));
     await settleImages(tester);
-    await tester.scrollUntilVisible(find.text('興味'), 200);
+    // the outer list (the narration languages are a nested reorderable list)
+    final page = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(find.text('興味'), 200, scrollable: page);
     await tester.ensureVisible(find.text('歴史'));
     await settleImages(tester);
     await saveScreen(boundary, 'preferences-interests', tester);
@@ -258,7 +273,7 @@ void main() {
     expect((fixture.savedInterests.last['interests'] as List).single['category'], 'history');
     expect((fixture.savedInterests.last['interests'] as List).single['explicit_score'], isNot(0.5));
     for (final label in categoryLabels.values) {
-      await tester.scrollUntilVisible(find.text(label[0]), 120);
+      await tester.scrollUntilVisible(find.text(label[0]), 120, scrollable: page);
       expect(find.text(label[0]), findsOneWidget);
     }
     expect(tester.takeException(), isNull);

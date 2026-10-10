@@ -48,7 +48,7 @@ class FakeLLM:
         sel = Selection(
             action="speak", knowledge_id=str(c.item.id), title="LLMタイトル",
             text="すぐそばの話です。" if self.behaviour != "visual" else "目の前に見えます。",
-            intro="歩きながらどうぞ。", reason="test", used_claim_ids=claim_ids,
+            intros={"ja": "歩きながらどうぞ。"}, reason="test", used_claim_ids=claim_ids,
             model="fake-model", prompt_version="select-v1", latency_ms=12, cost_usd=0.002,
         )
         from localvoice.services.llm import validate_selection
@@ -248,7 +248,8 @@ def test_validate_selection_rules(app):
                              local_time="")
 
         def check(text, ids=None, intro=""):
-            return validate_selection(Selection(action="speak", knowledge_id=kid, text=text, intro=intro,
+            return validate_selection(Selection(action="speak", knowledge_id=kid, text=text,
+                                                intros={"ja": intro} if intro else {},
                                                 used_claim_ids=ids or [claim]), inp)
 
         assert check("約300mの位置にある話です。") is None

@@ -1,4 +1,5 @@
 """User-facing setting values and the rule parameters they map to (PoC tuning values)."""
+from .languages import UI_LANGUAGES
 
 CATEGORIES = [
     "history",        # 歴史・文化
@@ -23,7 +24,7 @@ DETAIL_MODES = {"auto", "short", "summary", "detailed"}
 SERENDIPITY_LEVELS = {"low": 0.1, "normal": 0.2, "high": 0.35}
 SELECTION_MODES = {"llm", "rule"}
 PURPOSES = {"travel", "walk", "business", "commute", "other"}
-LANGUAGES = {"ja", "en"}
+LANGUAGES = set(UI_LANGUAGES)  # the app's screen language (narration languages: languages.py)
 MANUAL_TRANSPORT_MODES = {"auto", "walk", "bicycle", "car", "train", "shinkansen", "ship", "other"}
 MAX_SAME_CATEGORY_IN_ROW = 3
 

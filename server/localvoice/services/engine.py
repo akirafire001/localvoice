@@ -20,6 +20,7 @@ from ..models import (
 )
 from ..util import now, parse_datetime, parse_uuid
 from . import commands, geo
+from .languages import narration_languages
 from .prefs import CATEGORIES, NOTIFICATION_LEVELS, trip_settings
 from .ranking import (
     active_boosts,
@@ -32,6 +33,7 @@ from .ranking import (
 )
 from .rendering import item_speech_text, item_texts, location_payload, guide_payload
 from .selector import SelectionInput
+from .translation import localized_story, spoken_text
 
 log = logging.getLogger(__name__)
 
@@ -303,9 +305,11 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
         return _silent(db, trip, snap, reason, mode, 60, candidates=ranked[:10], trigger=trigger)
 
     rule_choice = top[0]
+    narr_langs = narration_languages(user)
     sel_input = SelectionInput(
         candidates=top,
         language=trip.language,
+        narration_languages=narr_langs,
         detail_mode=settings["detail_mode"],
         transport_class=tclass,
         course_confident=confident,
@@ -367,11 +371,13 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     # The story is heard from audio shared by every traveller; the LLM only adds a short intro for this moment,
     # so a personalised guide costs one short private synthesis instead of the whole story.
     speech_text = item_speech_text(item, trip.language, text)
-    intro = ""
+    intros = {}
     if selection is not None:
         title = selection.title or title
         text = selection.text or text
-        intro = selection.intro or ""
+        intros = selection.intros
+    intro = intros.get(trip.language, "")
+    narrations = _narrations(item, narr_langs, intros, settings["detail_mode"])
     decision = GuideDecision(
         trip_session_id=trip.id,
         context_snapshot_id=snap.id,
@@ -415,6 +421,8 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
             "language": trip.language,
             "content_version": item.content_version,
             "personalized": bool(intro),
+            # every narration language in the order spoken; body None = translated when its audio is first asked for
+            "narrations": narrations,
             # recorded so the next stories avoid the same techniques, and for learning which ones work
             "techniques": _item_techniques(item),
         },
@@ -423,7 +431,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     db.flush()
     guide = guide_payload(
         hist, item, location_payload(chosen),
-        voice_profile_id=default_voice(user, trip.language), selection_mode=hist.selection_mode,
+        voice_for=lambda lang: default_voice(user, lang), selection_mode=hist.selection_mode,
     )
     return {
         "guide": guide,
@@ -482,8 +490,17 @@ def history_payload(db, hist, user):
     item = db.get(KnowledgeItem, hist.knowledge_item_id)
     return guide_payload(
         hist, item, item_location(db, item),
-        voice_profile_id=default_voice(user, hist.language), selection_mode=hist.selection_mode,
+        voice_for=lambda lang: default_voice(user, lang), selection_mode=hist.selection_mode,
     )
+
+
+def _narrations(item, langs, intros, detail_mode):
+    out = []
+    for lang in langs:
+        story = localized_story(item, lang)
+        out.append({"language": lang, "intro": intros.get(lang) or None,
+                    "body": spoken_text(story, detail_mode) if story else None})
+    return out
 
 
 def _storytelling(item):

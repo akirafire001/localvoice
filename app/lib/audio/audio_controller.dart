@@ -57,79 +57,87 @@ class AudioController extends ChangeNotifier {
     await play(guide);
   }
 
+  /// The guide's languages in the order they are spoken (one entry for servers without narration languages).
+  static List<Map<String, dynamic>> narrationsOf(Map<String, dynamic> guide) {
+    final list = (guide['speech']?['narrations'] as List?)?.cast<Map>();
+    if (list != null && list.isNotEmpty) return [for (final n in list) n.cast<String, dynamic>()];
+    final lang = guide['language'] as String? ?? 'ja';
+    return [
+      {
+        'language': lang,
+        'text': (guide['speech']?['text'] as String?) ?? (guide['text'] as String? ?? ''),
+        'voice_profile_id': guide['speech']?['voice_profile_id'],
+      },
+    ];
+  }
+
+  /// Tells the story in each narration language, one after another. Every language's audio is asked for at
+  /// once, so a language that must first be translated is usually ready by the time the one before it ends.
   Future<void> play(Map<String, dynamic> guide, {void Function()? onSpoken}) async {
     final gen = ++_generation;
     await _player.stop();
     await _tts.stop();
     currentHistoryId = guide['history_id'] as String;
     _set(SpeechState.preparing);
-    final lang = guide['language'] as String? ?? 'ja';
-    final voice =
-        voices[lang] ??
-        (guide['speech']?['voice_profile_id'] as String?) ??
-        (lang == 'en' ? 'en-default' : 'ja-default');
-    final deadline = DateTime.now().add(AppConfig.speechWaitLimit);
-    String? audioPath;
-    String? introPath; // short line fitted to this moment, played before the story's shared audio
+    final narrations = narrationsOf(guide);
+    final fetches = [for (final n in narrations) _SpeechFetch(this, guide, n, gen)..start()];
+    var spoke = false;
     String? failure;
-    while (gen == _generation) {
-      try {
-        final r = await api.post('/api/v1/guides/${guide['history_id']}/speech', {'voice_profile_id': voice});
-        if (r.status == 200) {
-          audioPath = r.json['audio_path'] as String;
-          introPath = (r.json['intro'] as Map?)?['audio_path'] as String?;
-          break;
-        }
-      } on ApiException catch (e) {
-        failure = e.code;
-        break; // 410 content_gone, 429, 503 tts_unavailable/failed: fall back now
-      }
-      if (DateTime.now().isAfter(deadline)) {
-        failure = 'timeout';
-        break;
-      }
-      await Future.delayed(const Duration(seconds: 1));
-    }
-    if (gen != _generation) return; // superseded
-    if (failure == 'content_gone') {
-      _set(SpeechState.textOnly, 'gone');
-      return;
-    }
-    if (audioPath != null) {
-      try {
-        for (final path in [?introPath, audioPath]) {
-          await _player.setAudioSource(AudioSource.uri(api.uri(path), headers: api.authHeaders()));
-          if (gen != _generation) return;
-          await _player.setSpeed(rate);
-          _set(SpeechState.playing);
-          await _player.play();
-          await _player.processingStateStream.firstWhere((s) => s == ProcessingState.completed);
-          if (gen != _generation) return;
-        }
-        if (gen == _generation) {
-          onSpoken?.call();
-          _set(SpeechState.idle);
-        }
-        return;
-      } catch (_) {
-        if (gen != _generation) return;
-      }
-    }
-    final text = (guide['speech']?['text'] as String?) ?? (guide['text'] as String? ?? '');
-    if (allowDeviceTts && text.isNotEmpty) {
-      await _tts.setLanguage(lang == 'en' ? 'en-US' : 'ja-JP');
-      await _tts.setSpeechRate((0.5 * rate).clamp(0.2, 1.0));
-      await _tts.awaitSpeakCompletion(true);
+    for (var i = 0; i < narrations.length; i++) {
+      final n = narrations[i];
+      final fetch = fetches[i]..waitFromNow();
+      final r = await fetch.result;
       if (gen != _generation) return;
-      _set(SpeechState.playing, 'device_tts');
-      await _tts.speak(text);
-      if (gen == _generation) {
-        onSpoken?.call();
-        _set(SpeechState.idle);
+      if (r.failure == 'content_gone') {
+        _set(SpeechState.textOnly, 'gone');
+        return;
       }
-      return;
+      if (r.paths != null && await _playFiles(r.paths!, gen)) {
+        spoke = true;
+        continue;
+      }
+      if (gen != _generation) return;
+      final text = n['text'] as String?;
+      if (allowDeviceTts && text != null && text.isNotEmpty) {
+        await _tts.setLanguage(n['tts_locale'] as String? ?? _deviceLocale(n['language'] as String?));
+        await _tts.setSpeechRate((0.5 * rate).clamp(0.2, 1.0));
+        await _tts.awaitSpeakCompletion(true);
+        if (gen != _generation) return;
+        _set(SpeechState.playing, 'device_tts');
+        await _tts.speak(text);
+        if (gen != _generation) return;
+        spoke = true;
+        continue;
+      }
+      failure ??= r.failure;
     }
-    _set(SpeechState.textOnly, failure);
+    if (gen != _generation) return;
+    if (spoke) {
+      onSpoken?.call();
+      _set(SpeechState.idle);
+    } else {
+      _set(SpeechState.textOnly, failure);
+    }
+  }
+
+  static String _deviceLocale(String? lang) => lang == 'en' ? 'en-US' : (lang == null || lang == 'ja' ? 'ja-JP' : lang);
+
+  /// Plays the intro (when there is one) then the story. False when playback failed.
+  Future<bool> _playFiles(List<String> paths, int gen) async {
+    try {
+      for (final path in paths) {
+        await _player.setAudioSource(AudioSource.uri(api.uri(path), headers: api.authHeaders()));
+        if (gen != _generation) return false;
+        await _player.setSpeed(rate);
+        _set(SpeechState.playing);
+        await _player.play();
+        await _player.processingStateStream.firstWhere((s) => s == ProcessingState.completed);
+        if (gen != _generation) return false;
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Voice sample for the settings screen (never uses the guide flow).
@@ -162,5 +170,53 @@ class AudioController extends ChangeNotifier {
     _player.dispose();
     _tts.stop();
     super.dispose();
+  }
+}
+
+class _SpeechResult {
+  _SpeechResult({this.paths, this.failure});
+  final List<String>? paths; // intro (if any) then the story
+  final String? failure;
+}
+
+/// Server audio for one narration language. Polls until ready; the wait limit
+/// ([AppConfig.speechWaitLimit]) only starts once this language is next to play.
+class _SpeechFetch {
+  _SpeechFetch(this.c, this.guide, this.narration, this.gen);
+  final AudioController c;
+  final Map<String, dynamic> guide;
+  final Map<String, dynamic> narration;
+  final int gen;
+  DateTime? _deadline;
+  late final Future<_SpeechResult> result;
+
+  void start() => result = _run();
+
+  void waitFromNow() => _deadline ??= DateTime.now().add(AppConfig.speechWaitLimit);
+
+  Future<_SpeechResult> _run() async {
+    final lang = narration['language'] as String? ?? 'ja';
+    final voice = c.voices[lang] ?? (narration['voice_profile_id'] as String?) ?? '$lang-default';
+    while (gen == c._generation) {
+      try {
+        final r = await c.api.post('/api/v1/guides/${guide['history_id']}/speech', {
+          'voice_profile_id': voice,
+          'language': lang,
+        });
+        if (r.status == 200) {
+          final intro = (r.json['intro'] as Map?)?['audio_path'] as String?;
+          return _SpeechResult(paths: [?intro, r.json['audio_path'] as String]);
+        }
+      } on ApiException catch (e) {
+        // 410 content_gone, 429, 503 tts_unavailable/tts_failed/translation_unavailable: fall back now
+        return _SpeechResult(failure: e.code);
+      } catch (_) {
+        return _SpeechResult(failure: 'error');
+      }
+      final deadline = _deadline;
+      if (deadline != null && DateTime.now().isAfter(deadline)) return _SpeechResult(failure: 'timeout');
+      await Future.delayed(const Duration(seconds: 1));
+    }
+    return _SpeechResult(failure: 'superseded');
   }
 }
