@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-10",
+  "method": "built-in image_gen",
+  "round": 2,
+  "status": "selection concepts",
+  "variants": [
+    {
+      "key": "E",
+      "name": "story-bird",
+      "title": "声を届ける小鳥",
+      "description": "街の小話を教えてくれる小鳥。明るく、覚えやすいキャラクター寄りのマーク。",
+      "prompt": "Use case: logo-brand. Generate one original square app icon concept for LocalVoice: a companion that tells interesting stories about the place you are walking through, using audio. One centered bold symbol occupying roughly 65-70 percent of a full-bleed square background. Comfortable safe margins for OS rounding. Must remain recognizable at small sizes, prioritize a distinctive simple silhouette. No words or letters, no labels, no grid, no phone mockup, no map pin or compass, no watermark. This is a fresh identity exploration with warmth and personality. Subject: a singing little bird in profile facing right, shaped from two or three beautifully balanced chunky curves, with an expressive raised wing, short beak and one small eye. Bird body warm tangerine orange and tiny ivory wing inset, on a saturated deep indigo blue background. Two short thick ivory voice arcs just beyond beak. Style: sophisticated playful flat graphic brand mark, bold contemporary editorial design, clean solid colors and crisp edges. Charming but not childish. No legs, branches or feathers drawn individually.",
+      "file": "E-story-bird.png"
+    },
+    {
+      "key": "F",
+      "name": "listening-walk",
+      "title": "街を聴く耳",
+      "description": "歩きながら耳を傾ける体験を表現。落ち着いた大人向けの雰囲気。",
+      "prompt": "Use case: logo-brand. Generate one original square app icon concept for LocalVoice: a companion that tells interesting stories about the place you are walking through, using audio. One centered bold symbol occupying roughly 65-70 percent of a full-bleed square background. Comfortable safe margins for OS rounding. Must remain recognizable at small sizes, prioritize a distinctive simple silhouette. No words or letters, no labels, no grid, no phone mockup, no map pin or compass, no watermark. This is a fresh identity exploration with warmth and personality. Subject: an elegant abstract listening ear made from one very bold, continuous ivory ribbon curve. The inner ear curve flows into a simple winding walking-path motif, with one small golden circular discovery dot near the center. Not a realistic anatomical ear; a sophisticated flowing emblem. Background dusky plum purple #49345C, cream symbol with muted saffron accent. Style: premium calm graphic identity, flat clean forms, unusually graceful curved silhouette, very few elements. No buildings, labels, hearing-aid or headset imagery.",
+      "file": "F-listening-walk.png"
+    },
+    {
+      "key": "G",
+      "name": "landscape-book",
+      "title": "話が芽吹く本",
+      "description": "土地の風景と物語をつなぐマーク。知る楽しさと旅らしさを表現。",
+      "prompt": "Use case: logo-brand. Generate one original square app icon concept for LocalVoice: a companion that tells interesting stories about the place you are walking through, using audio. One centered bold symbol occupying roughly 65-70 percent of a full-bleed square background. Comfortable safe margins for OS rounding. Must remain recognizable at small sizes, prioritize a distinctive simple silhouette. No words or letters, no labels, no grid, no phone mockup, no map pin or compass, no watermark. This is a fresh identity exploration with warmth and personality. Subject: a wide open book whose two pages form a simple landscape: the left page rises into one gentle green hill, and the right page forms one azure flowing river curve. A large warm orange sun floats immediately above the spine and helps unify the compact silhouette. Main book silhouette deep dark teal, mint pale background. Only one hill and one river, no page lines, no buildings or tiny scenery. Style: crisp two-dimensional colorful geometric logo, refined and joyful, distinctive book-landscape fusion, large confident shapes. Avoid a detailed illustration or realistic book.",
+      "file": "G-landscape-book.png"
+    },
+    {
+      "key": "H",
+      "name": "fox-companion",
+      "title": "旅の相棒キツネ",
+      "description": "話を聞きたくなる旅の相棒。ホーム画面で目を引くマスコット方向。",
+      "prompt": "Use case: logo-brand. Generate one original square app icon concept for LocalVoice: a companion that tells interesting stories about the place you are walking through, using audio. One centered bold symbol occupying roughly 65-70 percent of a full-bleed square background. Comfortable safe margins for OS rounding. Must remain recognizable at small sizes, prioritize a distinctive simple silhouette. No words or letters, no labels, no grid, no phone mockup, no map pin or compass, no watermark. This is a fresh identity exploration with warmth and personality. Subject: a friendly small fox guide head with oversized rounded ears, a simple warm orange face, ivory rounded muzzle, two dark dot eyes and a tiny dark nose. It wears a thick simple midnight-blue headphone band with rounded ear cups, conveying a travel audio companion. One head only, frontal with a subtle welcoming tilt, clean joyful silhouette, not a bust or whole animal. Background soft sky blue. Style: tactile polished soft 3D clay app icon, smooth matte surfaces, gentle studio lighting and subtle depth, no fur texture, no glossy plastic. Highly memorable mature friendly mascot, minimal facial detail, no hat or clothing.",
+      "file": "H-fox-companion.png"
+    }
+  ]
+}
