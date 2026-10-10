@@ -24,7 +24,7 @@ SpotMemoと同じCodemagicのPersonal Accountと、既存のApple Developer連�
 - CodemagicアプリID: `6acabdc634b7f3fd846ddadd`。GitHub連携にLocalVoiceを追加済み。
 - 初回ビルドは `codex/localvoice-ios-testflight` ブランチで起動。外部テストを希望するため、TestFlightのベータ説明・連絡先・専用審査アカウント情報を保存済み。
 - 本番APIで審査専用アカウントのログインを確認済み。秘密情報は無視対象の `docs/store/ios/` に保存し、Gitには含めない。
-- 初回時点のAppleログインは `/api/v1/auth/apple/start` が503。Apple用鍵とサーバー環境変数を設定し、成功を確認してから外部審査へ提出する。
+- Appleログイン用のLocalVoice専用鍵を発行し、本番環境変数を設定済み。APIとworkerの再起動後、`/api/v1/auth/apple/start` は503から201となり、審査専用アカウントのログインも200を確認。Appleの認可画面から戻る実機の一連の動作は未確認。
 
 ## 初回登録
 
@@ -40,6 +40,8 @@ SpotMemoと同じCodemagicのPersonal Accountと、既存のApple Developer連�
 ## Appleログインのサーバー設定
 
 iOSの権限とApple Developerの設定に加えて、サーバーの `APPLE_BUNDLE_ID=tech.ideaworks.localvoice`、`APPLE_TEAM_ID`、`APPLE_KEY_ID`、`APPLE_PRIVATE_KEY` が必要。既存のApp Store Connect APIキーと、Sign in with Apple用の秘密鍵は用途が異なる。鍵をGitやビルド設定ファイルへ入れない。
+
+本番は `localvoice.service` と `localvoice-worker.service` が `/srv/app/localvoice/.env` を共有する。今回の設定前のファイルは `/srv/app/localvoice/.env.before-apple-20261011` に退避済み（root専用）。iOS用の設定のみを追加したため、Android/WebのAppleログインには別途Services IDと戻り先の設定が必要。
 
 ## 実機確認
 
