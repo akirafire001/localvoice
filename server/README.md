@@ -16,6 +16,54 @@ flask --app localvoice worker      # separate process: knowledge generation, aud
 flask --app localvoice rewrite-stories [--cell xn764e] [--limit 5] [--dry-run] [--force]  # give stored stories a spoken version (services/storytelling.py)
 ```
 
+## Landing page
+
+The multilingual LocalVoice landing page is served at `/` by the same Flask app. Open
+`http://localhost:8000/` after starting the server above. Restart an already-running
+server without auto-reload to register the new route.
+
+- `localvoice/landing.py`: public route, browser-language negotiation and prepared story catalog.
+- `localvoice/landing_copy.py`: LP copy in all six of the app's narration languages.
+- `localvoice/landing_samples.json`: exported text, sources and audio paths for three selected DB stories.
+- `localvoice/templates/landing.html`: product introduction, usage, interactive demo, FAQ, and development status.
+- `localvoice/static/landing/`: responsive CSS, prepared audio player, and bundled assets.
+
+The demo does not request location or create accounts. It plays 18 prepared MP3 files
+(three stories × Japanese, English, Chinese, Korean, Spanish and French), generated with
+the app's Google Chirp 3 HD voice profiles. Page views and playback never call TTS or LLMs,
+use OS/browser speech synthesis, or query the database. Audio loads only when played.
+
+`Accept-Language` selects the first supported browser language, including region variants
+such as `en-US`, `zh-TW`, `es-MX` and `fr-CA`. Unsupported preferences fall back to English;
+requests without a language header default to Japanese. The header language selector uses
+`?lang=ja|en|zh|ko|es|fr` to override automatic selection. HTML, metadata, examples and player
+messages all use the selected language; responses vary on `Accept-Language`.
+
+To refresh the exported examples/audio, configure `DATABASE_URL`, `TTS_PROVIDER=google`
+and `GOOGLE_TTS_API_KEY`, then run from `server/`:
+
+```bash
+flask --app localvoice landing prepare-samples
+pytest tests/test_landing.py -q
+```
+
+The export allowlist in `landing_translations.py` contains the Miyajima torii, Nara Great
+Buddha Hall, and Tsutsumine waste-heat stories. JA/EN text comes directly from the DB's spoken
+scripts; the other four languages have version-pinned editorial translations. Export reuses
+shared TTS cache entries, never private audio or trip histories, and rejects missing,
+suspended, expired or changed-version stories. The catalog is published only after all
+audio is ready. Refresh explicitly when source content is changed or withdrawn; public
+sample copies are independent of the live database. The current source records are drafts,
+which is disclosed alongside the source links in the demo's expandable details.
+
+Download links and pricing are intentionally not presented while store release is pending.
+For a separate local preview, run `flask --app localvoice run --port 8001`.
+
+Assets reuse the adopted branding and S1 artwork: `docs/branding/apple-touch-icon.png`
+(also the compact LP logo), `docs/branding/favicon.ico`, and selected illustrations/icons
+from `app/assets/s1/`. Copies are included under the Flask static directory so deploying
+`server/` alone includes all LP resources. Refresh those copies if the source artwork changes.
+
 ## Main settings (environment variables)
 
 | Variable | Purpose |

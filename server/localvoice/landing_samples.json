@@ -1,0 +1,188 @@
+[
+  {
+    "key": "curated:miyajima:torii-stands-by-weight",
+    "content_version": "v1",
+    "review_status": "unreviewed",
+    "icon": "architecture",
+    "places": {
+      "ja": "広島・宮島",
+      "en": "Miyajima, Hiroshima",
+      "zh": "广岛·宫岛",
+      "ko": "히로시마 · 미야지마",
+      "es": "Miyajima, Hiroshima",
+      "fr": "Miyajima, Hiroshima"
+    },
+    "sources": [
+      {
+        "title": "厳島神社",
+        "url": "https://ja.wikipedia.org/wiki/厳島神社"
+      },
+      {
+        "title": "Itsukushima Shrine",
+        "url": "https://en.wikipedia.org/wiki/Itsukushima_Shrine"
+      }
+    ],
+    "languages": {
+      "ja": {
+        "title": "大鳥居は自分の重さで立っている",
+        "body": "海に立つ厳島神社の大鳥居、柱は海底に深く埋まっているのでしょうか、それとも別の支え方でしょうか。答えは、笠木の中に石を詰めるなどして重くし、鳥居自身の重さで立たせる構造なんです。主柱には、巨大なクスノキの自然木が使われています。次にこの近くを通るとき、思い出してください。海の上で、頼りは自分の重さなんです。",
+        "detail": "厳島神社の大鳥居は、海底に柱を深く埋め込んで固定しているわけではありません。笠木の内部に石を詰めるなどして重くし、自らの重さで立つ構造になっています。主柱には巨大なクスノキの自然木が使われています。",
+        "audio": "landing/samples/torii/ja.mp3"
+      },
+      "en": {
+        "title": "The great torii stands by its own weight",
+        "body": "The great torii of Itsukushima Shrine stands in the sea—but are its pillars buried deep in the seabed, or is it supported another way? The answer is that stones are packed inside the top beam to make it heavy, so the gate stands by its own weight. Its main pillars are made from huge natural camphor trees. The next time you pass nearby, remember: out in the sea, it relies on its own weight.",
+        "detail": "The great torii of Itsukushima Shrine is not anchored deep in the seabed. Its top beam is weighted, for example with stones packed inside, so that the gate stands by its own weight. The main pillars are made from huge natural camphor trees.",
+        "audio": "landing/samples/torii/en.mp3"
+      },
+      "zh": {
+        "title": "大鸟居竟然靠自己的重量站立",
+        "body": "严岛神社的大鸟居立在海中。它的柱子深埋在海底吗？还是另有支撑？答案是：通过在顶部横梁内填入石块等方式增加重量，让鸟居靠自身重量站立。主柱用的是巨大的天然樟树木。下次来到附近，记住这个小秘密：它立在海上，依靠的却是自己的重量。",
+        "detail": "严岛神社的大鸟居立在海中。它的柱子深埋在海底吗？还是另有支撑？答案是：通过在顶部横梁内填入石块等方式增加重量，让鸟居靠自身重量站立。主柱用的是巨大的天然樟树木。下次来到附近，记住这个小秘密：它立在海上，依靠的却是自己的重量。",
+        "audio": "landing/samples/torii/zh.mp3"
+      },
+      "ko": {
+        "title": "큰 도리이는 자신의 무게로 서 있다",
+        "body": "바다에 서 있는 이쓰쿠시마 신사의 큰 도리이. 기둥이 바닷속 깊이 박혀 있을까요? 아니면 다른 방법으로 지탱할까요? 위쪽 가로대 안에 돌을 채우는 등 무게를 늘려, 도리이 자체의 무게로 서 있게 한 구조입니다. 주기둥에는 거대한 천연 녹나무를 사용했습니다. 다음에 이 근처를 지날 때 기억해 보세요. 바다 위에서 의지하는 것은 자신의 무게입니다.",
+        "detail": "바다에 서 있는 이쓰쿠시마 신사의 큰 도리이. 기둥이 바닷속 깊이 박혀 있을까요? 아니면 다른 방법으로 지탱할까요? 위쪽 가로대 안에 돌을 채우는 등 무게를 늘려, 도리이 자체의 무게로 서 있게 한 구조입니다. 주기둥에는 거대한 천연 녹나무를 사용했습니다. 다음에 이 근처를 지날 때 기억해 보세요. 바다 위에서 의지하는 것은 자신의 무게입니다.",
+        "audio": "landing/samples/torii/ko.mp3"
+      },
+      "es": {
+        "title": "El gran torii se sostiene por su propio peso",
+        "body": "El gran torii del santuario de Itsukushima se alza en el mar. ¿Sus pilares están enterrados en el fondo, o se sostiene de otra manera? La respuesta está arriba: se introducen piedras en la viga superior para darle peso, y la puerta se mantiene en pie por su propio peso. Los pilares principales son enormes troncos naturales de alcanforero. La próxima vez que pases cerca, recuerda: en medio del mar, su apoyo es su propio peso.",
+        "detail": "El gran torii del santuario de Itsukushima se alza en el mar. ¿Sus pilares están enterrados en el fondo, o se sostiene de otra manera? La respuesta está arriba: se introducen piedras en la viga superior para darle peso, y la puerta se mantiene en pie por su propio peso. Los pilares principales son enormes troncos naturales de alcanforero. La próxima vez que pases cerca, recuerda: en medio del mar, su apoyo es su propio peso.",
+        "audio": "landing/samples/torii/es.mp3"
+      },
+      "fr": {
+        "title": "Le grand torii tient par son propre poids",
+        "body": "Le grand torii du sanctuaire d’Itsukushima se dresse dans la mer. Ses piliers sont-ils profondément enfouis dans le fond marin ? Ou tient-il autrement ? Des pierres placées dans la poutre supérieure alourdissent la porte, qui tient debout par son propre poids. Ses piliers principaux sont d’énormes troncs naturels de camphrier. La prochaine fois que vous passerez à proximité, rappelez-vous : au milieu de la mer, il compte sur son propre poids.",
+        "detail": "Le grand torii du sanctuaire d’Itsukushima se dresse dans la mer. Ses piliers sont-ils profondément enfouis dans le fond marin ? Ou tient-il autrement ? Des pierres placées dans la poutre supérieure alourdissent la porte, qui tient debout par son propre poids. Ses piliers principaux sont d’énormes troncs naturels de camphrier. La prochaine fois que vous passerez à proximité, rappelez-vous : au milieu de la mer, il compte sur son propre poids.",
+        "audio": "landing/samples/torii/fr.mp3"
+      }
+    }
+  },
+  {
+    "key": "curated:nara:daibutsuden-narrower",
+    "content_version": "v1",
+    "review_status": "unreviewed",
+    "icon": "history-topic",
+    "places": {
+      "ja": "奈良・東大寺",
+      "en": "Tōdai-ji, Nara",
+      "zh": "奈良·东大寺",
+      "ko": "나라 · 도다이지",
+      "es": "Tōdai-ji, Nara",
+      "fr": "Tōdai-ji, Nara"
+    },
+    "sources": [
+      {
+        "title": "東大寺",
+        "url": "https://ja.wikipedia.org/wiki/東大寺"
+      },
+      {
+        "title": "Tōdai-ji",
+        "url": "https://en.wikipedia.org/wiki/T%C5%8Ddai-ji"
+      }
+    ],
+    "languages": {
+      "ja": {
+        "title": "大仏殿は昔より狭くなった",
+        "body": "大仏殿は、昔の姿をそのまま受け継いでいると思いがちですが、実はそうではないんです。戦乱で二度焼け、今の建物は江戸時代に再建されました。資材不足などから、正面の幅は創建時より約三割狭くなったそうです。それでも、世界最大級の木造建築。この大仏殿のそばを通るとき、思い出してください。縮んでも、世界最大級。",
+        "detail": "東大寺の大仏殿は戦乱で二度焼失し、現在の建物は江戸時代に再建されたものです。資材の不足などから、正面の幅は創建当初より約3割狭くなりました。それでも世界最大級の木造建築として知られています。",
+        "audio": "landing/samples/buddha-hall/ja.mp3"
+      },
+      "en": {
+        "title": "The Great Buddha Hall used to be wider",
+        "body": "It’s easy to assume the Great Buddha Hall has kept its original size, but that isn’t quite so. After burning down twice in wars, it was rebuilt in the Edo period. Partly because of material shortages, its front is about 30 percent narrower than it was when first built. Even so, it remains one of the largest wooden buildings in the world. Next time you pass by the hall, remember: smaller, yet still among the largest.",
+        "detail": "Todaiji's Great Buddha Hall burned down twice in wars, and the current building is an Edo-period reconstruction. Partly because of material shortages its front is about 30 percent narrower than the original. Even so, it remains one of the largest wooden buildings in the world.",
+        "audio": "landing/samples/buddha-hall/en.mp3"
+      },
+      "zh": {
+        "title": "大佛殿缩小了，却仍是世界最大级别",
+        "body": "你可能以为大佛殿一直保持着最初的规模，其实并不是这样。它在战乱中两次被烧毁，现在的建筑是在江户时代重建的。由于材料不足等原因，正面宽度比最初缩小了约三成。即便如此，它仍是世界上规模最大的木建筑之一。下次经过大佛殿，记住这句话：缩小了，却依旧巨大。",
+        "detail": "你可能以为大佛殿一直保持着最初的规模，其实并不是这样。它在战乱中两次被烧毁，现在的建筑是在江户时代重建的。由于材料不足等原因，正面宽度比最初缩小了约三成。即便如此，它仍是世界上规模最大的木建筑之一。下次经过大佛殿，记住这句话：缩小了，却依旧巨大。",
+        "audio": "landing/samples/buddha-hall/zh.mp3"
+      },
+      "ko": {
+        "title": "줄어들었는데도 세계 최대급, 대불전",
+        "body": "대불전이 처음 지어진 크기를 그대로 이어 왔다고 생각하기 쉽지만, 사실은 그렇지 않습니다. 전란으로 두 번 불탔고, 지금 건물은 에도 시대에 다시 지었습니다. 자재 부족 등의 이유로 정면 폭은 창건 당시보다 약 30퍼센트 줄었다고 합니다. 그래도 세계에서 가장 큰 목조 건축물 중 하나입니다. 다음에 대불전 곁을 지날 때 기억해 보세요. 줄어들었는데도 세계 최대급입니다.",
+        "detail": "대불전이 처음 지어진 크기를 그대로 이어 왔다고 생각하기 쉽지만, 사실은 그렇지 않습니다. 전란으로 두 번 불탔고, 지금 건물은 에도 시대에 다시 지었습니다. 자재 부족 등의 이유로 정면 폭은 창건 당시보다 약 30퍼센트 줄었다고 합니다. 그래도 세계에서 가장 큰 목조 건축물 중 하나입니다. 다음에 대불전 곁을 지날 때 기억해 보세요. 줄어들었는데도 세계 최대급입니다.",
+        "audio": "landing/samples/buddha-hall/ko.mp3"
+      },
+      "es": {
+        "title": "Más pequeño, pero todavía entre los mayores",
+        "body": "Es fácil pensar que el Salón del Gran Buda conserva su tamaño original. Pero no es así. Tras arder dos veces durante guerras, fue reconstruido en el período Edo. Por falta de materiales, entre otros motivos, su fachada quedó aproximadamente un treinta por ciento más estrecha que la original. Aun así, sigue siendo uno de los edificios de madera más grandes del mundo. La próxima vez que pases junto a él, recuerda: más pequeño, pero todavía entre los mayores.",
+        "detail": "Es fácil pensar que el Salón del Gran Buda conserva su tamaño original. Pero no es así. Tras arder dos veces durante guerras, fue reconstruido en el período Edo. Por falta de materiales, entre otros motivos, su fachada quedó aproximadamente un treinta por ciento más estrecha que la original. Aun así, sigue siendo uno de los edificios de madera más grandes del mundo. La próxima vez que pases junto a él, recuerda: más pequeño, pero todavía entre los mayores.",
+        "audio": "landing/samples/buddha-hall/es.mp3"
+      },
+      "fr": {
+        "title": "Plus petit, mais toujours parmi les plus grands",
+        "body": "On pourrait croire que la salle du Grand Bouddha a conservé ses dimensions d’origine. Ce n’est pourtant pas le cas. Après deux incendies lors de guerres, elle a été reconstruite à l’époque d’Edo. Le manque de matériaux, notamment, a réduit sa façade d’environ trente pour cent. Elle reste néanmoins l’un des plus grands bâtiments en bois du monde. La prochaine fois que vous passerez près de cette salle, rappelez-vous : plus petite, mais toujours immense.",
+        "detail": "On pourrait croire que la salle du Grand Bouddha a conservé ses dimensions d’origine. Ce n’est pourtant pas le cas. Après deux incendies lors de guerres, elle a été reconstruite à l’époque d’Edo. Le manque de matériaux, notamment, a réduit sa façade d’environ trente pour cent. Elle reste néanmoins l’un des plus grands bâtiments en bois du monde. La prochaine fois que vous passerez près de cette salle, rappelez-vous : plus petite, mais toujours immense.",
+        "audio": "landing/samples/buddha-hall/fr.mp3"
+      }
+    }
+  },
+  {
+    "key": "gen:xn764e:b636e2f0af00",
+    "content_version": "v1",
+    "review_status": "unreviewed",
+    "icon": "nature",
+    "places": {
+      "ja": "神奈川・堤根",
+      "en": "Tsutsumine, Kanagawa",
+      "zh": "神奈川·堤根",
+      "ko": "가나가와 · 쓰쓰미네",
+      "es": "Tsutsumine, Kanagawa",
+      "fr": "Tsutsumine, Kanagawa"
+    },
+    "sources": [
+      {
+        "title": "川崎市 : 堤根処理センター",
+        "url": "https://www.city.kawasaki.jp/300/page/0000013428.html"
+      },
+      {
+        "title": "川崎市 : 堤根処理センター整備事業について",
+        "url": "https://www.city.kawasaki.jp/300/page/0000186921.html"
+      }
+    ],
+    "languages": {
+      "ja": {
+        "title": "ごみを燃やす熱が、プールにもつながっていた",
+        "body": "ごみ処理施設は、燃やしたらそこでおしまい……と思いきや、堤根では熱のその先がありました。休止前のセンターには出力2,000キロワットの発電設備があり、温水プールなどへ蒸気を送る設備もあったんです。センターは2024年3月末に休止し、川崎市は2026年5月、老朽化した施設を解体して新たな焼却処理施設を整備する方針を公表しました。堤根では、ごみの熱が電気とプールの温水につながっていたんです。",
+        "detail": "休止前の堤根処理センターには、出力2,000キロワットの発電設備がありました。さらに、余熱利用施設の温水プールなどへ蒸気を供給する設備も備えていました。ごみの焼却熱を、電気やプールの温水にも利用する仕組みです。センターは2024年3月末に休止しました。川崎市が2026年5月に公表した整備事業では、老朽化した施設を解体し、新たなごみ焼却処理施設を整備する方針が示されています。",
+        "audio": "landing/samples/waste-heat/ja.mp3"
+      },
+      "en": {
+        "title": "Waste-Incineration Heat Also Served a Pool",
+        "body": "A waste-treatment plant might seem to have one job: burn rubbish and be done. But before its suspension, Tsutsumine had 2,000-kilowatt generating equipment and also supplied steam to facilities including a heated pool. The center was suspended at the end of March 2024, and in May 2026 Kawasaki announced a policy to demolish the aging facility and build a new waste-incineration plant. Here in Tsutsumine, heat from rubbish was connected to both electricity and warm water for a pool.",
+        "detail": "Before its suspension, the Tsutsumine treatment center had electricity-generating equipment rated at 2,000 kilowatts. It also had equipment to supply steam to waste-heat facilities, including a heated swimming pool. Its systems put incineration heat to use for electricity and pool heating. The center was suspended at the end of March 2024. In a project announced in May 2026, Kawasaki set out a policy to demolish the aging facility and build a new waste-incineration plant.",
+        "audio": "landing/samples/waste-heat/en.mp3"
+      },
+      "zh": {
+        "title": "垃圾焚烧的热量，还温暖了泳池",
+        "body": "垃圾处理设施把垃圾烧完，工作就结束了吗？堤根的热量还有下一站。停运前的处理中心有两千千瓦的发电设备，也有向温水游泳池等设施输送蒸汽的设备。中心于二〇二四年三月底停运。二〇二六年五月，川崎市公布了拆除老旧设施、建设新焚烧处理设施的方针。在堤根，垃圾的热量曾变成电力，也连到了泳池的温水。",
+        "detail": "垃圾处理设施把垃圾烧完，工作就结束了吗？堤根的热量还有下一站。停运前的处理中心有两千千瓦的发电设备，也有向温水游泳池等设施输送蒸汽的设备。中心于二〇二四年三月底停运。二〇二六年五月，川崎市公布了拆除老旧设施、建设新焚烧处理设施的方针。在堤根，垃圾的热量曾变成电力，也连到了泳池的温水。",
+        "audio": "landing/samples/waste-heat/zh.mp3"
+      },
+      "ko": {
+        "title": "쓰레기의 열이 수영장 온수까지 이어졌다",
+        "body": "쓰레기 처리 시설은 태우고 나면 끝일까요? 쓰쓰미네에서는 그 열에 다음 행선지가 있었습니다. 가동 중단 전 센터에는 2천 킬로와트 발전 설비가 있었고, 온수 수영장 등에 증기를 보내는 설비도 있었습니다. 센터는 2024년 3월 말에 가동을 중단했습니다. 2026년 5월 가와사키시는 노후 시설을 철거하고 새로운 소각 처리 시설을 정비할 방침을 발표했습니다. 이곳에서는 쓰레기의 열이 전기와 수영장의 온수로 이어졌습니다.",
+        "detail": "쓰레기 처리 시설은 태우고 나면 끝일까요? 쓰쓰미네에서는 그 열에 다음 행선지가 있었습니다. 가동 중단 전 센터에는 2천 킬로와트 발전 설비가 있었고, 온수 수영장 등에 증기를 보내는 설비도 있었습니다. 센터는 2024년 3월 말에 가동을 중단했습니다. 2026년 5월 가와사키시는 노후 시설을 철거하고 새로운 소각 처리 시설을 정비할 방침을 발표했습니다. 이곳에서는 쓰레기의 열이 전기와 수영장의 온수로 이어졌습니다.",
+        "audio": "landing/samples/waste-heat/ko.mp3"
+      },
+      "es": {
+        "title": "El calor de la basura también calentaba una piscina",
+        "body": "Una planta de residuos quema basura, y ya está. ¿O no? Antes de suspender su actividad, el centro de Tsutsumine tenía equipos de generación de dos mil kilovatios y suministraba vapor a instalaciones como una piscina climatizada. El centro dejó de funcionar a finales de marzo de 2024. En mayo de 2026 Kawasaki anunció su intención de demoler la instalación envejecida y construir una nueva planta de incineración. Aquí, el calor de la basura producía electricidad y también agua caliente para una piscina.",
+        "detail": "Una planta de residuos quema basura, y ya está. ¿O no? Antes de suspender su actividad, el centro de Tsutsumine tenía equipos de generación de dos mil kilovatios y suministraba vapor a instalaciones como una piscina climatizada. El centro dejó de funcionar a finales de marzo de 2024. En mayo de 2026 Kawasaki anunció su intención de demoler la instalación envejecida y construir una nueva planta de incineración. Aquí, el calor de la basura producía electricidad y también agua caliente para una piscina.",
+        "audio": "landing/samples/waste-heat/es.mp3"
+      },
+      "fr": {
+        "title": "La chaleur des déchets réchauffait aussi une piscine",
+        "body": "Une usine de traitement des déchets les brûle, puis tout s’arrête ? À Tsutsumine, la chaleur avait une autre destination. Avant sa suspension, le centre disposait d’équipements de production électrique de deux mille kilowatts et fournissait de la vapeur à des installations dont une piscine chauffée. Il a été suspendu fin mars 2024. En mai 2026, Kawasaki a annoncé son intention de démolir le site vieillissant et de construire une nouvelle usine d’incinération. Ici, la chaleur des déchets donnait de l’électricité et de l’eau chaude pour une piscine.",
+        "detail": "Une usine de traitement des déchets les brûle, puis tout s’arrête ? À Tsutsumine, la chaleur avait une autre destination. Avant sa suspension, le centre disposait d’équipements de production électrique de deux mille kilowatts et fournissait de la vapeur à des installations dont une piscine chauffée. Il a été suspendu fin mars 2024. En mai 2026, Kawasaki a annoncé son intention de démolir le site vieillissant et de construire une nouvelle usine d’incinération. Ici, la chaleur des déchets donnait de l’électricité et de l’eau chaude pour une piscine.",
+        "audio": "landing/samples/waste-heat/fr.mp3"
+      }
+    }
+  }
+]
