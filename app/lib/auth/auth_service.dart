@@ -9,6 +9,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../api/api_client.dart';
 import '../config.dart';
+import '../util/i18n.dart';
 
 class UserInfo {
   UserInfo(this.json);
@@ -82,6 +83,7 @@ class AuthService extends ChangeNotifier {
     final r = await api.postPublic('/api/v1/auth/register', {
       'login_id': loginId,
       'password': password,
+      'device_language': deviceLanguageTag(),
       if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
       if (recoveryEmail != null && recoveryEmail.isNotEmpty) 'recovery_email': recoveryEmail,
     });
@@ -137,7 +139,10 @@ class AuthService extends ChangeNotifier {
 
   Future<void> signInWithGoogle() async {
     final token = await _googleIdToken();
-    final r = await api.postPublic('/api/v1/auth/google', {'id_token': token});
+    final r = await api.postPublic('/api/v1/auth/google', {
+      'id_token': token,
+      'device_language': deviceLanguageTag(),
+    });
     await _signedIn(r.json);
   }
 
@@ -203,6 +208,7 @@ class AuthService extends ChangeNotifier {
         'id_token': cred.identityToken,
         'authorization_code': cred.authorizationCode,
         'code_verifier': verifier,
+        'device_language': deviceLanguageTag(),
         if (name.isNotEmpty) 'display_name': name,
       };
     }
@@ -212,6 +218,7 @@ class AuthService extends ChangeNotifier {
       'challenge_id': start['challenge_id'],
       'handoff_code': cred.authorizationCode,
       'code_verifier': verifier,
+      'device_language': deviceLanguageTag(),
     };
   }
 

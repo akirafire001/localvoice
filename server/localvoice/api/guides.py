@@ -1,14 +1,14 @@
 """Guide feedback (api-design POST /guides/{history_id}/feedback)."""
 from datetime import timedelta
 
-from flask import Blueprint, g, jsonify
+from flask import Blueprint, current_app, g, jsonify
 from sqlalchemy import select
 
 from ..auth.sessions import require_auth
 from ..db import get_db
 from ..errors import ApiError, bad_request, not_found
 from ..models import KnowledgeItem, NotificationHistory, Participant, TopicBoost, TripSession, UserInterest
-from ..services import engine, memory
+from ..services import engine, memory, next_story
 from ..services.rendering import sources_payload
 from ..util import json_body, now, parse_uuid
 
@@ -17,6 +17,8 @@ bp = Blueprint("guides", __name__)
 RATINGS = {"interesting", "knew_it", "not_interesting", "wrong_info"}
 ACTIONS = RATINGS | {"more_detail", "more_related", "enough_topic", "like", "dislike", "skip_story", "opened", "spoken"}
 LEARN = {"interesting": 0.1, "like": 0.1, "more_detail": 0.05, "more_related": 0.05, "not_interesting": -0.1, "dislike": -0.1}
+# These change which story should come next, so anything already prepared is dropped.
+INVALIDATE_NEXT = {"more_related", "enough_topic", "not_interesting", "dislike", "wrong_info"}
 
 
 def get_owned_history(db, history_id):
@@ -56,6 +58,7 @@ def feedback(history_id):
     item = db.get(KnowledgeItem, h.knowledge_item_id)
     t = now()
     resp = {"status": "ok", "action": action}
+    prepare_more = False
 
     if action == "opened":
         h.opened = True
@@ -106,9 +109,21 @@ def feedback(history_id):
             if snap is None:
                 resp.update({"guide": None, "decision": {"reason": "no_context"}})
             else:
-                result = engine.evaluate(db, trip, g.user, snap, trigger="skip_story", exclude_ids=[item.id])
+                taken = next_story.take(db, trip, g.user, snap, h.id)
+                if taken and taken["result"]:
+                    result, keep = taken["result"], taken["remaining"]
+                else:
+                    result = engine.evaluate(db, trip, g.user, snap, trigger="skip_story", exclude_ids=[item.id])
+                    keep = []
                 if result["guide"] is not None:
                     memory.maybe_update(db, trip)
+                    prepare_more = next_story.schedule(db, trip, result["guide"]["history_id"], snap, keep_stories=keep)
                 resp.update(result)
+    if action in INVALIDATE_NEXT and trip.ended_at is None:
+        snap = engine.latest_snapshot(db, trip)
+        if snap is not None:
+            prepare_more = next_story.invalidate(db, trip, h.id, snap) or prepare_more
     db.commit()
+    if prepare_more:
+        next_story.kick(current_app._get_current_object(), trip.id)
     return jsonify(resp)

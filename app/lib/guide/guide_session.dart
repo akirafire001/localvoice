@@ -69,6 +69,9 @@ class GuideSession extends ChangeNotifier {
   Motion? lastMotion;
   GpsState gps = GpsState.off;
   String? lastDecision;
+  /// True while a story button is waiting for the server. Audio playback is not included.
+  bool feedbackBusy = false;
+  String? feedbackAction;
   bool offline = false;
   StreamSubscription<Position>? _sub;
   bool _sending = false;
@@ -137,11 +140,13 @@ class GuideSession extends ChangeNotifier {
     if (trip == null) return null;
     await stopGps();
     await audio.stop();
-    await _flushUnsent();
+    // Close the trip before uploading leftover points. A fresh point sent first would
+    // run another full story selection, and finish itself no longer waits on the summary model.
     final r = (await api.post('/api/v1/trips/$tripId/finish')).json;
     trip = r;
     await store!.set('active_trip_id', null);
     notifyListeners();
+    unawaited(_flushUnsent());
     return r['summary'] as Map<String, dynamic>?;
   }
 
@@ -281,30 +286,51 @@ class GuideSession extends ChangeNotifier {
     }
   }
 
-  Future<void> _onGuide(Map<String, dynamic> g) async {
+  Future<void> _onGuide(Map<String, dynamic> g, {bool waitForAudio = true}) async {
     guides.add(g);
     current = g;
     await store?.saveGuide(tripId!, g);
     notifyListeners();
     if (!appInForeground) await notifier.showGuide(g);
-    await audio.autoPlay(g);
+    final playing = audio.autoPlay(g);
+    if (waitForAudio) {
+      await playing;
+    } else {
+      unawaited(() async {
+        try {
+          await playing;
+        } catch (_) {}
+      }());
+    }
   }
 
   /// Feedback actions (api-design feedback). Returns the server response.
-  Future<Map<String, dynamic>> feedback(Map<String, dynamic> guide, String action) async {
-    final r = (await api.post('/api/v1/guides/${guide['history_id']}/feedback', {'action': action})).json;
-    if (['interesting', 'knew_it', 'not_interesting', 'wrong_info'].contains(action)) {
-      guide['rating'] = action;
-      await store?.saveGuide(tripId ?? '', guide);
-    }
-    if (action == 'more_detail' && r['detail_text'] != null) {
-      guide['detail_text'] = r['detail_text'];
-    }
-    if (action == 'skip_story' || action == 'wrong_info') await audio.stop();
-    final g = r['guide'];
-    if (g is Map) await _onGuide(g.cast<String, dynamic>());
+  /// The future completes when the new story is on screen, not when its audio ends.
+  Future<Map<String, dynamic>?> feedback(Map<String, dynamic> guide, String action) async {
+    if (feedbackBusy) return null;
+    feedbackBusy = true;
+    feedbackAction = action;
     notifyListeners();
-    return r;
+    try {
+      // Stop the current voice before the round trip, so the tap is audible immediately.
+      if (action == 'skip_story' || action == 'wrong_info') await audio.stop();
+      final r = (await api.post('/api/v1/guides/${guide['history_id']}/feedback', {'action': action})).json;
+      if (['interesting', 'knew_it', 'not_interesting', 'wrong_info'].contains(action)) {
+        guide['rating'] = action;
+        await store?.saveGuide(tripId ?? '', guide);
+      }
+      if (action == 'more_detail' && r['detail_text'] != null) {
+        guide['detail_text'] = r['detail_text'];
+      }
+      final g = r['guide'];
+      if (g is Map) await _onGuide(g.cast<String, dynamic>(), waitForAudio: false);
+      notifyListeners();
+      return r;
+    } finally {
+      feedbackBusy = false;
+      feedbackAction = null;
+      notifyListeners();
+    }
   }
 
   // ------------------------------------------------------------ P1: instructions, states, companions

@@ -1,6 +1,7 @@
 """/context pipeline: rules → (LLM) selection → validation/fallback → decision log (mvp-technical-design §7-8)."""
 import logging
 import math
+import uuid
 from datetime import timedelta, timezone
 
 from flask import current_app
@@ -160,7 +161,11 @@ def latest_snapshot(db, trip):
 # ---------------------------------------------------------------- decision
 
 
-def _silent(db, trip, snap, reason, mode, next_after=60, candidates=None, rule_choice=None, **extra):
+def _silent(db, trip, snap, reason, mode, next_after=60, candidates=None, rule_choice=None, *, record=True, **extra):
+    decision = {"reason": reason, "next_check_after_sec": next_after}
+    if not record:
+        # A prepared "nothing to say" is not a decision the traveller has been shown.
+        return {"guide": None, "draft": None, "decision": decision}
     d = GuideDecision(
         trip_session_id=trip.id,
         context_snapshot_id=snap.id if snap is not None else None,
@@ -174,7 +179,8 @@ def _silent(db, trip, snap, reason, mode, next_after=60, candidates=None, rule_c
     )
     db.add(d)
     db.flush()
-    return {"guide": None, "decision": {"reason": reason, "next_check_after_sec": next_after, "decision_id": str(d.id)}}
+    decision["decision_id"] = str(d.id)
+    return {"guide": None, "decision": decision}
 
 
 def llm_cost_so_far(db, trip_id):
@@ -219,7 +225,7 @@ def _course_confident(snap):
     return speed >= 1.0
 
 
-def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
+def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=True, extra_history=(), seed_extra=0):
     """Decide whether to speak for this snapshot. Always records a GuideDecision."""
     cfg = _cfg()
     t = now()
@@ -235,7 +241,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
         settings["detail_mode"] = detail_override
 
     if snap.accuracy_m is not None and float(snap.accuracy_m) > cfg.MAX_ACCURACY_M:
-        return _silent(db, trip, snap, "low_accuracy", mode, 30, trigger=trigger)
+        return _silent(db, trip, snap, "low_accuracy", mode, 30, trigger=trigger, record=record)
 
     quiet = db.execute(
         select(TemporaryState).where(
@@ -246,18 +252,18 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
         )
     ).scalar_one_or_none()
     if quiet is not None and not manual:
-        return _silent(db, trip, snap, "quiet_mode", mode, int((quiet.expires_at - t).total_seconds()), trigger=trigger)
+        return _silent(db, trip, snap, "quiet_mode", mode, int((quiet.expires_at - t).total_seconds()), trigger=trigger, record=record)
 
-    history = todays_history(db, trip.id, t)
+    history = todays_history(db, trip.id, t) + list(extra_history)
     auto_hist = [h for h in history if h.channel == "auto"]
     if not manual and auto_hist:
         since_last = (t - auto_hist[-1].shown_at).total_seconds()
         if since_last < level["cooldown_sec"]:
-            return _silent(db, trip, snap, "cooldown", mode, int(level["cooldown_sec"] - since_last) + 1, trigger=trigger)
+            return _silent(db, trip, snap, "cooldown", mode, int(level["cooldown_sec"] - since_last) + 1, trigger=trigger, record=record)
         last_hour = [h for h in auto_hist if h.shown_at > t - timedelta(hours=1)]
         if len(last_hour) >= level["hourly_limit"]:
             wait = int((last_hour[0].shown_at + timedelta(hours=1) - t).total_seconds()) + 1
-            return _silent(db, trip, snap, "hourly_limit", mode, max(wait, 60), trigger=trigger)
+            return _silent(db, trip, snap, "hourly_limit", mode, max(wait, 60), trigger=trigger, record=record)
 
     lat, lon = snapshot_point(snap)
     tclass = snap.inferred_transport_mode or "walking"
@@ -287,7 +293,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
         boosts=boosts,
         history=history,
         serendipity=settings["serendipity"],
-        seed=seed_for(snap.client_event_id) + (1 if manual else 0),
+        seed=seed_for(snap.client_event_id) + (1 if manual else 0) + seed_extra,
         excluded_ids=exclude_ids,
         heard_ids=heard_before_ids(db, user.id, trip.id, [c.item.id for c in raw]),
         t=t,
@@ -302,7 +308,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
     _maybe_enqueue_generation(db, lat, lon, course if confident else None, tclass, n_unheard)
     if not top:
         reason = "no_candidates" if not ranked else "below_threshold"
-        return _silent(db, trip, snap, reason, mode, 60, candidates=ranked[:10], trigger=trigger)
+        return _silent(db, trip, snap, reason, mode, 60, candidates=ranked[:10], trigger=trigger, record=record)
 
     rule_choice = top[0]
     narr_langs = narration_languages(user)
@@ -360,7 +366,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
             elif result.action == "stay_silent":
                 return _silent(
                     db, trip, snap, "llm_silent", mode, 60, candidates=top, rule_choice=rule_choice,
-                    trigger=trigger, llm_reason=result.reason, **llm_meta, **decision_extra,
+                    trigger=trigger, llm_reason=result.reason, record=record, **llm_meta, **decision_extra,
                 )
             else:
                 selection = result
@@ -378,43 +384,24 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
         intros = selection.intros
     intro = intros.get(trip.language, "")
     narrations = _narrations(item, narr_langs, intros, settings["detail_mode"])
-    decision = GuideDecision(
-        trip_session_id=trip.id,
-        context_snapshot_id=snap.id,
-        trigger=trigger,
-        candidates_json=[c.summary() for c in top],
-        rule_choice_id=rule_choice.item.id,
-        llm_choice_id=item.id if selection is not None else None,
-        final_action="speak",
-        reason="selected",
-        llm_reason=selection.reason if selection else None,
-        selection_mode=mode,
-        fallback=fallback,
-        fallback_reason=fallback_reason,
-        **llm_meta,
-        input_json=decision_extra["input_json"],
-    )
-    db.add(decision)
-    db.flush()
-    hist = NotificationHistory(
-        trip_session_id=trip.id,
-        knowledge_item_id=item.id,
-        guide_decision_id=decision.id,
-        channel="manual" if manual else "auto",
-        score=chosen.score,
-        score_components={
+    draft = {
+        "knowledge_item_id": str(item.id),
+        "rule_choice_id": str(rule_choice.item.id),
+        "llm_choice_id": str(item.id) if selection is not None else None,
+        "title": title,
+        "text": text,
+        "detail_text": body,
+        "language": trip.language,
+        "score": float(chosen.score),
+        "score_components": {
             **chosen.components,
             "category": item.category,
             "duplicate_group": (item.metadata_json or {}).get("duplicate_group"),
             "used_claim_ids": selection.used_claim_ids if selection else [],
             "story_type": _storytelling(item).get("story_type"),
         },
-        title=title,
-        rendered_text=text,
-        detail_text=body,
-        language=trip.language,
-        selection_mode="llm" if selection is not None else "rule",
-        speech_snapshot_json={
+        "selection_mode": "llm" if selection is not None else "rule",
+        "speech": {
             "text": f"{intro} {speech_text}" if intro else speech_text,  # all that is heard (device TTS reads it)
             "intro": intro or None,
             "body": speech_text,
@@ -426,20 +413,80 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=()):
             # recorded so the next stories avoid the same techniques, and for learning which ones work
             "techniques": _item_techniques(item),
         },
+        "location": location_payload(chosen),
+        "detail_mode": settings["detail_mode"],
+        "candidates": [c.summary() for c in top],
+        "llm_reason": selection.reason if selection else None,
+        "fallback": fallback,
+        "fallback_reason": fallback_reason,
+        "llm_meta": {
+            k: (float(v) if k == "estimated_cost" and v is not None else v) for k, v in llm_meta.items()
+        },
+        "input_json": decision_extra["input_json"],
+        "trigger": trigger,
+    }
+    if not record:
+        return {"guide": None, "draft": draft, "decision": {"reason": "selected", "fallback": fallback, "next_check_after_sec": 60}}
+    return materialize(db, trip, user, snap, draft)
+
+
+def materialize(db, trip, user, snap, draft):
+    """Turn a prepared story into the guide the traveller is actually shown."""
+    item = db.get(KnowledgeItem, uuid.UUID(draft["knowledge_item_id"]))
+    if item is None or item.review_status == "suspended":
+        return None
+    if item.valid_until is not None and item.valid_until <= now():
+        return None
+    trigger = draft.get("trigger") or "context"
+    meta = draft.get("llm_meta") or {}
+    decision = GuideDecision(
+        trip_session_id=trip.id,
+        context_snapshot_id=snap.id if snap is not None else None,
+        trigger=trigger,
+        candidates_json=draft.get("candidates") or [],
+        rule_choice_id=uuid.UUID(draft["rule_choice_id"]) if draft.get("rule_choice_id") else None,
+        llm_choice_id=uuid.UUID(draft["llm_choice_id"]) if draft.get("llm_choice_id") else None,
+        final_action="speak",
+        reason="selected",
+        llm_reason=draft.get("llm_reason"),
+        selection_mode=draft.get("selection_mode") or "rule",
+        fallback=bool(draft.get("fallback")),
+        fallback_reason=draft.get("fallback_reason"),
+        llm_model=meta.get("llm_model"),
+        prompt_version=meta.get("prompt_version"),
+        latency_ms=meta.get("latency_ms"),
+        estimated_cost=meta.get("estimated_cost"),
+        input_json=draft.get("input_json") or {},
+    )
+    db.add(decision)
+    db.flush()
+    hist = NotificationHistory(
+        trip_session_id=trip.id,
+        knowledge_item_id=item.id,
+        guide_decision_id=decision.id,
+        channel="manual" if trigger != "context" else "auto",
+        score=draft["score"],
+        score_components=draft.get("score_components") or {},
+        title=draft["title"],
+        rendered_text=draft["text"],
+        detail_text=draft["detail_text"],
+        language=draft["language"],
+        selection_mode=draft["selection_mode"],
+        speech_snapshot_json=draft["speech"],
     )
     db.add(hist)
     db.flush()
     guide = guide_payload(
-        hist, item, location_payload(chosen),
+        hist, item, draft.get("location"),
         voice_for=lambda lang: default_voice(user, lang), selection_mode=hist.selection_mode,
     )
     return {
         "guide": guide,
         "decision": {
-            "score": round(chosen.score, 4),
+            "score": round(float(draft["score"]), 4),
             "reason": "selected",
             "decision_id": str(decision.id),
-            "fallback": fallback,
+            "fallback": bool(draft.get("fallback")),
             "next_check_after_sec": 60,
         },
     }
