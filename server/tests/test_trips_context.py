@@ -21,7 +21,8 @@ def _send(client, t, trip_id, body):
     return r.get_json()
 
 
-def test_no_candidates_is_silent(client):
+def test_no_candidates_is_silent(app, client):
+    app.config["LV"].TUTORIAL_ENABLED = False  # the first trip's tutorial: test_waiting.py
     t = register(client)
     trip = _trip(client, t)
     res = _send(client, t, trip, ctx(LAT, LON))
@@ -63,6 +64,7 @@ def test_cooldown_duplicate_and_conflict(app, client):
 
 
 def test_low_accuracy_and_quality_filters(app, client):
+    app.config["LV"].TUTORIAL_ENABLED = False
     t = register(client)
     add_item(app, "沿革だけ", LAT, LON, auto_eligible=False)
     add_item(app, "停止中", LAT, LON, review_status="suspended")
@@ -295,6 +297,7 @@ def test_pacing_is_explained_and_speaking_is_not_interrupted(app, client):
 
 
 def test_no_candidates_reports_search_state(app, client, monkeypatch):
+    app.config["LV"].TUTORIAL_ENABLED = False
     t = register(client)
     trip = _trip(client, t)
     res = _send(client, t, trip, ctx(LAT, LON))
@@ -304,7 +307,7 @@ def test_no_candidates_reports_search_state(app, client, monkeypatch):
 
     monkeypatch.setattr(engine, "_generation_running", lambda *a: True)
     res = _send(client, t, trip, ctx(LAT, LON))
-    assert res["decision"]["searching"] is True and res["decision"]["next_check_after_sec"] == 30
+    assert res["decision"]["searching"] is True and res["decision"]["next_check_after_sec"] == 10
 
 
 def test_continuous_mode_moves_on_without_skip(app, client):

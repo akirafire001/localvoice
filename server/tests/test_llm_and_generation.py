@@ -159,6 +159,9 @@ def test_context_enqueues_generation_and_worker_stores_attributed_items(app, cli
         jobs = db.execute(select(KnowledgeGenerationJob)).scalars().all()
         assert len(jobs) >= 2  # current cell + look-ahead cells
         assert max(j.priority for j in jobs) == 10
+        assert all(j.stage == "fast" for j in jobs)  # nothing written there yet: a quick round first
+        here = next(j for j in jobs if j.priority == 10)
+        assert here.warm_json == {"ja": "ja-default"}  # the traveller's voice, for the first stories' audio
     # second context in the same cell does not enqueue again
     _send(client, t, trip, ctx(LAT, LON, speed=10, course=0, mode="motorized"))
     with session_scope(app) as db:
@@ -173,8 +176,10 @@ def test_context_enqueues_generation_and_worker_stores_attributed_items(app, cli
 
     with app.app_context():
         n = process_generation(app, max_jobs=10)
-    assert n == len(jobs)
+    assert n == 2 * len(jobs)  # each fast round is followed by the cell's deep research
     with session_scope(app) as db:
+        stages = sorted(j.stage for j in db.execute(select(KnowledgeGenerationJob)).scalars())
+        assert stages == ["fast"] * len(jobs) + ["full"] * len(jobs)
         items = db.execute(select(KnowledgeItem).where(KnowledgeItem.origin == "generated")).scalars().all()
         titles = {i.title: i for i in items}
         assert "出典のない話" not in titles

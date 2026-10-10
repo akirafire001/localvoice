@@ -94,6 +94,29 @@ class GeneratedBadge extends StatelessWidget {
   );
 }
 
+/// Marks a story told while the stories of this place were not ready yet (server guide.waiting).
+class WaitingBadge extends StatelessWidget {
+  const WaitingBadge(this.kind, {super.key});
+  final String kind;
+
+  static String? label(String? kind) => switch (kind) {
+    'tutorial' => tr('使い方', 'How to use'),
+    'nearby' => tr('少し離れた場所の話', 'From a little further away'),
+    'global' => tr('どこでも通じる話', 'Holds anywhere'),
+    _ => null,
+  };
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Text(label(kind) ?? kind, style: Theme.of(context).textTheme.labelSmall),
+  );
+}
+
 class PasswordField extends StatefulWidget {
   const PasswordField({super.key, required this.controller, this.label, this.autofill});
   final TextEditingController controller;

@@ -172,6 +172,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                         children: [
                           Text('${categoryLabel(g['category'] as String?)} · ${fmtTime(g['shown_at'] as String?)}'),
                           if (g['origin'] == 'generated') const GeneratedBadge(),
+                          if (WaitingBadge.label(g['waiting'] as String?) != null) WaitingBadge(g['waiting'] as String),
                         ],
                       ),
                       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),

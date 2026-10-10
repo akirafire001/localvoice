@@ -111,6 +111,34 @@ Rules:
 Story types:
 """ + "\n".join(f"  {k}: {v}" for k, v in storytelling.STORY_TYPES.items()) + "\n\n" + storytelling.SPEECH_RULES + "\n\n" + storytelling.TECHNIQUE_GUIDE
 
+# Stories that hold anywhere in the world, told while the stories of a new place are still being written
+# (knowledge_gen.generate_global). Same rules and storytelling; only the scope differs.
+GLOBAL_GENERATE_SYSTEM = GENERATE_SYSTEM + """
+
+This request has scope "global": the materials are about things a traveller meets anywhere in the world (the sky, maps and time, roads and railways, plants and birds in towns, food that spread across the world, signs and symbols, money, the body on the move). Tell each as a story that holds wherever the listener is; never claim it is about the place here or name the listener's location. Anchor every item at area_center with radius_m 5000; why_here says it can be heard anywhere. Skip anything true only in some countries unless the story says so."""
+GLOBAL_RESEARCH_THEMES = [
+    ("sky", "空・雲・夕焼け・虹・月など、世界のどこでも見られる空の現象とその仕組み"),
+    ("maps_time", "地図・方位・緯度経度・GPS・標準時と時差など、移動と位置・時刻の仕組みとその由来"),
+    ("place_names", "世界の地名のでき方に共通するパターン（川・山・人名・聖人・先住民の言葉など）"),
+    ("roads", "道路・信号・道路標識・番地・右側通行と左側通行など、道と街路の仕組みの由来"),
+    ("railways", "鉄道の線路の幅・時刻表・駅など、鉄道が世界に広めた仕組みとその由来"),
+    ("urban_nature", "街路樹・ハト・カラス・スズメなど、世界の街に住む植物や生き物の話"),
+    ("travel_body", "時差ぼけ・乗り物酔い・歩く速さ・高地など、旅と体の科学"),
+    ("food_spread", "トマト・唐辛子・ジャガイモ・コーヒー・茶など、世界に広まった食べ物の伝わり方"),
+    ("calendar", "暦・曜日・時刻・12進法や60進法など、時の数え方の由来"),
+    ("buildings", "屋根の形と気候、窓、レンガ、エレベーターなど、建物に共通する仕組みの由来"),
+    ("symbols", "文字・数字・ピクトグラム（非常口のマークなど）・地図記号の由来"),
+    ("money", "硬貨・紙幣・クレジットカード・チップなど、お金の仕組みの由来"),
+]
+GLOBAL_PROMPT = """次のテーマについて、Web検索で調べてください。
+
+知りたいこと: {theme}
+
+世界のどこを旅していても当てはまる事柄を探してください。特定の国や地域でしか通用しない話は除くか、どこの話かを必ず添えてください。
+百科事典、大学・研究機関・博物館、公的機関、信頼できる報道を優先してください。
+見つかった事柄を1つずつ、1〜2文の日本語で、それがなぜそうなのか（理由や背景）が分かればそれも添えて、出典付きで書いてください。
+出典で確かめられないことは書かないでください。見つからなければ「該当なし」とだけ書いてください。"""
+
 MAX_RESEARCH_TOWNS = 3
 # Research themes, most telling first. One web search per theme; a generation job researches a few themes a town
 # has not had yet, so towns people keep passing through get deeper over time instead of paying for every theme up
@@ -480,17 +508,20 @@ class ClaudeLLM:
 
     # ------------------------------------------------------------ A. generate knowledge
 
-    def generate_items(self, cell, center, materials, already_told=None, country=None):
-        """`country` (a name) asks for stories about manners common to that whole country (scope "country")."""
+    def generate_items(self, cell, center, materials, already_told=None, country=None, scope=None):
+        """`country` (a name) asks for stories about manners common to that whole country (scope "country");
+        scope "global" for stories that hold anywhere in the world."""
         payload = {"area_cell": cell, "area_center": {"lat": center[0], "lon": center[1]}, "materials": materials}
         if country:
             payload.update(scope="country", country=country)
+        if scope == "global":
+            payload["scope"] = "global"
         if already_told:
             payload["already_told"] = already_told
         user = json.dumps(payload, ensure_ascii=False)
         try:
             data, meta = self._json_call(
-                GENERATE_SYSTEM, user, GENERATE_SCHEMA, self.cfg.LLM_GENERATE_EFFORT,
+                GLOBAL_GENERATE_SYSTEM if scope == "global" else GENERATE_SYSTEM, user, GENERATE_SCHEMA, self.cfg.LLM_GENERATE_EFFORT,
                 self.cfg.LLM_GENERATE_TIMEOUT_SEC, max_tokens=24000, model=self.generate_model,
             )
         except _MetaError as e:
@@ -548,7 +579,7 @@ class ClaudeLLM:
         else:
             names = "、".join(f"{t['municipality']}{t['town']}" for t in towns)
         avoid = _avoid(known)
-        materials, metas, errors, done, found_n = [], [], [], [], {}
+        prompts = []
         for key, theme in LOCAL_RESEARCH_THEMES:
             if themes is not None and key not in themes:
                 continue
@@ -557,36 +588,57 @@ class ClaudeLLM:
             if key in LOCAL_MANNER_THEMES:
                 theme += "\n" + _LOCAL_ONLY
             prompt = LOCAL_HISTORY_PROMPT.format(towns=names, theme=theme, sources=SOURCES_ABROAD if abroad else SOURCES_JAPAN)
+            prompts.append((key, prompt + avoid))
+        return self._research_themes(prompts)
+
+    # Theme searches of one job run at the same time (RESEARCH_PARALLEL). Off where calls must keep their order.
+    parallel_research = True
+
+    def _research_themes(self, prompts):
+        """One web search per (theme key, prompt); results are combined in the themes' order."""
+        def one(prompt):
             try:
-                found, meta = self._web_research(prompt + avoid, max_uses=4)
+                return self._web_research(prompt, max_uses=4)
             except LLMError as e:
-                errors.append(str(e))
+                return e
+
+        workers = max(1, min(len(prompts), int(getattr(getattr(self, "cfg", None), "RESEARCH_PARALLEL", 1) or 1)))
+        if self.parallel_research and workers > 1:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                results = list(pool.map(one, [p for _, p in prompts]))
+        else:
+            results = [one(p) for _, p in prompts]
+        materials, metas, errors, done, found_n = [], [], [], [], {}
+        for (key, _), r in zip(prompts, results):
+            if isinstance(r, LLMError):
+                errors.append(str(r))
                 continue
+            found, meta = r
             materials += found
             metas.append(meta)
             done.append(key)
             found_n[key] = len(found)
         return _research_result(materials, metas, errors, done, found_n)
 
+    def research_global(self, themes=None, known=None):
+        """One web search per GLOBAL_RESEARCH_THEMES theme about things a traveller meets anywhere."""
+        avoid = _avoid(known)
+        prompts = [(key, GLOBAL_PROMPT.format(theme=theme) + avoid)
+                   for key, theme in GLOBAL_RESEARCH_THEMES if themes is None or key in themes]
+        return self._research_themes(prompts)
+
     def research_country_customs(self, country, themes=None, known=None):
         """One web search per COUNTRY_RESEARCH_THEMES theme about manners common to the whole country, for
         travellers who do not live there. `country` is its name (Japanese where OSM has it)."""
         avoid = _avoid(known)
-        materials, metas, errors, done, found_n = [], [], [], [], {}
-        for key, theme in COUNTRY_RESEARCH_THEMES:
-            if themes is not None and key not in themes:
-                continue
-            prompt = COUNTRY_PROMPT.format(country=country, theme=theme.format(country=country))
-            try:
-                found, meta = self._web_research(prompt + avoid, max_uses=4)
-            except LLMError as e:
-                errors.append(str(e))
-                continue
-            materials += found
-            metas.append(meta)
-            done.append(key)
-            found_n[key] = len(found)
-        return _research_result(materials, metas, errors, done, found_n)
+        prompts = [
+            (key, COUNTRY_PROMPT.format(country=country, theme=theme.format(country=country)) + avoid)
+            for key, theme in COUNTRY_RESEARCH_THEMES
+            if themes is None or key in themes
+        ]
+        return self._research_themes(prompts)
 
     def _web_research(self, prompt, max_uses):
         import anthropic

@@ -25,6 +25,7 @@ from . import geo
 from . import storytelling
 from .llm import (
     COUNTRY_RESEARCH_THEMES,
+    GLOBAL_RESEARCH_THEMES,
     LOCAL_HISTORY_PROMPT_VERSION,
     LOCAL_RESEARCH_THEMES,
     VISUAL_PATTERNS,
@@ -67,7 +68,8 @@ def cells_for(lat, lon, course, tclass, nearby=False):
     return out
 
 
-def enqueue_for_position(db, lat, lon, course, tclass, nearby=False):
+def enqueue_for_position(db, lat, lon, course, tclass, nearby=False, warm=None):
+    """`warm` (language -> voice_profile_id): the waiting traveller's voices, used by a fast job for the cell here."""
     t = now()
     for cell, prio in cells_for(lat, lon, course, tclass, nearby):
         db.execute(insert(AreaCoverage).values(area_cell=cell, status="none", item_count=0).on_conflict_do_nothing())
@@ -95,8 +97,11 @@ def enqueue_for_position(db, lat, lon, course, tclass, nearby=False):
             cov.status, cov.item_count, cov.generated_at = "done", curated, t
             cov.expires_at = t + timedelta(days=_cfg().COVERAGE_TTL_DAYS)
             continue
+        # A cell with no stories yet first gets a quick round, saved at once; the deep research follows (run_job).
+        stage = "fast" if not cov.item_count else "full"
         cov.status = "queued"
-        db.add(KnowledgeGenerationJob(area_cell=cell, priority=prio))
+        db.add(KnowledgeGenerationJob(area_cell=cell, priority=prio, stage=stage,
+                                      warm_json=(warm or None) if stage == "fast" and prio == 10 else None))
 
 
 def generation_running(db, lat, lon, course, tclass):
@@ -109,11 +114,13 @@ def generation_running(db, lat, lon, course, tclass):
     return busy > 0
 
 
-def claim_job(db):
+def claim_job(db, stages=None):
+    """The next queued job, highest priority first. `stages` limits it to those stages (a fast-only thread)."""
+    q = select(KnowledgeGenerationJob).where(KnowledgeGenerationJob.status == "queued")
+    if stages:
+        q = q.where(KnowledgeGenerationJob.stage.in_(stages))
     job = db.execute(
-        select(KnowledgeGenerationJob)
-        .where(KnowledgeGenerationJob.status == "queued")
-        .order_by(KnowledgeGenerationJob.priority.desc(), KnowledgeGenerationJob.created_at)
+        q.order_by(KnowledgeGenerationJob.priority.desc(), KnowledgeGenerationJob.created_at)
         .limit(1)
         .with_for_update(skip_locked=True)
     ).scalar_one_or_none()
@@ -129,18 +136,39 @@ def claim_job(db):
     return job
 
 
+# A deep job follows its cell's fast one this far down the queue, so the quick rounds of the cells around run first
+DEEP_PRIORITY_DROP = 10
+
+
 def run_job(db, job):
-    """Generate items for one cell. Commits its own result."""
+    """Generate items for one cell. Commits as it goes: each round of stories can be told as soon as it is saved."""
     cell = job.area_cell
     cov = db.get(AreaCoverage, cell)
     t = now()
+    fast = job.stage == "fast"
+    progress = {"created": 0}
+
+    def saved(n):
+        progress["created"] += n
+        if cov:
+            cov.item_count = (cov.item_count or 0) + n
+        db.commit()
+
     try:
-        created, more = _generate(db, cell)
+        created, more = _generate(db, cell, stage="fast" if fast else "full", on_saved=saved)
         job.status, job.finished_at, job.error = "done", now(), None
         if cov:
-            cov.status = "partial" if more else "done"
-            cov.item_count, cov.generated_at = (cov.item_count or 0) + created, t
+            cov.generated_at = t
             cov.expires_at = t + timedelta(days=_cfg().COVERAGE_TTL_DAYS)
+            if fast:
+                # the deep research for the same cell comes next (its stories add to these)
+                cov.status = "queued"
+                db.add(KnowledgeGenerationJob(area_cell=cell, priority=job.priority - DEEP_PRIORITY_DROP, stage="full"))
+            else:
+                cov.status = "partial" if more else "done"
+        db.commit()
+        if fast and job.warm_json:
+            warm_audio(db, cell, job.warm_json, job.started_at)
     except Exception as e:  # noqa: BLE001
         log.exception("generation failed for %s", cell)
         db.rollback()
@@ -151,23 +179,67 @@ def run_job(db, job):
         retry = job.attempts < MAX_ATTEMPTS
         job.status = "queued" if retry else "failed"
         if cov:
-            cov.status = "queued" if retry else "failed"
+            # stories saved before the failure stay and can be told
+            cov.status = "queued" if retry else ("partial" if progress["created"] else "failed")
             cov.generated_at = now()
+            if not retry and progress["created"]:
+                cov.expires_at = now() + timedelta(days=_cfg().COVERAGE_TTL_DAYS)
     db.commit()
+
+
+def warm_audio(db, cell, voices, since):
+    """Voices the shared audio of the first stories just written for the cell, for the traveller waiting there."""
+    try:
+        from .translation import localized_story, spoken_text
+        from .voice import VOICE_PROFILES, get_or_create_asset, synthesize_asset
+    except ImportError:
+        return
+    limit = _cfg().WARM_AUDIO_STORIES
+    if limit <= 0:
+        return
+    items = db.execute(
+        select(KnowledgeItem)
+        .where(KnowledgeItem.area_cell == cell, KnowledgeItem.created_at >= since,
+               KnowledgeItem.review_status != "suspended")
+        .order_by(KnowledgeItem.created_at, KnowledgeItem.id)
+        .limit(limit)
+    ).scalars().all()
+    for item in items:
+        for lang, vid in voices.items():
+            if vid not in VOICE_PROFILES or VOICE_PROFILES[vid]["language"] != lang:
+                continue
+            story = localized_story(item, lang)
+            if story is None:
+                continue  # needs a translation first; made when someone hears it
+            try:
+                asset, prov = get_or_create_asset(
+                    db, text=spoken_text(story, "auto"), language=lang, voice_profile_id=vid, scope="shared",
+                    content_version=item.content_version, knowledge_item_id=item.id, valid_until=item.valid_until,
+                )
+                db.commit()
+                if asset is not None and asset.status in ("pending", "invalidated"):
+                    synthesize_asset(db, asset, prov)
+            except Exception:  # noqa: BLE001
+                log.exception("warming audio failed for %s", item.id)
+                db.rollback()
 
 
 def generate_cell(db, cell):
     return _generate(db, cell)[0]
 
 
-def _generate(db, cell, llm=None, sources=None):
+def _generate(db, cell, llm=None, sources=None, *, stage="full", on_saved=None):
     """Returns (stories created, whether the cell's towns or country still have research themes left).
 
     `llm` replaces get_llm() and `sources` (an object with town_materials and collect_materials) the live source
-    fetches: external_gen runs this same pipeline with answers written by a subscription's agent."""
+    fetches: external_gen runs this same pipeline with answers written by a subscription's agent.
+    `stage` "fast" writes one round from the quick sources only (towns, Wikipedia, OSM, and one web search when
+    those are thin) and leaves the research themes to a later "full" run.
+    `on_saved(n)` is called after each round is stored (the worker commits there, so it can be told at once)."""
     llm = llm or get_llm()
     if llm is None or not hasattr(llm, "generate_items"):
         raise LLMError("llm_disabled")
+    fast = stage == "fast"
     fetch_towns = sources.town_materials if sources else town_materials
     fetch_materials = sources.collect_materials if sources else collect_materials
     center = geo.geohash_center(cell)
@@ -176,9 +248,10 @@ def _generate(db, cell, llm=None, sources=None):
     towns = fetch_towns(center[0], center[1], (s, w, n, e)) if research else []
     country = _country_of(towns)
     materials = fetch_materials(center[0], center[1], (s, w, n, e), country_code=country and country[0])
-    more = False
+    more = fast
     if research:
         materials += towns
+    if research and not fast:
         todo = _themes_todo(db, towns)
         batch = todo[: _cfg().LOCAL_RESEARCH_THEMES_PER_JOB]
         more = len(todo) > len(batch)
@@ -201,15 +274,17 @@ def _generate(db, cell, llm=None, sources=None):
             materials += extra
         except LLMError as err:
             log.warning("web research failed for %s: %s", cell, err)
-    created = _write_stories(db, llm, cell, center, materials, country=country)
-    if research and country:
-        c_created, c_more = _country_customs(db, llm, cell, center, country)
+    created = _write_stories(db, llm, cell, center, materials, country=country, max_rounds=1 if fast else None,
+                             on_saved=on_saved)
+    if research and country and not fast:
+        c_created, c_more = _country_customs(db, llm, cell, center, country, on_saved=on_saved)
         created += c_created
         more = more or c_more
     return created, more
 
 
-def _write_stories(db, llm, cell, center, materials, country=None, country_wide=False):
+def _write_stories(db, llm, cell, center, materials, country=None, country_wide=False, max_rounds=None, on_saved=None,
+                   global_scope=False):
     """Stories from the materials. One call writes a dozen stories at most, so keep asking for stories not told yet
     until the materials run dry (a round adds nothing) or GENERATION_MAX_ROUNDS is reached."""
     if not materials:
@@ -217,11 +292,16 @@ def _write_stories(db, llm, cell, center, materials, country=None, country_wide=
     for i, m in enumerate(materials, 1):
         m["id"] = f"m{i}"
     created = 0
-    for rnd in range(_cfg().GENERATION_MAX_ROUNDS):
-        told = _told_in_country(db, country[0]) if country_wide else _told_near(db, center)
+    for rnd in range(max_rounds or _cfg().GENERATION_MAX_ROUNDS):
+        if global_scope:
+            told = _told_global(db)
+        else:
+            told = _told_in_country(db, country[0]) if country_wide else _told_near(db, center)
         kw = {"already_told": told} if told else {}
         if country_wide:
             kw["country"] = country[1]
+        if global_scope:
+            kw["scope"] = "global"
         try:
             items, meta = llm.generate_items(cell, center, materials, **kw)
         except LLMError:
@@ -232,8 +312,10 @@ def _write_stories(db, llm, cell, center, materials, country=None, country_wide=
         extra = {"country": country[0]} if country_wide else {}
         _usage(db, "generate_knowledge", {**meta, "round": rnd + 1, **extra}, llm)
         added = store_generated(db, cell, center, materials, items, meta, country=country and country[0],
-                                country_wide=country_wide)
+                                country_wide=country_wide, global_scope=global_scope)
         created += added
+        if on_saved is not None:
+            on_saved(added)
         if not added:
             break
     return created
@@ -247,7 +329,7 @@ def _country_of(towns):
     return None
 
 
-def _country_customs(db, llm, cell, center, country):
+def _country_customs(db, llm, cell, center, country, on_saved=None):
     """Manners common to the whole country are researched a few themes at a time, once per country, and told to
     travellers who do not live there (ranking.fetch_candidates). Returns (stories created, themes left)."""
     if not hasattr(llm, "research_country_customs"):
@@ -266,7 +348,8 @@ def _country_customs(db, llm, cell, center, country):
         return 0, True
     _usage(db, "local_history_research", {**meta, "towns": [key]}, llm)
     try:
-        created = _write_stories(db, llm, cell, center, materials, country=country, country_wide=True)
+        created = _write_stories(db, llm, cell, center, materials, country=country, country_wide=True,
+                                 on_saved=on_saved)
     except LLMError as err:
         log.warning("country customs stories failed for %s: %s", country[0], err)
         created = 0
@@ -309,6 +392,47 @@ def _told_in_country(db, country_code, limit=150):
         {"c": country_code, "limit": limit},
     ).all()
     return [{"title": t, "summary": s} for t, s in rows]
+
+
+def _told_global(db, limit=150):
+    """Stories for anywhere in the world already stored, so a round does not retell them."""
+    rows = db.execute(
+        text(
+            """SELECT title, short_ja FROM knowledge_items
+               WHERE metadata_json->>'scope' = 'global'
+               ORDER BY created_at, id LIMIT :limit"""
+        ),
+        {"limit": limit},
+    ).all()
+    return [{"title": t, "summary": s} for t, s in rows]
+
+
+GLOBAL_KEY = "global"
+
+
+def generate_global(db, themes=None, llm=None, echo=print):
+    """Researches a few GLOBAL_RESEARCH_THEMES not used up yet and writes stories that hold anywhere in the world.
+    Commits after each round. Returns (stories created, themes still left)."""
+    llm = llm or get_llm()
+    if llm is None or not hasattr(llm, "research_global"):
+        raise LLMError("llm_disabled")
+    todo = _themes_todo(db, [{"key": GLOBAL_KEY}], GLOBAL_RESEARCH_THEMES)
+    batch = todo[: themes or _cfg().LOCAL_RESEARCH_THEMES_PER_JOB]
+    if not batch:
+        return 0, False
+    state = _research_state(db).get(GLOBAL_KEY, {})
+    kw = {"known": [s["title"] for s in _told_global(db)]} if any(state.get(k) for k in batch) else {}
+    echo(f"researching: {', '.join(batch)}")
+    materials, meta = llm.research_global(batch, **kw)
+    _usage(db, "local_history_research", {**meta, "towns": [GLOBAL_KEY]}, llm)
+    db.commit()
+
+    def saved(n):
+        echo(f"  saved {n} stories")
+        db.commit()
+
+    created = _write_stories(db, llm, GLOBAL_KEY, (0.0, 0.0), materials, on_saved=saved, global_scope=True)
+    return created, len(todo) > len(batch)
 
 
 def _town_key(t):
@@ -447,9 +571,10 @@ def _confidence(source_kinds, publishers):
     return "medium" if len(publishers) >= 2 else "low"
 
 
-def store_generated(db, cell, center, materials, items, meta, country=None, country_wide=False):
+def store_generated(db, cell, center, materials, items, meta, country=None, country_wide=False, global_scope=False):
     """`country` (ISO code) is recorded on every story; `country_wide` stories hold for the whole country and are
-    offered anywhere in it, to travellers who do not live there."""
+    offered anywhere in it, to travellers who do not live there. `global_scope` stories hold anywhere in the world:
+    they have no position and are told while the stories of a new place are being written (waiting.py)."""
     by_id = {m["id"]: m for m in materials}
     created = 0
     for it in items:
@@ -461,7 +586,7 @@ def store_generated(db, cell, center, materials, items, meta, country=None, coun
         if not claims:
             continue  # unattributed items are not stored
         try:
-            lat, lon = float(it["lat"]), float(it["lon"])
+            lat, lon = (0.0, 0.0) if global_scope else (float(it["lat"]), float(it["lon"]))
         except (KeyError, TypeError, ValueError):
             continue
         if geo.haversine_m(lat, lon, center[0], center[1]) > 5000:
@@ -470,10 +595,15 @@ def store_generated(db, cell, center, materials, items, meta, country=None, coun
         if not title:
             continue
         digest = hashlib.sha256(title.encode()).hexdigest()[:12]
-        key = f"gen:country:{country}:{digest}" if country_wide else f"gen:{cell}:{digest}"
+        if global_scope:
+            key = f"gen:global:{digest}"
+        else:
+            key = f"gen:country:{country}:{digest}" if country_wide else f"gen:{cell}:{digest}"
         if db.execute(select(KnowledgeItem.id).where(KnowledgeItem.canonical_key == key)).first():
             continue
-        if country_wide:
+        if global_scope:
+            nearby = [(r["title"], r["summary"]) for r in _told_global(db, limit=2000)]
+        elif country_wide:
             lat, lon = center
             nearby = [(r["title"], r["summary"]) for r in _told_in_country(db, country, limit=1000)]
         else:
@@ -498,17 +628,18 @@ def store_generated(db, cell, center, materials, items, meta, country=None, coun
             category=it.get("category") or "history",
             short_ja=it.get("short_ja"), body_ja=it.get("body_ja"),
             short_en=it.get("short_en"), body_en=it.get("body_en"),
-            position=f"SRID=4326;POINT({lon} {lat})",
-            radius_m=5000 if country_wide else max(50, min(5000, int(it.get("radius_m") or 200))),
+            position=None if global_scope else f"SRID=4326;POINT({lon} {lat})",
+            radius_m=5000 if country_wide or global_scope else max(50, min(5000, int(it.get("radius_m") or 200))),
             valid_until=now() + timedelta(days=TIME_SENSITIVE_DAYS) if it.get("time_sensitive") else None,
             interestingness=0.6, novelty=0.6,
             confidence_level=_confidence({by_id[s]["kind"] for s in used}, publishers),
             fact_type=fact_type,
-            origin="generated", review_status="unreviewed", area_cell=cell,
+            origin="generated", review_status="unreviewed", area_cell=None if global_scope else cell,
             generated_by={"model": meta.get("model"), "prompt_version": meta.get("prompt_version"),
                           "generated_at": now().isoformat()},
             metadata_json={
-                "scope": "country" if country_wide else "area" if int(it.get("radius_m") or 0) >= 800 else "point",
+                "scope": ("global" if global_scope else "country" if country_wide
+                          else "area" if int(it.get("radius_m") or 0) >= 800 else "point"),
                 **({"country": country} if country else {}),
                 **({"audience": "visitors"} if country_wide else {}),
                 "story_quality": {

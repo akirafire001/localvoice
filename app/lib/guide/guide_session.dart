@@ -242,6 +242,17 @@ class GuideSession extends ChangeNotifier {
     );
     gps = GpsState.on;
     notifyListeners();
+    unawaited(_sendLastKnown());
+  }
+
+  /// The phone's last fix, when recent, so the first story is chosen before the GPS has a fresh fix.
+  Future<void> _sendLastKnown() async {
+    try {
+      final p = await Geolocator.getLastKnownPosition();
+      if (p == null || lastPosition != null) return;
+      if (DateTime.now().toUtc().difference(p.timestamp.toUtc()) > const Duration(minutes: 2)) return;
+      await _onPosition(p);
+    } catch (_) {}
   }
 
   Future<void> stopGps() async {
@@ -259,6 +270,8 @@ class GuideSession extends ChangeNotifier {
     lastMotion = m;
     notifyListeners();
     if (!active || store == null) return;
+    // The server could not choose from a coarse fix: send the first good one at once instead of waiting.
+    if (lastDecision == 'low_accuracy' && p.accuracy <= AppConfig.goodAccuracyM && !selecting) throttle.reset();
     if (!throttle.shouldSend(t, p.latitude, p.longitude, m.mode)) return;
     await _sendPosition(p, t, m);
   }

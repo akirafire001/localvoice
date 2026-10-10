@@ -69,13 +69,14 @@ def feedback(history_id):
         h.rating = action
         if action == "knew_it":
             _learn(db, g.user.id, item.category, knowledge_delta=0.1)
-        elif action == "wrong_info":
-            # Stop serving immediately and wait for review (realtime-llm-design §3.4)
+        elif action == "wrong_info" and item.origin != "system":
+            # Stop serving immediately and wait for review (realtime-llm-design §3.4).
+            # The app's own tutorial is never suspended (it says nothing about a place); the rating stays on the guide.
             item.review_status = "suspended"
             meta = dict(item.metadata_json or {})
             meta.setdefault("wrong_info_reports", []).append({"history_id": str(h.id), "at": t.isoformat()})
             item.metadata_json = meta
-        if action in LEARN:
+        if action in LEARN and item.origin != "system":  # a rating of the tutorial says nothing about interests
             _learn(db, g.user.id, item.category, LEARN[action])
     else:
         h.feedback_type = action

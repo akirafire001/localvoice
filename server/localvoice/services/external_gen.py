@@ -53,6 +53,8 @@ class NeedAnswer(Exception):
 class ExternalLLM(ClaudeLLM):
     """ClaudeLLM's prompts and parsing, with the two model calls answered from the task's stored answers."""
 
+    parallel_research = False  # the replay matches stored answers to calls in order
+
     def __init__(self, cfg, task):
         self.cfg = cfg
         self.provider = f"external:{task.agent}"

@@ -346,6 +346,10 @@ class KnowledgeGenerationJob(Base):
     area_cell: Mapped[str] = mapped_column(String(12))
     priority: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(16), default="queued")
+    # "fast": a first round of stories from quick sources, saved at once; "full": the deep research (knowledge_gen)
+    stage: Mapped[str] = mapped_column(String(8), default="full")
+    # language -> voice_profile_id of a traveller waiting here; a fast job voices its first stories in these
+    warm_json: Mapped[dict | None] = mapped_column(JSONB)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)

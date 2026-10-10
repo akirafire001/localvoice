@@ -35,14 +35,28 @@ def from_device_language(tag):
     return ui, narration
 
 
+def region_of(tag):
+    """The OS region (ISO 3166 code, lower case) from a language tag such as ja-JP or zh-Hant-TW, or None."""
+    for part in tag.strip().replace("_", "-").split("-")[1:]:
+        if len(part) == 2 and part.isalpha():
+            return part.lower()
+    return None
+
+
 def apply_device_language(user, data):
-    """Initial languages for a new account. Ignored when the client sent no OS language."""
+    """Initial languages and country of residence for a new account, from the OS settings. Ignored when the client
+    sent no OS language. The country comes from `device_region`, else the region of the language tag."""
     tag = data.get("device_language") if isinstance(data, dict) else None
     if not isinstance(tag, str) or not tag.strip():
         return
     ui, narration = from_device_language(tag)
     user.locale = ui
     user.voice_settings_json = {**(user.voice_settings_json or {}), "narration_languages": [narration]}
+    region = data.get("device_region")
+    region = region.strip().lower() if isinstance(region, str) and len(region.strip()) == 2 and region.strip().isalpha() \
+        else region_of(tag)
+    if region:
+        user.home_country = region
 
 
 def default_narration_languages(user):

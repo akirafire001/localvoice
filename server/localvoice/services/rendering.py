@@ -94,6 +94,9 @@ def guide_payload(history, item, location, *, voice_for, selection_mode):
         },
         "location": location,
         "origin": item.origin,
+        # told while the stories here were not ready yet: "tutorial", "nearby" (from a little further away) or
+        # "global" (holds anywhere); null for the usual stories of this place
+        "waiting": (history.score_components or {}).get("waiting"),
         "selection_mode": selection_mode,
         "shown_at": history.shown_at.isoformat(),
         "rating": history.rating,
