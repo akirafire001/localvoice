@@ -237,7 +237,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                   width: 132,
                   child: Row(
                     children: [
-                      LvIcon(categoryIcon(i['category'] as String?), size: 24),
+                      LvIcon(categoryIcon(i['category'] as String?), size: 28),
                       const SizedBox(width: 8),
                       Expanded(child: Text(categoryLabel(i['category'] as String?))),
                     ],

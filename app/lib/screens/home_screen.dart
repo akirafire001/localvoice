@@ -93,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (s.active)
             Card(
               child: ListTile(
-                leading: const LvIcon(LvIconKind.guide, size: 32),
+                leading: const LvIcon(LvIconKind.guide, size: 40),
                 title: Text(tr('ガイド中の旅行があります', 'A trip is in progress')),
                 subtitle: Text(labelOf(purposeLabels, s.trip?['purpose'] as String?)),
                 trailing: const LvIcon(LvIconKind.forward),
@@ -101,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           else ...[
-            const LvIllustration(LvArtwork.homeDiscovery, height: 145),
+            const LvIllustration(LvArtwork.homeDiscovery, height: 180),
             const SizedBox(height: 16),
             Text(tr('目的', 'Purpose'), style: Theme.of(context).textTheme.titleSmall),
             Wrap(
@@ -109,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 for (final k in purposeLabels.keys)
                   ChoiceChip(
-                    avatar: LvIcon(purposeIcon(k), size: 20),
+                    avatar: LvIcon(purposeIcon(k), size: 24),
                     showCheckmark: false,
                     label: Text(labelOf(purposeLabels, k)),
                     selected: _purpose == k,
@@ -124,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 for (final k in transportLabels.keys)
                   ChoiceChip(
-                    avatar: LvIcon(transportIcon(k), size: 20),
+                    avatar: LvIcon(transportIcon(k), size: 24),
                     showCheckmark: false,
                     label: Text(labelOf(transportLabels, k)),
                     selected: _transport == k,
@@ -146,12 +146,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           const Divider(height: 40),
           ListTile(
-            leading: const LvIcon(LvIconKind.history, size: 28),
+            leading: const LvIcon(LvIconKind.history, size: 32),
             title: Text(tr('これまでの旅行', 'Past trips')),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TripListScreen())),
           ),
           ListTile(
-            leading: const LvIcon(LvIconKind.map, size: 28),
+            leading: const LvIcon(LvIconKind.map, size: 32),
             title: Text(tr('地図で振り返る', 'Review on the map')),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen())),
           ),

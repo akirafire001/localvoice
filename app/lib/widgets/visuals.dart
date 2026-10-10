@@ -132,7 +132,7 @@ LvIconKind ratingIcon(String rating) => switch (rating) {
 };
 
 class LvIcon extends StatelessWidget {
-  const LvIcon(this.kind, {super.key, this.size = 24, this.color});
+  const LvIcon(this.kind, {super.key, this.size = 28, this.color});
   final LvIconKind kind;
   final double size;
   final Color? color;
@@ -158,7 +158,7 @@ class LvIcon extends StatelessWidget {
 }
 
 class LvIllustration extends StatelessWidget {
-  const LvIllustration(this.artwork, {super.key, this.height = 150});
+  const LvIllustration(this.artwork, {super.key, this.height = 190});
   final LvArtwork artwork;
   final double height;
 
@@ -184,8 +184,8 @@ class LvBrandTitle extends StatelessWidget {
         borderRadius: BorderRadius.circular(large ? 14 : 10),
         child: Image.asset(
           'assets/branding/app-icon.png',
-          width: large ? 52 : 34,
-          height: large ? 52 : 34,
+          width: large ? 60 : 38,
+          height: large ? 60 : 38,
           excludeFromSemantics: true,
         ),
       ),
@@ -239,7 +239,7 @@ class LvSectionTitle extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 10, top: 6),
     child: Row(
       children: [
-        LvIcon(icon, size: 26),
+        LvIcon(icon, size: 30),
         const SizedBox(width: 10),
         Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
       ],
@@ -257,7 +257,7 @@ class LvEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final preferred = compact ? 100.0 : 150.0;
+      final preferred = compact ? 125.0 : 190.0;
       final height = constraints.hasBoundedHeight ? (constraints.maxHeight * 0.4).clamp(48.0, preferred) : preferred;
       return Center(
         child: SingleChildScrollView(

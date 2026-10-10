@@ -234,7 +234,7 @@ class _StatusBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          LvIcon(icon, size: 20),
+          LvIcon(icon, size: 24),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
         ],
@@ -274,7 +274,7 @@ class GuideStoryCard extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Chip(
-              avatar: LvIcon(categoryIcon(g['category'] as String?), size: 20),
+              avatar: LvIcon(categoryIcon(g['category'] as String?), size: 24),
               label: Text(categoryLabel(g['category'] as String?)),
               visualDensity: VisualDensity.compact,
             ),
@@ -314,7 +314,7 @@ class GuideStoryCard extends StatelessWidget {
                 child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
               ),
             TextButton.icon(
-              icon: const LvIcon(LvIconKind.detail, size: 20),
+              icon: const LvIcon(LvIconKind.detail, size: 24),
               onPressed: () async {
                 await guarded(context, () => session.feedback(g, 'more_detail'));
                 g['_showDetail'] = true;
@@ -322,7 +322,7 @@ class GuideStoryCard extends StatelessWidget {
               label: Text(tr('詳しく', 'More')),
             ),
             TextButton.icon(
-              icon: const LvIcon(LvIconKind.next, size: 20),
+              icon: const LvIcon(LvIconKind.next, size: 24),
               onPressed: () async {
                 final r = await guarded(context, () => session.feedback(g, 'skip_story'));
                 // No untold story nearby: the server queues the surrounding area for generation
@@ -341,12 +341,12 @@ class GuideStoryCard extends StatelessWidget {
           spacing: 8,
           children: [
             ActionChip(
-              avatar: const LvIcon(LvIconKind.related, size: 20),
+              avatar: const LvIcon(LvIconKind.related, size: 24),
               label: Text(tr('関連する話を', 'More like this')),
               onPressed: () => _act(context, 'more_related', tr('関連する話を増やします', 'More related stories')),
             ),
             ActionChip(
-              avatar: const LvIcon(LvIconKind.enough, size: 20),
+              avatar: const LvIcon(LvIconKind.enough, size: 24),
               label: Text(tr('この話題はもう十分', 'Enough of this topic')),
               onPressed: () => _act(context, 'enough_topic', tr('しばらくこの話題を控えます', 'This topic will pause for a while')),
             ),
@@ -365,7 +365,7 @@ class GuideStoryCard extends StatelessWidget {
               ['wrong_info', '情報が違う', 'Wrong info'],
             ])
               ChoiceChip(
-                avatar: LvIcon(ratingIcon(r[0]), size: 20),
+                avatar: LvIcon(ratingIcon(r[0]), size: 24),
                 showCheckmark: false,
                 label: Text(tr(r[1], r[2])),
                 selected: rating == r[0],
@@ -406,7 +406,7 @@ class _Sources extends StatelessWidget {
     if (src.isEmpty && conf == null) return const SizedBox.shrink();
     return ExpansionTile(
       tilePadding: EdgeInsets.zero,
-      leading: const LvIcon(LvIconKind.sources, size: 22),
+      leading: const LvIcon(LvIconKind.sources, size: 26),
       title: Text(tr('出典・信頼度', 'Sources & confidence'), style: Theme.of(context).textTheme.bodySmall),
       children: [
         if (conf != null)
@@ -559,7 +559,7 @@ class _CompanionsState extends State<_Companions> {
             children: [
               for (final c in categoryLabels.keys)
                 FilterChip(
-                  avatar: LvIcon(categoryIcon(c), size: 20),
+                  avatar: LvIcon(categoryIcon(c), size: 24),
                   showCheckmark: false,
                   label: Text(categoryLabel(c)),
                   selected: _interests.contains(c),

@@ -52,8 +52,8 @@ class _TripListScreenState extends State<TripListScreen> {
                 children: [
                   for (final t in trips)
                     ListTile(
-                      leading: LvIcon(purposeIcon(t['purpose'] as String?), size: 30),
-                      trailing: LvIcon(t['ended_at'] == null ? LvIconKind.guide : LvIconKind.check, size: 20),
+                      leading: LvIcon(purposeIcon(t['purpose'] as String?), size: 36),
+                      trailing: LvIcon(t['ended_at'] == null ? LvIconKind.guide : LvIconKind.check, size: 24),
                       title: Text(
                         '${labelOf(purposeLabels, t['purpose'] as String?)}  ${fmtTime(t['started_at'] as String?)}',
                       ),
@@ -159,7 +159,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 for (final g in items)
                   Card(
                     child: ExpansionTile(
-                      leading: LvIcon(categoryIcon(g['category'] as String?), size: 28),
+                      leading: LvIcon(categoryIcon(g['category'] as String?), size: 32),
                       title: Text(g['title'] as String? ?? ''),
                       subtitle: Wrap(
                         spacing: 6,
@@ -187,7 +187,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                               ['wrong_info', '情報が違う', 'Wrong info'],
                             ])
                               ChoiceChip(
-                                avatar: LvIcon(ratingIcon(r[0]), size: 20),
+                                avatar: LvIcon(ratingIcon(r[0]), size: 24),
                                 showCheckmark: false,
                                 label: Text(tr(r[1], r[2])),
                                 selected: g['rating'] == r[0],

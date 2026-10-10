@@ -26,6 +26,8 @@ ThemeData localVoiceTheme() {
       fillColor: Colors.white,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     ),
+    // Room for the 24px S1 icons used as chip avatars.
+    chipTheme: const ChipThemeData(avatarBoxConstraints: BoxConstraints.tightFor(width: 24, height: 24)),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(48, 48),
