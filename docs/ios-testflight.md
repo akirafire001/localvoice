@@ -25,7 +25,11 @@ SpotMemoと同じCodemagicのPersonal Accountと、既存のApple Developer連�
 - 初回ビルドは `codex/localvoice-ios-testflight` ブランチで起動。外部テストを希望するため、TestFlightのベータ説明・連絡先・専用審査アカウント情報を保存済み。
 - 本番APIで審査専用アカウントのログインを確認済み。秘密情報は無視対象の `docs/store/ios/` に保存し、Gitには含めない。
 - Appleログイン用のLocalVoice専用鍵を発行し、本番環境変数を設定済み。APIとworkerの再起動後、`/api/v1/auth/apple/start` は503から201となり、審査専用アカウントのログインも200を確認。Appleの認可画面から戻る実機の一連の動作は未確認。
-- Codemagicの初回ビルドはMac割り当て待ち。本人の希望により、予約 `localvoice-iphone`（このチャット、5分ごと）でビルドの確認、必要な修復、外部TestFlight審査と参加リンクの準備を続ける。待機状態が変わらない間は通知しない。
+- PR [#44](https://github.com/akirafire001/localvoice/pull/44) は09:16 JSTにmainへマージ済み。元ブランチが削除されたため、09:25 JSTに開始した初回ビルドはソース取得で `Remote branch codex/localvoice-ios-testflight not found` となり停止した。アプリの解析・テスト・ネイティブビルドはまだ実行されていない。
+- 09:28 JSTにmainのコミット `bd81391` から[ビルド #2](https://codemagic.io/app/6acabdc634b7f3fd846ddadd/build/6acad819546ce6236ced60af)を起動し、queuedを確認。署名・ビルド設定の変更は不要だった。
+- ビルド #2は10:50 JSTに開始。10:52 JSTの確認でソース取得が成功し、SDKの準備中（building）となった。IPA生成・署名・アップロードはまだ未確認。
+- 本人の希望により、予約 `localvoice-iphone`（このチャット、5分ごと）で最新ビルドの確認、必要な修復、外部TestFlight審査と参加リンクの準備を続ける。予約の監視対象もビルド #2へ更新済み。待機状態が変わらない間は通知しない。
+- 以降の修正と記録は専用worktreeの `codex/localvoice-ios-testflight-followup` で進め、作業中のmainを切り替えない。監視対象はこの文書に記載した最新ビルドを優先する。
 - 外部テストに必要な内部グループ `LocalVoice Internal` は作成済み。IPA生成・アップロード確認・外部審査への提出・参加リンクの有効化は、ビルド開始後の残作業。
 
 ## 初回登録
