@@ -1,0 +1,65 @@
+workflows:
+  production-ios-testflight:
+    name: LocalVoice iPhone / TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      ios_signing:
+        provisioning_profiles:
+          - localvoice_app_store
+        certificates:
+          - SpotMemo Distribution
+      flutter: 3.47.6
+      xcode: latest
+      cocoapods: default
+      vars:
+        API_BASE_URL: https://localvoice.ideaworks.tech
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/app"
+          flutter pub get --enforce-lockfile
+      - name: Analyze
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/app"
+          flutter analyze
+      - name: Test
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/app"
+          flutter test
+      - name: Configure native iOS dependencies
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/app"
+          # Flutter sets up SwiftPM and CocoaPods fallback for unsupported plugins.
+          flutter build ios --release --config-only --no-codesign \
+            --dart-define="API_BASE_URL=$API_BASE_URL"
+      - name: Set up iOS signing
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/app"
+          xcode-project use-profiles
+      - name: Build production iOS IPA
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/app"
+          # The project counter increases on every attempt, including failed builds.
+          flutter build ipa --release \
+            --build-number="$PROJECT_BUILD_NUMBER" \
+            --dart-define="API_BASE_URL=$API_BASE_URL" \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - app/build/ios/ipa/*.ipa
+      - app/build/ios/archive/*.xcarchive/dSYMs/*.dSYM
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Upload for TestFlight; beta groups and external review are configured in ASC.
+        submit_to_testflight: false
+        submit_to_app_store: false

@@ -31,6 +31,10 @@ The previous Android OAuth client covers only `com.localvoice.localvoice` with t
 
 Google Sign-In is configured for Google Cloud project `localvoice-510815` (web, Android and iOS clients; iOS `GIDClientID` and URL scheme are in `ios/Runner/Info.plist`). The OAuth app is in Testing mode. Basic Sign in with Google authentication using only name, email and profile is exempt from the OAuth test-user-list requirement; requesting additional scopes would change that ([Google's audience documentation](https://support.google.com/cloud/answer/15549945)). External setup still needed: Sign in with Apple capability (iOS) and a Services ID + return URL (Android, see server `APPLE_*`).
 
+## iPhone / TestFlight
+
+The iOS bundle identifier is `tech.ideaworks.localvoice`, matching the existing Google iOS OAuth client. The app targets iPhone and iOS 15 or later. The repository-root `codemagic.yaml` builds and uploads the signed app using the existing Codemagic Apple integration. See [iOS / TestFlight setup and device checks](../docs/ios-testflight.md) for signing, Apple login configuration, and tester distribution.
+
 ## S1 visual assets
 
 The home banner uses 22 offline pencil-and-wash WebP images under `assets/s1/home_banners/`: the two selected existing sketches and 20 landmarks from different countries. Original PNGs are preserved with the artwork documentation. One banner is chosen once per app launch and kept through navigation and language changes. See the [gallery, prompts, and behavior](../docs/ui/asset-production/home-banners/README.md).
