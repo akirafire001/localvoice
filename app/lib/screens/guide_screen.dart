@@ -470,6 +470,7 @@ class GuideStoryCard extends StatelessWidget {
               visualDensity: VisualDensity.compact,
             ),
             if (g['origin'] == 'generated') const GeneratedBadge(),
+            if (WaitingBadge.label(g['waiting'] as String?) != null) WaitingBadge(g['waiting'] as String),
             if (loc?['relative_direction'] != null)
               Text(_dir(loc!['relative_direction'] as String), style: theme.textTheme.bodySmall),
           ],

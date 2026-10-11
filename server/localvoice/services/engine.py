@@ -259,7 +259,7 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
         settings["detail_mode"] = detail_override
 
     if snap.accuracy_m is not None and float(snap.accuracy_m) > cfg.MAX_ACCURACY_M:
-        return _silent(db, trip, snap, "low_accuracy", mode, 30, trigger=trigger, record=record)
+        return _silent(db, trip, snap, "low_accuracy", mode, cfg.LOW_ACCURACY_RECHECK_SEC, trigger=trigger, record=record)
 
     quiet = quiet_state(db, trip, t)
     if quiet is not None and not manual:
@@ -325,16 +325,24 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     top = (unheard or eligible)[: cfg.LLM_CANDIDATES]
     # country-wide manners say nothing about this place: they do not count as stories left here
     n_unheard = sum(1 for c in ranked if not c.heard_before and (c.item.metadata_json or {}).get("scope") != "country")
-    _maybe_enqueue_generation(db, lat, lon, course if confident else None, tclass, n_unheard)
+    narr_langs = narration_languages(user)
+    _maybe_enqueue_generation(db, lat, lon, course if confident else None, tclass, n_unheard,
+                              warm={lang: default_voice(user, lang) for lang in narr_langs})
     if not top:
         reason = "no_candidates" if not ranked else "below_threshold"
         searching = _generation_running(db, lat, lon, course if confident else None, tclass)
+        # The tutorial, a story from a little further away, or one for anywhere fills the wait. Chosen live only
+        # (never queued ahead by next_story), so the stories of this place take over as soon as they are ready.
+        waiting = None if not record else _waiting_guide(db, trip, user, snap, lat, lon, settings, narr_langs, searching=searching,
+                                 exclude=set(exclude_ids) | {h.knowledge_item_id for h in history},
+                                 trigger=trigger, record=record, seed=seed_for(snap.client_event_id) + seed_extra)
+        if waiting is not None:
+            return waiting
         # while new stories are being written here, look again sooner so the guide resumes once they are ready
-        return _silent(db, trip, snap, reason, mode, 30 if searching else 60, candidates=ranked[:10], trigger=trigger,
-                       record=record, info={"searching": searching})
+        return _silent(db, trip, snap, reason, mode, cfg.SEARCHING_RECHECK_SEC if searching else 60,
+                       candidates=ranked[:10], trigger=trigger, record=record, info={"searching": searching})
 
     rule_choice = top[0]
-    narr_langs = narration_languages(user)
     sel_input = SelectionInput(
         candidates=top,
         language=trip.language,
@@ -451,6 +459,74 @@ def evaluate(db, trip, user, snap, *, trigger="context", exclude_ids=(), record=
     if not record:
         return {"guide": None, "draft": draft, "decision": {"reason": "selected", "fallback": fallback, "next_check_after_sec": 60}}
     return materialize(db, trip, user, snap, draft)
+
+
+def _waiting_guide(db, trip, user, snap, lat, lon, settings, narr_langs, *, searching, exclude, trigger, record, seed):
+    """A story to tell while nothing is ready here (waiting.py), as a guide (or a draft when not recording)."""
+    from . import waiting  # local import to avoid cycles
+
+    found = waiting.waiting_story(
+        db, user, trip, lat, lon, trip.language, searching=searching, filler_radius_m=_cfg().FILLER_RADIUS_M,
+        exclude_ids=exclude, seed=seed, tutorial=_cfg().TUTORIAL_ENABLED,
+    )
+    if found is None:
+        return None
+    item, kind, distance = found
+    if kind == "nearby":
+        intros = {lang: waiting.filler_intro(distance, lang) for lang in narr_langs}
+    elif kind == "global":
+        intros = {lang: waiting.global_intro(lang) for lang in narr_langs}
+    else:
+        intros = {}
+    intros = {k: v for k, v in intros.items() if v}
+    title, text, body = item_texts(item, trip.language, settings["detail_mode"])
+    speech_text = item_speech_text(item, trip.language, text)
+    intro = intros.get(trip.language, "")
+    location = None
+    if kind == "nearby":
+        ilat, ilon = point_of(item.position)
+        location = {"lat": ilat, "lon": ilon, "radius_m": item.radius_m,
+                    "kind": "area" if (item.metadata_json or {}).get("scope") == "area" or item.radius_m >= 800 else "point",
+                    "distance_m": round(distance), "relative_direction": None}
+    draft = {
+        "knowledge_item_id": str(item.id),
+        "rule_choice_id": str(item.id),
+        "llm_choice_id": None,
+        "title": title,
+        "text": text,
+        "detail_text": body,
+        "language": trip.language,
+        "score": 0.0,
+        "score_components": {"category": item.category, "waiting": kind,
+                             "story_type": _storytelling(item).get("story_type")},
+        "selection_mode": "rule",
+        "speech": {
+            "text": f"{intro} {speech_text}" if intro else speech_text,
+            "intro": intro or None,
+            "body": speech_text,
+            "language": trip.language,
+            "content_version": item.content_version,
+            "personalized": bool(intro),
+            "narrations": _narrations(item, narr_langs, intros, settings["detail_mode"]),
+            "techniques": _item_techniques(item),
+        },
+        "location": location,
+        "detail_mode": settings["detail_mode"],
+        "candidates": [],
+        "llm_reason": None,
+        "fallback": False,
+        "fallback_reason": None,
+        "llm_meta": {},
+        "input_json": {"lat": round(lat, 5), "lon": round(lon, 5), "waiting": kind, "searching": searching},
+        "trigger": trigger,
+    }
+    if not record:
+        return {"guide": None, "draft": draft, "decision": {"reason": "selected", "fallback": False, "next_check_after_sec": 60}}
+    result = materialize(db, trip, user, snap, draft)
+    if result is not None:
+        result["decision"]["waiting"] = kind
+        result["decision"]["searching"] = searching
+    return result
 
 
 def _take_prepared(db, trip, user, snap):
@@ -576,16 +652,17 @@ def _generation_running(db, lat, lon, course, tclass):
     return generation_running(db, lat, lon, course, tclass)
 
 
-def _maybe_enqueue_generation(db, lat, lon, course, tclass, n_left):
+def _maybe_enqueue_generation(db, lat, lon, course, tclass, n_left, warm=None):
     """n_left: stories still untold here. When few are left (typically while staying in one place),
-    the cells around the current one are queued too, so "next story" has something new to offer."""
+    the cells around the current one are queued too, so "next story" has something new to offer.
+    warm: the traveller's voices, so the first stories written for a new place are voiced at once."""
     cfg = _cfg()
     if not cfg.KNOWLEDGE_GENERATION_ENABLED:
         return
     try:
         from .knowledge_gen import enqueue_for_position
 
-        enqueue_for_position(db, lat, lon, course, tclass, nearby=n_left < cfg.NEARBY_GENERATION_MIN_STORIES)
+        enqueue_for_position(db, lat, lon, course, tclass, nearby=n_left < cfg.NEARBY_GENERATION_MIN_STORIES, warm=warm)
     except ImportError:
         pass
 

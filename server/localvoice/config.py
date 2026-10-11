@@ -161,6 +161,23 @@ class Config:
         # than RESEARCH_MIN_NEW_FACTS facts or it has been researched RESEARCH_MAX_PASSES times for a town.
         self.RESEARCH_MIN_NEW_FACTS = _int("RESEARCH_MIN_NEW_FACTS", 2)
         self.RESEARCH_MAX_PASSES = _int("RESEARCH_MAX_PASSES", 4)
+        # Research themes of one job are searched at the same time, this many at once
+        self.RESEARCH_PARALLEL = _int("RESEARCH_PARALLEL", 4)
+        # Worker threads that run only "fast" jobs (a first round for a place nobody has stories for yet), so a
+        # traveller there never waits behind a long deep-research job
+        self.GENERATION_FAST_THREADS = _int("GENERATION_FAST_THREADS", 1)
+        # Shared story audio voiced by a fast job for the traveller waiting there, so the first story plays at once
+        self.WARM_AUDIO_STORIES = _int("WARM_AUDIO_STORIES", 4)
+
+        # Waiting (time to first story)
+        # While new stories are being written here, the app asks again this often
+        self.SEARCHING_RECHECK_SEC = _int("SEARCHING_RECHECK_SEC", 10)
+        # A fix too coarse to choose a story is followed by another this soon (the app also sends a better fix at once)
+        self.LOW_ACCURACY_RECHECK_SEC = _int("LOW_ACCURACY_RECHECK_SEC", 5)
+        # While waiting, stories this far away (told as such) fill the gap before the stories here are ready
+        self.FILLER_RADIUS_M = _int("FILLER_RADIUS_M", 5000)
+        # The app tutorial (waiting.TUTORIAL) is told on a user's first trip while nothing is ready
+        self.TUTORIAL_ENABLED = _bool("TUTORIAL_ENABLED", True)
 
         # Stories written by the owner's AI subscriptions (services/external_gen.py, tools/subgen). Off without a token.
         self.EXTERNAL_GEN_TOKEN = os.environ.get("EXTERNAL_GEN_TOKEN", "")

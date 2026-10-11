@@ -132,10 +132,7 @@ def guide_speech(history_id):
     if lang == h.language:
         h.audio_asset_id = asset.id
     db.commit()
-    if asset.status in ("pending", "invalidated"):
-        asset = voice.synthesize_asset(db, asset, provider)
-    if intro_asset is not None and intro_asset.status in ("pending", "invalidated"):
-        intro_asset = voice.synthesize_asset(db, intro_asset, provider)
+    asset, intro_asset = _synthesize_both(db, asset, intro_asset, provider)
     body, status = _asset_body(asset)
     if status == 200:
         if intro_asset is not None and intro_asset.status not in ("ready", "failed"):
@@ -143,6 +140,41 @@ def guide_speech(history_id):
         # a failed intro is dropped rather than holding the story back
         body["intro"] = _asset_body(intro_asset)[0] if intro_asset is not None and intro_asset.status == "ready" else None
     return jsonify(body), status
+
+
+def _synthesize_both(db, asset, intro_asset, provider):
+    """Voices the story and its intro at the same time (the intro on its own session), so the first play waits
+    for the longer of the two instead of both."""
+    pending = ("pending", "invalidated")
+    if intro_asset is None or intro_asset.status not in pending:
+        if asset.status in pending:
+            asset = voice.synthesize_asset(db, asset, provider)
+        return asset, intro_asset
+    if asset.status not in pending:
+        return asset, voice.synthesize_asset(db, intro_asset, provider)
+    import threading
+
+    from flask import current_app
+
+    app = current_app._get_current_object()
+    intro_id = intro_asset.id
+
+    def run_intro():
+        with app.app_context():
+            other = app.extensions["lv_sessionmaker"]()
+            try:
+                a = other.get(AudioAsset, intro_id)
+                if a is not None and a.status in pending:
+                    voice.synthesize_asset(other, a, provider)
+            finally:
+                other.close()
+
+    th = threading.Thread(target=run_intro, name="intro-tts", daemon=True)
+    th.start()
+    asset = voice.synthesize_asset(db, asset, provider)
+    th.join(timeout=20)
+    db.refresh(intro_asset)
+    return asset, intro_asset
 
 
 @bp.get("/speech-assets/<asset_id>")

@@ -73,6 +73,21 @@ def create_app(config=None):
         with session_scope(app) as db:
             rewrite_all(db, llm, cell=cell, limit=limit, force=force, dry_run=dry_run, echo=click.echo)
 
+    @app.cli.command("generate-global-stories")
+    @click.option("--themes", type=int, default=None, help="Research at most this many themes (default: per-job count).")
+    def generate_global_cmd(themes):
+        """Write stories that hold anywhere in the world (told while a new place's stories are being written)."""
+        from .db import session_scope
+        from .services.knowledge_gen import generate_global
+        from .services.llm import LLMError
+
+        with session_scope(app) as db:
+            try:
+                created, more = generate_global(db, themes=themes, echo=click.echo)
+            except LLMError as e:
+                raise click.ClickException(f"generation failed: {e}")
+        click.echo(f"global stories: {created} created" + ("; themes left, run again for more" if more else ""))
+
     from .worker import register as register_worker
 
     register_worker(app)

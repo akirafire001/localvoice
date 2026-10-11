@@ -25,6 +25,8 @@ class AppConfig {
   /// Context sending (mvp-technical-design §3: never send raw GPS every second)
   static const sendMinDistanceM = 30.0;
   static const sendMaxInterval = Duration(seconds: 60);
+  /// A fix at least this accurate can be used to choose a story (server MAX_ACCURACY_M)
+  static const goodAccuracyM = 100.0;
 
   /// Audio generation wait limit before falling back (voice-design §7)
   static const speechWaitLimit = Duration(seconds: 5);

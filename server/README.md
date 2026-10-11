@@ -14,6 +14,7 @@ flask --app localvoice seed        # draft curated stories (宮島・広島・�
 flask --app localvoice run --host 0.0.0.0 --port 8000
 flask --app localvoice worker      # separate process: knowledge generation, audio, revocation retries, cleanup
 flask --app localvoice rewrite-stories [--cell xn764e] [--limit 5] [--dry-run] [--force]  # give stored stories a spoken version (services/storytelling.py)
+flask --app localvoice generate-global-stories [--themes 4]  # stories that hold anywhere in the world (llm.GLOBAL_RESEARCH_THEMES); run again for more
 ```
 
 ## Landing page
@@ -106,6 +107,21 @@ from `app/assets/s1/`. Copies are included under the Flask static directory so d
 | `MAIL_BACKEND` | `log` (stores mails in `outbox_mails`) or `smtp` (+`SMTP_*`) |
 | `LOCAL_RESEARCH_THEMES_PER_JOB`, `COUNTRY_RESEARCH_THEMES_PER_JOB` | Research themes (`llm.LOCAL_RESEARCH_THEMES`, 42) searched per generation job for the cell's towns (default 4), and country-wide manners (`llm.COUNTRY_RESEARCH_THEMES`, researched once per country, told only to users from other countries) per job (default 2) |
 | `SOURCE_FETCH_ENABLED` | Fetch Wikipedia/Wikidata/OSM materials for generation (default on) |
+| `RESEARCH_PARALLEL` | Research themes of one job searched at the same time (default 4) |
+| `GENERATION_FAST_THREADS` | Worker threads that run only "fast" jobs: the first round for a place with no stories, saved at once, before its deep research (default 1) |
+| `WARM_AUDIO_STORIES` | Stories of a fast round voiced right away for the traveller waiting there (default 4) |
+| `SEARCHING_RECHECK_SEC`, `LOW_ACCURACY_RECHECK_SEC` | How soon the app asks again while stories are being written here (default 10) and after a fix too coarse to use (default 5) |
+| `FILLER_RADIUS_M` | While waiting, unheard stories up to this far away are told, introduced as from elsewhere (default 5000) |
+| `TUTORIAL_ENABLED` | Tell the app tutorial (`services/waiting.py`) on a user's first trip while nothing is ready (default on) |
+
+## Time to the first story (services/waiting.py, knowledge_gen.run_job)
+
+- A cell with no stories gets a **fast** job first: towns, Wikipedia/OSM (and one web search when those are thin), one round of
+  stories, saved at once, then voiced for the waiting traveller. Its **full** job (research themes in parallel, more rounds,
+  country-wide manners) follows lower in the queue and saves each round as it is written.
+- While nothing is ready, the guide tells the tutorial (first trip only), then — while stories are being written here — the
+  nearest unheard story within `FILLER_RADIUS_M`, then a story for anywhere (`generate-global-stories`).
+- On an existing database run `flask --app localvoice init-db` once (adds `knowledge_generation_jobs.stage` and `warm_json`).
 
 ## Tests
 
@@ -124,6 +140,7 @@ Tests use a real PostGIS database and fake Google/Apple/LLM/TTS providers; no ex
 - `localvoice/services/ranking.py` — PostGIS candidates and scoring
 - `localvoice/services/llm.py` — Claude adapter and output validation
 - `localvoice/services/knowledge_gen.py`, `sources.py` — runtime knowledge generation
+- `localvoice/services/waiting.py` — tutorial and stories that fill the wait in a new place
 - `localvoice/services/voice.py` — VoiceProvider and audio cache
 - `localvoice/services/commands.py` — natural-language temporary instructions and temporary states
 - `localvoice/worker.py` — background loop
